@@ -216,8 +216,17 @@ void cpu_idle(void)
 		idle_notifier_call_chain(IDLE_START);
 		while (!need_resched()) {
 #ifdef CONFIG_HOTPLUG_CPU
-			if (cpu_is_offline(smp_processor_id()))
+			if (cpu_is_offline(smp_processor_id())) {
+
+				/* NOTE : preempt_count() should be 0 for dying CPU
+				*        as the CPU will use this very thread when
+				*        it is alive
+				*/
+				if (preempt_count())
+					preempt_enable_no_resched();
+
 				cpu_die();
+			}
 #endif
 
 			local_irq_disable();
