@@ -53,6 +53,8 @@ static void mpage_end_io(struct bio *bio, int err)
 			prefetchw(&bvec->bv_page->flags);
 		if (bio_data_dir(bio) == READ) {
 			if (uptodate) {
+				/* FIXME: fix to solve cache coherence issues. */
+				flush_dcache_page(page);
 				SetPageUptodate(page);
 			} else {
 				ClearPageUptodate(page);
