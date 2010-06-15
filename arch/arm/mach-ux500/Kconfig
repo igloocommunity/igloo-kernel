@@ -69,5 +69,19 @@ config U5500_MBOX
 	help
 	  Add support for U5500 mailbox communication with modem side
 
+config TEE_UX500
+	bool "Trusted Execution Environment (TEE) ux500 hardware support"
+	depends on (TEE_SUPPORT && MACH_U8500_MOP)
+	default y
+	help
+	  Adds TEE hardware support for ux500 platforms.
+
+config TEE_SVP
+	bool "Trusted Execution Environment (TEE) ux500 SVP support"
+	depends on (TEE_SUPPORT && (MACH_U8500_SIMULATOR || MACH_U5500_SIMULATOR))
+	default y
+	help
+	  Adds TEE support for SVP in ux500 platforms.
+
 source "arch/arm/mach-ux500/pm/Kconfig"
 endif
