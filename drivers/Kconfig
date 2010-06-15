@@ -118,5 +118,8 @@ source "drivers/platform/Kconfig"
 
 source "drivers/clk/Kconfig"
 
+source "drivers/tee/Kconfig"
+
 source "drivers/hwspinlock/Kconfig"
 endmenu
+
