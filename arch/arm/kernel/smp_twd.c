@@ -127,8 +127,13 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
 	twd_calibrate_rate();
 
 	clk->name = "local_timer";
+#if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && \
+	defined(CONFIG_LOCAL_TIMERS)
 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
 			CLOCK_EVT_FEAT_C3STOP;
+#else
+	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+#endif
 	clk->rating = 350;
 	clk->set_mode = twd_set_mode;
 	clk->set_next_event = twd_set_next_event;
