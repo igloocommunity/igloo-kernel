@@ -46,13 +46,10 @@
 #define GPIO27_DIR_OUTPUT			0x04
 #define GPIO29_DIR_OUTPUT			0x10
 #define GPIO31_DIR_OUTPUT			0x40
-#define GPIO35_DIR_OUTPUT			0x04
 
 /* Macrocell register definitions */
 #define AB8500_CTRL3_REG			0x0200
 #define AB8500_GPIO_DIR4_REG			0x1013
-#define AB8500_GPIO_DIR5_REG			0x1014
-#define AB8500_GPIO_OUT5_REG			0x1024
 
 /*
  * AB8500 register cache & default register settings
@@ -1856,7 +1853,65 @@ void ab8500_audio_power_control(bool power_on)
 	}
 }
 
-/* Extended interface for codec-driver */
+void ab8500_audio_pwm_vibra(unsigned char speed_left_pos,
+			unsigned char speed_left_neg,
+			unsigned char speed_right_pos,
+			unsigned char speed_right_neg)
+{
+	unsigned int clear_mask, set_mask;
+	bool vibra_on;
+
+	if (ab8500_codec == NULL) {
+		pr_err("%s: ERROR: AB8500 ASoC-driver not yet probed!\n", __func__);
+		return;
+	}
+
+	vibra_on = speed_left_pos | speed_left_neg | speed_right_pos | speed_right_neg;
+	if (!vibra_on) {
+		clear_mask = BMASK(REG_ANACONF4_ENVIB1) | BMASK(REG_ANACONF4_ENVIB2);
+		ab8500_codec_update_reg_audio(ab8500_codec, REG_ANACONF4, clear_mask, 0x00);
+		speed_left_pos = 0;
+		speed_left_neg = 0;
+		speed_right_pos = 0;
+		speed_right_neg = 0;
+	}
+
+	pr_debug("%s: PWM-vibra (%d, %d, %d, %d).\n",
+			__func__,
+			speed_left_pos,
+			speed_left_neg,
+			speed_right_pos,
+			speed_right_neg);
+
+	set_mask = BMASK(REG_PWMGENCONF1_PWMTOVIB1) |
+		BMASK(REG_PWMGENCONF1_PWMTOVIB2) |
+		BMASK(REG_PWMGENCONF1_PWM1CTRL) |
+		BMASK(REG_PWMGENCONF1_PWM2CTRL) |
+		BMASK(REG_PWMGENCONF1_PWM1NCTRL) |
+		BMASK(REG_PWMGENCONF1_PWM1PCTRL) |
+		BMASK(REG_PWMGENCONF1_PWM2NCTRL) |
+		BMASK(REG_PWMGENCONF1_PWM2PCTRL);
+	ab8500_codec_update_reg_audio(ab8500_codec, REG_PWMGENCONF1, 0x00, set_mask);
+
+	if (speed_left_pos > REG_PWMGENCONFX_PWMVIBXDUTCYC_MAX)
+		speed_left_pos = REG_PWMGENCONFX_PWMVIBXDUTCYC_MAX;
+	ab8500_codec_update_reg_audio(ab8500_codec, REG_PWMGENCONF3, REG_MASK_ALL, speed_left_pos);
+
+	if (speed_left_neg > REG_PWMGENCONFX_PWMVIBXDUTCYC_MAX)
+		speed_left_neg = REG_PWMGENCONFX_PWMVIBXDUTCYC_MAX;
+	ab8500_codec_update_reg_audio(ab8500_codec, REG_PWMGENCONF2, REG_MASK_ALL, speed_left_neg);
+
+	if (speed_right_pos > REG_PWMGENCONFX_PWMVIBXDUTCYC_MAX)
+		speed_right_pos = REG_PWMGENCONFX_PWMVIBXDUTCYC_MAX;
+	ab8500_codec_update_reg_audio(ab8500_codec, REG_PWMGENCONF5, REG_MASK_ALL, speed_right_pos);
+
+	if (speed_right_neg > REG_PWMGENCONFX_PWMVIBXDUTCYC_MAX)
+		speed_right_neg = REG_PWMGENCONFX_PWMVIBXDUTCYC_MAX;
+	ab8500_codec_update_reg_audio(ab8500_codec, REG_PWMGENCONF4, REG_MASK_ALL, speed_right_neg);
+
+	set_mask = BMASK(REG_ANACONF4_ENVIB1) | BMASK(REG_ANACONF4_ENVIB2);
+	ab8500_codec_update_reg_audio(ab8500_codec, REG_ANACONF4, 0x00, set_mask);
+}
 
 int ab8500_audio_set_word_length(struct snd_soc_dai *dai, unsigned int wl)
 {

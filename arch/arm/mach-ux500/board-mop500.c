@@ -55,6 +55,7 @@
 #ifdef CONFIG_U8500_SIM_DETECT
 #include <mach/sim_detect.h>
 #endif
+#include <mach/ste_audio_io_vibrator.h>
 #include <video/av8100.h>
 
 #include "pins-db8500.h"
@@ -973,6 +974,10 @@ static void __init mop500_init_machine(void)
 	mop500_spi_init();
 	mop500_uart_init();
 	mop500_wlan_init();
+
+#ifdef CONFIG_ANDROID_STE_TIMED_VIBRA
+	mop500_vibra_init();
+#endif
 
 	platform_device_register(&ab8500_device);
 

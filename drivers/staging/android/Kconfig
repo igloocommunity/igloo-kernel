@@ -90,6 +90,14 @@ config ANDROID_LOW_MEMORY_KILLER
 	---help---
 	  Register processes to be killed when memory is low
 
+config ANDROID_STE_TIMED_VIBRA
+	bool "ST-Ericsson Timed Output Vibrator"
+	depends on STE_AUDIO_IO_DEV
+	depends on ANDROID_TIMED_OUTPUT
+	default y
+	help
+	  ST-Ericsson's vibrator driver using timed output class device
+
 endif # if ANDROID
 
 endmenu
