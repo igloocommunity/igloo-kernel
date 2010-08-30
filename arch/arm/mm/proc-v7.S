@@ -61,7 +61,18 @@ ENDPROC(cpu_v7_proc_fin)
  */
 	.align	5
 ENTRY(cpu_v7_reset)
-	mov	pc, r0
+	mov     r4, r0
+	mov     ip, #0
+	bl      v7_flush_kern_cache_all         @ invalidate I,D caches
+	dsb                                     @ drain WB
+#ifdef CONFIG_MMU
+	mcr     p15, 0, ip, c8, c7, 0           @ invalidate I & D TLBs
+#endif
+	mrc     p15, 0, ip, c1, c0, 0           @ ctrl register
+	bic     ip, ip, #0x000f                 @ ............wcam
+	bic     ip, ip, #0x1100                 @ ...i...s........
+	mcr     p15, 0, ip, c1, c0, 0           @ ctrl register
+	mov     pc, r4
 ENDPROC(cpu_v7_reset)
 
 /*
