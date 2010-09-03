@@ -1,0 +1,8 @@
+arch="armel"
+supported="%VENDOR% %UCFLAVOUR%"
+desc="%VENDOR% %UCFLAVOUR%-based systems"
+target="Targeted towards boards such as TBD"
+bootloader="flash-kernel"
+provides=""
+section_image="universe/base"
+do_debug="Yes"
