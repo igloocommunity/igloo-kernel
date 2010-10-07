@@ -252,4 +252,15 @@ config CRYPTO_DEV_OMAP_AES
 	  OMAP processors have AES module accelerator. Select this if you
 	  want to use the OMAP module for AES algorithms.
 
+config CRYPTO_DEV_UX500
+	tristate "Driver for ST-Ericsson UX500 crypto hardware acceleration"
+	#depends on ARCH_U8500
+	select CRYPTO_ALGAPI
+	help
+	  Driver for ST-Ericsson UX500 crypto engine.
+
+if CRYPTO_DEV_UX500
+	source "drivers/crypto/ux500/Kconfig"
+endif # if CRYPTO_DEV_UX500
+
 endif # CRYPTO_HW
