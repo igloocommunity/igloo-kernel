@@ -514,6 +514,10 @@ static struct platform_device ux500_backlight_device[] = {
 
 /* add any platform devices here - TODO */
 static struct platform_device *mop500_platform_devs[] __initdata = {
+#ifdef CONFIG_CRYPTO_DEV_UX500_HASH
+	&ux500_hash1_device,
+#endif
+	&ux500_cryp1_device,
 	&mop500_gpio_keys_device,
 	&ab8500_device,
 #ifdef CONFIG_LEDS_PWM
