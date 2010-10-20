@@ -254,7 +254,7 @@ config CRYPTO_DEV_OMAP_AES
 
 config CRYPTO_DEV_UX500
 	tristate "Driver for ST-Ericsson UX500 crypto hardware acceleration"
-	#depends on ARCH_U8500
+	depends on ARCH_U8500
 	select CRYPTO_ALGAPI
 	help
 	  Driver for ST-Ericsson UX500 crypto engine.
