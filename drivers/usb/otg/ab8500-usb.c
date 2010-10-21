@@ -37,6 +37,9 @@
 #include <mach/prcmu.h>
 #include <mach/usb.h>
 
+#include <linux/wakelock.h>
+static struct wake_lock ab8500_musb_wakelock;
+
 #define AB8500_MAIN_WD_CTRL_REG 0x01
 #define AB8500_USB_LINE_STAT_REG 0x80
 #define AB8500_USB_PHY_CTRL_REG 0x8A
@@ -170,8 +173,8 @@ static void ab8500_usb_phy_enable(struct ab8500_usb *ab, bool sel_host)
 	bit = sel_host ? AB8500_BIT_PHY_CTRL_HOST_EN :
 			AB8500_BIT_PHY_CTRL_DEVICE_EN;
 
+	wake_lock(&ab8500_musb_wakelock);
 	ab->usb_gpio->enable();
-
 	clk_enable(ab->sysclk);
 
 	ab8500_usb_regulator_ctrl(ab, sel_host, true);
@@ -223,6 +226,7 @@ static void ab8500_usb_phy_disable(struct ab8500_usb *ab, bool sel_host)
 
 	prcmu_qos_add_requirement(PRCMU_QOS_APE_OPP,
 				(char *)dev_name(ab->dev), 50);
+	wake_unlock(&ab8500_musb_wakelock);
 }
 
 #define ab8500_usb_host_phy_en(ab)	ab8500_usb_phy_enable(ab, true)
@@ -704,6 +708,7 @@ static int __devinit ab8500_usb_probe(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "revision 0x%2x driver initialized\n", ab->rev);
 
+	wake_lock_init(&ab8500_musb_wakelock, WAKE_LOCK_SUSPEND, "ab8500-usb");
 	return 0;
 fail3:
 	ab8500_usb_irq_free(ab);
