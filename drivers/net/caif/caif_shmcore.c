@@ -6,7 +6,7 @@
  * License terms: GNU General Public License (GPL) version 2
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ":" fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ":" __func__ "():" fmt
 
 #include <linux/spinlock.h>
 #include <linux/sched.h>
