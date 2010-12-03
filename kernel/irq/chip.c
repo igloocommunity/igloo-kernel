@@ -419,7 +419,7 @@ void handle_nested_irq(unsigned int irq)
 {
 	struct irq_desc *desc = irq_to_desc(irq);
 	struct irqaction *action;
-	irqreturn_t action_ret;
+	irqreturn_t action_ret = IRQ_NONE;
 
 	might_sleep();
 
@@ -434,7 +434,11 @@ void handle_nested_irq(unsigned int irq)
 	desc->status |= IRQ_INPROGRESS;
 	raw_spin_unlock_irq(&desc->lock);
 
-	action_ret = action->thread_fn(action->irq, action->dev_id);
+	do {
+		action_ret |= action->thread_fn(action->irq, action->dev_id);
+		action = action->next;
+	} while (action);
+
 	if (!noirqdebug)
 		note_interrupt(irq, desc, action_ret);
 
