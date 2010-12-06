@@ -10,5 +10,5 @@
  *
  */
 
-int blkdev_partition(struct parsed_partitions *state, struct block_device *bdev);
+int blkdev_partition(struct parsed_partitions *state);
 

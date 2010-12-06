@@ -107,7 +107,7 @@ static int parse_blkdev_parts(char *blkdev_name, struct parsed_partitions *state
 	return part_nbr;
 }
 
-int blkdev_partition(struct parsed_partitions *state, struct block_device *bdev)
+int blkdev_partition(struct parsed_partitions *state)
 {
 	char blkdev_name[BDEVNAME_SIZE];
 
@@ -116,7 +116,7 @@ int blkdev_partition(struct parsed_partitions *state, struct block_device *bdev)
 		return 0;
 
 	/* Get the name of the blockdevice we are operating upon */
-	if (bdevname(bdev, blkdev_name) == NULL) {
+	if (bdevname(state->bdev, blkdev_name) == NULL) {
 		printk(KERN_WARNING "Could not get a blkdev name\n");
 		return 0;
 	}
