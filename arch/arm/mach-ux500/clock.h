@@ -47,6 +47,10 @@ struct clk {
 	struct clk **parents;
 	struct regulator *regulator;
 	struct list_head list;
+#if defined(CONFIG_DEBUG_FS)
+	struct dentry		*dent;	/* For visible tree hierarchy */
+	struct dentry		*dent_bus;	/* For visible tree hierarchy */
+#endif
 };
 
 /**
