@@ -17,6 +17,7 @@
 #include <linux/clockchips.h>
 #include <linux/irq.h>
 #include <linux/io.h>
+#include <linux/cpufreq.h>
 
 #include <asm/smp_twd.h>
 #include <asm/hardware/gic.h>
@@ -25,11 +26,17 @@
 void __iomem *twd_base;
 
 static unsigned long twd_timer_rate;
+static unsigned long twd_periphclk_prescaler;
+static unsigned long twd_target_rate;
 
 static void twd_set_mode(enum clock_event_mode mode,
 			struct clock_event_device *clk)
 {
 	unsigned long ctrl;
+	unsigned long prescale;
+
+	prescale = __raw_readl(twd_base + TWD_TIMER_CONTROL) &
+			TWD_TIMER_CONTROL_PRESCALE_MASK;
 
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
@@ -47,6 +54,8 @@ static void twd_set_mode(enum clock_event_mode mode,
 	default:
 		ctrl = 0;
 	}
+
+	ctrl |= prescale;
 
 	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
 }
@@ -79,6 +88,52 @@ int twd_timer_ack(void)
 
 	return 0;
 }
+
+/*
+ * must be called with interrupts disabled and on the cpu that is being changed
+ */
+static void twd_update_cpu_frequency(unsigned long new_rate)
+{
+	u32 ctrl;
+	int prescaler;
+
+	BUG_ON(twd_periphclk_prescaler == 0 || twd_target_rate == 0);
+
+	twd_timer_rate = new_rate / twd_periphclk_prescaler;
+
+	prescaler = DIV_ROUND_UP(twd_timer_rate, twd_target_rate);
+	prescaler = clamp(prescaler - 1, 0, 0xFF);
+
+	ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
+	ctrl &= ~TWD_TIMER_CONTROL_PRESCALE_MASK;
+	ctrl |= prescaler << 8;
+	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
+}
+
+static void twd_update_cpu_frequency_on_cpu(void *data)
+{
+	struct cpufreq_freqs *freq = data;
+
+	twd_update_cpu_frequency(freq->new * 1000);
+}
+
+static int twd_cpufreq_notifier(struct notifier_block *nb,
+			unsigned long event, void *data)
+{
+	struct cpufreq_freqs *freq = data;
+
+	if (event == CPUFREQ_RESUMECHANGE ||
+	    (event == CPUFREQ_PRECHANGE && freq->new > freq->old) ||
+	    (event == CPUFREQ_POSTCHANGE && freq->new < freq->old))
+		smp_call_function_single(freq->cpu,
+			twd_update_cpu_frequency_on_cpu, freq, 1);
+
+	return 0;
+}
+
+static struct notifier_block twd_cpufreq_notifier_block = {
+	.notifier_call = twd_cpufreq_notifier,
+};
 
 static void __cpuinit twd_calibrate_rate(void)
 {
@@ -122,9 +177,28 @@ static void __cpuinit twd_calibrate_rate(void)
 /*
  * Setup the local clock events for a CPU.
  */
-void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+static void __cpuinit __twd_timer_setup(struct clock_event_device *clk,
+	unsigned long target_rate, unsigned int periphclk_prescaler)
 {
+	unsigned long load;
+	unsigned long cpu_rate;
+	unsigned long twd_tick_rate;
+
 	twd_calibrate_rate();
+
+	if (target_rate && periphclk_prescaler) {
+		cpu_rate = twd_timer_rate * periphclk_prescaler;
+		twd_target_rate = target_rate;
+		twd_periphclk_prescaler = periphclk_prescaler;
+		twd_update_cpu_frequency(cpu_rate);
+		twd_tick_rate = twd_target_rate;
+	} else {
+		twd_tick_rate = twd_timer_rate;
+	}
+
+	load = twd_tick_rate / HZ;
+
+	__raw_writel(load, twd_base + TWD_TIMER_LOAD);
 
 	clk->name = "local_timer";
 #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && \
@@ -138,7 +212,7 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
 	clk->set_mode = twd_set_mode;
 	clk->set_next_event = twd_set_next_event;
 	clk->shift = 20;
-	clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
+	clk->mult = div_sc(twd_tick_rate, NSEC_PER_SEC, clk->shift);
 	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
 	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
 
@@ -147,3 +221,34 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
 
 	clockevents_register_device(clk);
 }
+
+void __cpuinit twd_timer_setup_scalable(struct clock_event_device *clk,
+	unsigned long target_rate, unsigned int periphclk_prescaler)
+{
+	__twd_timer_setup(clk, target_rate, periphclk_prescaler);
+}
+
+void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+{
+	__twd_timer_setup(clk, 0, 0);
+}
+
+static int twd_timer_setup_cpufreq(void)
+{
+	if (twd_periphclk_prescaler)
+		cpufreq_register_notifier(&twd_cpufreq_notifier_block,
+			CPUFREQ_TRANSITION_NOTIFIER);
+
+	return 0;
+}
+arch_initcall(twd_timer_setup_cpufreq);
+
+#ifdef CONFIG_HOTPLUG_CPU
+/*
+ * take a local timer down
+ */
+void twd_timer_stop(void)
+{
+	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
+}
+#endif
