@@ -406,6 +406,12 @@ static bool chan_is_logical(struct d40_chan *chan)
 	return !chan_is_physical(chan);
 }
 
+static void __iomem *chan_base(struct d40_chan *chan)
+{
+	return chan->base->virtbase + D40_DREG_PCBASE +
+	       chan->phy_chan->num * D40_DREG_PCDELTA;
+}
+
 static int d40_pool_lli_alloc(struct d40_desc *d40d,
 			      int lli_len, bool is_log)
 {
@@ -981,8 +987,7 @@ static void d40_term_all(struct d40_chan *d40c)
 static void __d40_config_set_event(struct d40_chan *d40c, bool enable,
 				   u32 event, int reg)
 {
-	void __iomem *addr = d40c->base->virtbase + D40_DREG_PCBASE
-			     + d40c->phy_chan->num * D40_DREG_PCDELTA + reg;
+	void __iomem *addr = chan_base(d40c) + reg;
 	int tries;
 
 	if (!enable) {
@@ -1035,15 +1040,12 @@ static void d40_config_set_event(struct d40_chan *d40c, bool do_enable)
 
 static u32 d40_chan_has_events(struct d40_chan *d40c)
 {
+	void __iomem *chanbase = chan_base(d40c);
 	u32 val;
 
-	val = readl(d40c->base->virtbase + D40_DREG_PCBASE +
-		    d40c->phy_chan->num * D40_DREG_PCDELTA +
-		    D40_CHAN_REG_SSLNK);
+	val = readl(chanbase + D40_CHAN_REG_SSLNK);
+	val |= readl(chanbase + D40_CHAN_REG_SDLNK);
 
-	val |= readl(d40c->base->virtbase + D40_DREG_PCBASE +
-		     d40c->phy_chan->num * D40_DREG_PCDELTA +
-		     D40_CHAN_REG_SDLNK);
 	return val;
 }
 
@@ -1145,38 +1147,21 @@ static void d40_config_write(struct d40_chan *d40c)
 	writel(var, d40c->base->virtbase + D40_DREG_PRMOE + addr_base);
 
 	if (chan_is_logical(d40c)) {
+		int lidx = (d40c->phy_chan->num << D40_SREG_ELEM_LOG_LIDX_POS)
+			   & D40_SREG_ELEM_LOG_LIDX_MASK;
+		void __iomem *chanbase = chan_base(d40c);
+
 		/* Set default config for CFG reg */
-		writel(d40c->src_def_cfg,
-		       d40c->base->virtbase + D40_DREG_PCBASE +
-		       d40c->phy_chan->num * D40_DREG_PCDELTA +
-		       D40_CHAN_REG_SSCFG);
-		writel(d40c->dst_def_cfg,
-		       d40c->base->virtbase + D40_DREG_PCBASE +
-		       d40c->phy_chan->num * D40_DREG_PCDELTA +
-		       D40_CHAN_REG_SDCFG);
+		writel(d40c->src_def_cfg, chanbase + D40_CHAN_REG_SSCFG);
+		writel(d40c->dst_def_cfg, chanbase + D40_CHAN_REG_SDCFG);
 
 		/* Set LIDX for lcla */
-		writel((d40c->phy_chan->num << D40_SREG_ELEM_LOG_LIDX_POS) &
-		       D40_SREG_ELEM_LOG_LIDX_MASK,
-		       d40c->base->virtbase + D40_DREG_PCBASE +
-		       d40c->phy_chan->num * D40_DREG_PCDELTA +
-		       D40_CHAN_REG_SDELT);
-
-		writel((d40c->phy_chan->num << D40_SREG_ELEM_LOG_LIDX_POS) &
-		       D40_SREG_ELEM_LOG_LIDX_MASK,
-		       d40c->base->virtbase + D40_DREG_PCBASE +
-		       d40c->phy_chan->num * D40_DREG_PCDELTA +
-		       D40_CHAN_REG_SSELT);
+		writel(lidx, chanbase + D40_CHAN_REG_SSELT);
+		writel(lidx, chanbase + D40_CHAN_REG_SDELT);
 
 		/* Clear LNK which will be used by d40_chan_has_events() */
-		writel(0,
-		       d40c->base->virtbase + D40_DREG_PCBASE +
-		       d40c->phy_chan->num * D40_DREG_PCDELTA +
-		       D40_CHAN_REG_SSLNK);
-		writel(0,
-		       d40c->base->virtbase + D40_DREG_PCBASE +
-		       d40c->phy_chan->num * D40_DREG_PCDELTA +
-		       D40_CHAN_REG_SDLNK);
+		writel(0, chanbase + D40_CHAN_REG_SSLNK);
+		writel(0, chanbase + D40_CHAN_REG_SDLNK);
 	}
 }
 
@@ -1188,11 +1173,10 @@ static u32 d40_residue(struct d40_chan *d40c)
 		num_elt = (readl(&d40c->lcpa->lcsp2) &
 			   D40_MEM_LCSP2_ECNT_MASK) >> D40_MEM_LCSP2_ECNT_POS;
 	else
-		num_elt = (readl(d40c->base->virtbase + D40_DREG_PCBASE +
-				 d40c->phy_chan->num * D40_DREG_PCDELTA +
-				 D40_CHAN_REG_SDELT) &
+		num_elt = (readl(chan_base(d40c) + D40_CHAN_REG_SDELT) &
 			   D40_SREG_ELEM_PHY_ECNT_MASK) >>
 			D40_SREG_ELEM_PHY_ECNT_POS;
+
 	return num_elt * (1 << d40c->dma_cfg.dst_info.data_width);
 }
 
@@ -1203,10 +1187,9 @@ static bool d40_tx_is_linked(struct d40_chan *d40c)
 	if (chan_is_logical(d40c))
 		is_link = readl(&d40c->lcpa->lcsp3) &  D40_MEM_LCSP3_DLOS_MASK;
 	else
-		is_link = readl(d40c->base->virtbase + D40_DREG_PCBASE +
-				d40c->phy_chan->num * D40_DREG_PCDELTA +
-				D40_CHAN_REG_SDLNK) &
-			D40_SREG_LNK_PHYS_LNK_MASK;
+		is_link = readl(chan_base(d40c) + D40_CHAN_REG_SDLNK)
+			  & D40_SREG_LNK_PHYS_LNK_MASK;
+
 	return is_link;
 }
 
@@ -1910,6 +1893,7 @@ static int d40_free_dma(struct d40_chan *d40c)
 
 static bool d40_is_paused(struct d40_chan *d40c)
 {
+	void __iomem *chanbase = chan_base(d40c);
 	bool is_paused = false;
 	unsigned long flags;
 	void __iomem *active_reg;
@@ -1936,14 +1920,10 @@ static bool d40_is_paused(struct d40_chan *d40c)
 	if (d40c->dma_cfg.dir == STEDMA40_MEM_TO_PERIPH ||
 	    d40c->dma_cfg.dir == STEDMA40_MEM_TO_MEM) {
 		event = D40_TYPE_TO_EVENT(d40c->dma_cfg.dst_dev_type);
-		status = readl(d40c->base->virtbase + D40_DREG_PCBASE +
-			       d40c->phy_chan->num * D40_DREG_PCDELTA +
-			       D40_CHAN_REG_SDLNK);
+		status = readl(chanbase + D40_CHAN_REG_SDLNK);
 	} else if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM) {
 		event = D40_TYPE_TO_EVENT(d40c->dma_cfg.src_dev_type);
-		status = readl(d40c->base->virtbase + D40_DREG_PCBASE +
-			       d40c->phy_chan->num * D40_DREG_PCDELTA +
-			       D40_CHAN_REG_SSLNK);
+		status = readl(chanbase + D40_CHAN_REG_SSLNK);
 	} else {
 		dev_err(&d40c->chan.dev->device,
 			"[%s] Unknown direction\n", __func__);
