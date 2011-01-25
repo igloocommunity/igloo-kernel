@@ -2063,50 +2063,78 @@ err:
 	return NULL;
 }
 
-static struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
-						   struct scatterlist *sgl_dst,
-						   unsigned int dst_nents,
-						   struct scatterlist *sgl_src,
-						   unsigned int src_nents,
-						   unsigned long dma_flags)
+static dma_addr_t
+d40_get_dev_addr(struct d40_chan *chan, enum dma_data_direction direction)
 {
-	struct d40_desc *d40d;
-	struct d40_chan *d40c = container_of(chan, struct d40_chan,
-					     chan);
+	struct stedma40_platform_data *plat = chan->base->plat_data;
+	struct stedma40_chan_cfg *cfg = &chan->dma_cfg;
+	dma_addr_t addr = -EINVAL;
+
+	if (chan->runtime_addr)
+		return chan->runtime_addr;
+
+	if (direction == DMA_FROM_DEVICE) {
+		if (chan->src_dev_addr)
+			addr = chan->src_dev_addr;
+		else
+			addr = plat->dev_rx[cfg->src_dev_type];
+
+	} else if (direction == DMA_TO_DEVICE) {
+		if (chan->dst_dev_addr)
+			addr = chan->dst_dev_addr;
+		else
+			addr = plat->dev_tx[cfg->dst_dev_type];
+	}
+
+	return addr;
+}
+
+static struct dma_async_tx_descriptor *
+d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
+	    struct scatterlist *sg_dst, unsigned int sg_len,
+	    enum dma_data_direction direction, unsigned long dma_flags)
+{
+	struct d40_chan *chan = container_of(dchan, struct d40_chan, chan);
+	dma_addr_t dev_addr = 0;
+	struct d40_desc *desc;
 	unsigned long flags;
-	int err;
+	int ret;
 
-	if (d40c->phy_chan == NULL) {
-		chan_err(d40c, "Unallocated channel.\n");
-		return ERR_PTR(-EINVAL);
+	if (!chan->phy_chan) {
+		chan_err(chan, "Cannot prepare unallocated channel\n");
+		return NULL;
 	}
 
-	spin_lock_irqsave(&d40c->lock, flags);
+	spin_lock_irqsave(&chan->lock, flags);
 
-	d40d = d40_prep_desc(d40c, sgl_dst, src_nents, dma_flags);
-
-	if (!d40d)
+	desc = d40_prep_desc(chan, sg_src, sg_len, dma_flags);
+	if (desc == NULL)
 		goto err;
 
-	if (chan_is_logical(d40c)) {
+	if (direction != DMA_NONE)
+		dev_addr = d40_get_dev_addr(chan, direction);
 
-		err = d40_prep_sg_log(d40c, d40d, sgl_src, sgl_dst,
-				src_nents, DMA_NONE, 0);
-	} else {
-		err = d40_prep_sg_phy(d40c, d40d, sgl_src, sgl_dst,
-				src_nents, DMA_NONE, 0);
+	if (chan_is_logical(chan))
+		ret = d40_prep_sg_log(chan, desc, sg_src, sg_dst,
+				      sg_len, direction, dev_addr);
+	else
+		ret = d40_prep_sg_phy(chan, desc, sg_src, sg_dst,
+				      sg_len, direction, dev_addr);
+
+	if (ret) {
+		chan_err(chan, "Failed to prepare %s sg job: %d\n",
+			 chan_is_logical(chan) ? "log" : "phy", ret);
+		goto err;
 	}
 
-	if (err < 0)
-		goto err;
+	spin_unlock_irqrestore(&chan->lock, flags);
 
-	spin_unlock_irqrestore(&d40c->lock, flags);
+	return &desc->txd;
 
-	return &d40d->txd;
 err:
-	if (d40d)
-		d40_desc_free(d40c, d40d);
-	spin_unlock_irqrestore(&d40c->lock, flags);
+	if (desc)
+		d40_desc_free(chan, desc);
+	spin_unlock_irqrestore(&chan->lock, flags);
 	return NULL;
 }
 
@@ -2272,51 +2300,17 @@ static struct dma_async_tx_descriptor *d40_prep_memcpy(struct dma_chan *chan,
 	sg_dma_len(&dst_sg) = size;
 	sg_dma_len(&src_sg) = size;
 
-	return stedma40_memcpy_sg(chan, &dst_sg, 1, &src_sg, 1, dma_flags);
+	return d40_prep_sg(chan, &src_sg, &dst_sg, 1, DMA_NONE, dma_flags);
 }
 
-int stedma40_set_dev_addr(struct dma_chan *chan,
-			  dma_addr_t src_dev_addr,
-			  dma_addr_t dst_dev_addr)
+static struct dma_async_tx_descriptor *
+d40_prep_memcpy_sg(struct dma_chan *chan,
+		   struct scatterlist *dst_sg, unsigned int dst_nents,
+		   struct scatterlist *src_sg, unsigned int src_nents,
+		   unsigned long dma_flags)
 {
-	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
-	unsigned long flags;
-
-	spin_lock_irqsave(&d40c->lock, flags);
-
-	d40c->src_dev_addr = src_dev_addr;
-	d40c->dst_dev_addr = dst_dev_addr;
-
-	spin_unlock_irqrestore(&d40c->lock, flags);
-
-	return 0;
-}
-EXPORT_SYMBOL(stedma40_set_dev_addr);
-
-static dma_addr_t
-d40_get_dev_addr(struct d40_chan *chan, enum dma_data_direction direction)
-{
-	struct stedma40_platform_data *plat = chan->base->plat_data;
-	struct stedma40_chan_cfg *cfg = &chan->dma_cfg;
-	dma_addr_t addr = -EINVAL;
-
-	if (chan->runtime_addr)
-		return chan->runtime_addr;
-
-	if (direction == DMA_FROM_DEVICE) {
-		if (chan->src_dev_addr)
-			addr = chan->src_dev_addr;
-		else
-			addr = plat->dev_rx[cfg->src_dev_type];
-
-	} else if (direction == DMA_TO_DEVICE) {
-		if (chan->dst_dev_addr)
-			addr = chan->dst_dev_addr;
-		else
-			addr = plat->dev_tx[cfg->dst_dev_type];
-	}
-
-	return addr;
+	return d40_prep_sg(chan, src_sg, dst_sg, src_nents,
+						DMA_NONE, dma_flags);
 }
 
 static struct dma_async_tx_descriptor *
@@ -2324,53 +2318,10 @@ d40_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 		  unsigned int sg_len, enum dma_data_direction direction,
 		  unsigned long dma_flags)
 {
-	struct d40_desc *d40d;
-	struct d40_chan *d40c = container_of(chan, struct d40_chan,
-					     chan);
-	dma_addr_t dev_addr;
-	unsigned long flags;
-	int err;
-
-
-	if (d40c->phy_chan == NULL) {
-		chan_err(d40c, "Cannot prepare unallocated channel\n");
-		return ERR_PTR(-EINVAL);
-	}
-
 	if (direction != DMA_FROM_DEVICE && direction != DMA_TO_DEVICE)
 		return NULL;
 
-	spin_lock_irqsave(&d40c->lock, flags);
-	d40d = d40_prep_desc(d40c, sgl, sg_len, dma_flags);
-
-	if (d40d == NULL)
-		goto err;
-	d40_usage_inc(d40c);
-
-	dev_addr = d40_get_dev_addr(d40c, direction);
-
-	if (chan_is_logical(d40c))
-		err = d40_prep_sg_log(d40c, d40d, sgl, NULL,
-				      sg_len, direction, dev_addr);
-	else
-		err = d40_prep_sg_phy(d40c, d40d, sgl, NULL,
-				      sg_len, direction, dev_addr);
-	d40_usage_dec(d40c);
-
-	if (err) {
-		chan_err(d40c, "Failed to prepare %s slave sg job: %d\n",
-			chan_is_logical(d40c) ? "log" : "phy", err);
-		goto err;
-	}
-
-	spin_unlock_irqrestore(&d40c->lock, flags);
-	return &d40d->txd;
-
-err:
-	if (d40d)
-		d40_desc_free(d40c, d40d);
-	spin_unlock_irqrestore(&d40c->lock, flags);
-	return NULL;
+	return d40_prep_sg(chan, sgl, sgl, sg_len, direction, dma_flags);
 }
 
 static enum dma_status d40_tx_status(struct dma_chan *chan,
@@ -2940,7 +2891,7 @@ static void d40_ops_init(struct d40_base *base, struct dma_device *dev)
 	}
 
 	if (dma_has_cap(DMA_SG, dev->cap_mask))
-		dev->device_prep_dma_sg = stedma40_memcpy_sg;
+		dev->device_prep_dma_sg = d40_prep_memcpy_sg;
 
 	if (dma_has_cap(DMA_CYCLIC, dev->cap_mask))
 		dev->device_prep_dma_cyclic = dma40_prep_dma_cyclic;
