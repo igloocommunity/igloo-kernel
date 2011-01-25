@@ -425,8 +425,9 @@ static void __iomem *chan_base(struct d40_chan *chan)
 	d40_err(chan2dev(d40c), format, ## arg)
 
 static int d40_pool_lli_alloc(struct d40_chan *d40c, struct d40_desc *d40d,
-			      int lli_len, bool is_log)
+			      int lli_len)
 {
+	bool is_log = chan_is_logical(d40c);
 	u32 align;
 	void *base;
 
@@ -1961,12 +1962,20 @@ d40_prep_desc(struct d40_chan *chan, struct scatterlist *sg,
 	      unsigned int sg_len, unsigned long dma_flags)
 {
 	struct d40_desc *desc;
+	int ret;
 
 	desc = d40_desc_get(chan);
 	if (!desc)
 		return NULL;
 
 	desc->lli_len = sg_len;
+
+	ret = d40_pool_lli_alloc(chan, desc, desc->lli_len);
+	if (ret < 0) {
+		chan_err(chan, "Could not allocate lli\n");
+		goto err;
+	}
+
 	desc->lli_current = 0;
 	desc->txd.flags = dma_flags;
 	desc->txd.tx_submit = d40_tx_submit;
@@ -1974,6 +1983,10 @@ d40_prep_desc(struct d40_chan *chan, struct scatterlist *sg,
 	dma_async_tx_descriptor_init(&desc->txd, &chan->chan);
 
 	return desc;
+
+err:
+	d40_desc_free(chan, desc);
+	return NULL;
 }
 
 struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
@@ -2002,11 +2015,6 @@ struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
 
 	if (chan_is_logical(d40c)) {
 
-		if (d40_pool_lli_alloc(d40c, d40d, sgl_len, true) < 0) {
-			chan_err(d40c, "Out of memory\n");
-			goto err;
-		}
-
 		(void) d40_log_sg_to_lli(sgl_src,
 					 sgl_len,
 					 d40d->lli_log.src,
@@ -2019,10 +2027,6 @@ struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
 					 d40c->log_def.lcsp3,
 					 d40c->dma_cfg.dst_info.data_width);
 	} else {
-		if (d40_pool_lli_alloc(d40c, d40d, sgl_len, false) < 0) {
-			chan_err(d40c, "Out of memory\n");
-			goto err;
-		}
 
 		res = d40_phy_sg_to_lli(sgl_src,
 					sgl_len,
@@ -2291,11 +2295,6 @@ static int d40_prep_slave_sg_log(struct d40_desc *d40d,
 	dma_addr_t dev_addr = 0;
 	int total_size;
 
-	if (d40_pool_lli_alloc(d40c, d40d, sg_len, true) < 0) {
-		chan_err(d40c, "Out of memory\n");
-		return -ENOMEM;
-	}
-
 	if (direction == DMA_FROM_DEVICE)
 		dev_addr = d40_dev_rx_addr(d40c);
 	else if (direction == DMA_TO_DEVICE)
@@ -2326,11 +2325,6 @@ static int d40_prep_slave_sg_phy(struct d40_desc *d40d,
 	dma_addr_t src_dev_addr;
 	dma_addr_t dst_dev_addr;
 	int res;
-
-	if (d40_pool_lli_alloc(d40c, d40d, sgl_len, false) < 0) {
-		chan_err(d40c, "Out of memory\n");
-		return -ENOMEM;
-	}
 
 	if (direction == DMA_FROM_DEVICE) {
 		dst_dev_addr = 0;
@@ -2846,6 +2840,12 @@ stedma40_cyclic_prep_sg(struct dma_chan *chan,
 	d40d->cyclic = true;
 	d40d->txd.flags = dma_flags;
 	INIT_LIST_HEAD(&d40d->node);
+
+	err = d40_pool_lli_alloc(d40c, d40d, sg_len);
+	if (err < 0) {
+		chan_err(d40c, "Could not allocate lli\n");
+		goto out;
+	}
 
 	d40_usage_inc(d40c);
 
