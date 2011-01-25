@@ -2063,10 +2063,11 @@ err:
 	return NULL;
 }
 
-struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
+static struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
 						   struct scatterlist *sgl_dst,
+						   unsigned int dst_nents,
 						   struct scatterlist *sgl_src,
-						   unsigned int sgl_len,
+						   unsigned int src_nents,
 						   unsigned long dma_flags)
 {
 	struct d40_desc *d40d;
@@ -2082,7 +2083,7 @@ struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
 
 	spin_lock_irqsave(&d40c->lock, flags);
 
-	d40d = d40_prep_desc(d40c, sgl_dst, sgl_len, dma_flags);
+	d40d = d40_prep_desc(d40c, sgl_dst, src_nents, dma_flags);
 
 	if (!d40d)
 		goto err;
@@ -2090,10 +2091,10 @@ struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
 	if (chan_is_logical(d40c)) {
 
 		err = d40_prep_sg_log(d40c, d40d, sgl_src, sgl_dst,
-				sgl_len, DMA_NONE, 0);
+				src_nents, DMA_NONE, 0);
 	} else {
 		err = d40_prep_sg_phy(d40c, d40d, sgl_src, sgl_dst,
-				sgl_len, DMA_NONE, 0);
+				src_nents, DMA_NONE, 0);
 	}
 
 	if (err < 0)
@@ -2108,7 +2109,6 @@ err:
 	spin_unlock_irqrestore(&d40c->lock, flags);
 	return NULL;
 }
-EXPORT_SYMBOL(stedma40_memcpy_sg);
 
 bool stedma40_filter(struct dma_chan *chan, void *data)
 {
@@ -2272,7 +2272,7 @@ static struct dma_async_tx_descriptor *d40_prep_memcpy(struct dma_chan *chan,
 	sg_dma_len(&dst_sg) = size;
 	sg_dma_len(&src_sg) = size;
 
-	return stedma40_memcpy_sg(chan, &dst_sg, &src_sg, 1, dma_flags);
+	return stedma40_memcpy_sg(chan, &dst_sg, 1, &src_sg, 1, dma_flags);
 }
 
 int stedma40_set_dev_addr(struct dma_chan *chan,
@@ -2939,6 +2939,9 @@ static void d40_ops_init(struct d40_base *base, struct dma_device *dev)
 		dev->copy_align = 2;
 	}
 
+	if (dma_has_cap(DMA_SG, dev->cap_mask))
+		dev->device_prep_dma_sg = stedma40_memcpy_sg;
+
 	if (dma_has_cap(DMA_CYCLIC, dev->cap_mask))
 		dev->device_prep_dma_cyclic = dma40_prep_dma_cyclic;
 
@@ -2976,6 +2979,7 @@ static int __init d40_dmaengine_init(struct d40_base *base,
 
 	dma_cap_zero(base->dma_memcpy.cap_mask);
 	dma_cap_set(DMA_MEMCPY, base->dma_memcpy.cap_mask);
+	dma_cap_set(DMA_SG, base->dma_memcpy.cap_mask);
 
 	d40_ops_init(base, &base->dma_memcpy);
 
@@ -2993,6 +2997,7 @@ static int __init d40_dmaengine_init(struct d40_base *base,
 	dma_cap_zero(base->dma_both.cap_mask);
 	dma_cap_set(DMA_SLAVE, base->dma_both.cap_mask);
 	dma_cap_set(DMA_MEMCPY, base->dma_both.cap_mask);
+	dma_cap_set(DMA_SG, base->dma_both.cap_mask);
 	dma_cap_set(DMA_CYCLIC, base->dma_both.cap_mask);
 
 	d40_ops_init(base, &base->dma_both);
