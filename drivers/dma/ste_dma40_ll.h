@@ -323,20 +323,18 @@ int d40_phy_sg_to_lli(struct scatterlist *sg,
 		      struct d40_phy_lli *lli,
 		      dma_addr_t lli_phys,
 		      u32 reg_cfg,
-		      u32 data_width,
-		      int psize,
 		      bool cyclic,
-		      bool cyclic_int);
+		      bool cyclic_int,
+		      struct stedma40_half_channel_info *info);
 
 int d40_phy_fill_lli(struct d40_phy_lli *lli,
 		     dma_addr_t data,
 		     u32 data_size,
-		     int psize,
 		     dma_addr_t next_lli,
 		     u32 reg_cfg,
 		     bool term_int,
-		     u32 data_width,
-		     bool is_device);
+		     bool is_device,
+		     struct stedma40_half_channel_info *info);
 
 /* Logical channels */
 

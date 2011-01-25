@@ -2016,19 +2016,17 @@ d40_prep_sg_phy(struct d40_chan *chan, struct d40_desc *desc,
 				desc->lli_phy.src,
 				virt_to_phys(desc->lli_phy.src),
 				chan->src_def_cfg,
-				src_info->data_width,
-				src_info->psize,
 				desc->cyclic,
-				desc->txd.flags & DMA_PREP_INTERRUPT);
+				desc->txd.flags & DMA_PREP_INTERRUPT,
+				src_info);
 
 	ret = d40_phy_sg_to_lli(sg_dst, sg_len, dst_dev_addr,
 				desc->lli_phy.dst,
 				virt_to_phys(desc->lli_phy.dst),
 				chan->dst_def_cfg,
-				dst_info->data_width,
-				dst_info->psize,
 				desc->cyclic,
-				desc->txd.flags & DMA_PREP_INTERRUPT);
+				desc->txd.flags & DMA_PREP_INTERRUPT,
+				dst_info);
 
 	dma_sync_single_for_device(chan->base->dev, desc->lli_pool.dma_addr,
 				   desc->lli_pool.size, DMA_TO_DEVICE);
