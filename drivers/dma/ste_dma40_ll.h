@@ -308,6 +308,11 @@ struct d40_def_lcsp {
 
 /* Physical channels */
 
+enum d40_lli_flags {
+	LLI_ADDR_INC	= 1 << 0,
+	LLI_TERM_INT	= 1 << 1,
+};
+
 void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
 		 u32 *src_cfg,
 		 u32 *dst_cfg,
@@ -332,9 +337,8 @@ int d40_phy_fill_lli(struct d40_phy_lli *lli,
 		     u32 data_size,
 		     dma_addr_t next_lli,
 		     u32 reg_cfg,
-		     bool term_int,
-		     bool is_device,
-		     struct stedma40_half_channel_info *info);
+		     struct stedma40_half_channel_info *info,
+		     unsigned int flags);
 
 /* Logical channels */
 
@@ -343,7 +347,7 @@ void d40_log_fill_lli(struct d40_log_lli *lli,
 		      u32 data_size,
 		      u32 reg_cfg,
 		      u32 data_width,
-		      bool addr_inc);
+		      unsigned int flags);
 
 int d40_log_sg_to_lli(struct scatterlist *sg,
 		      int sg_len,

@@ -131,14 +131,15 @@ void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
 }
 
 int d40_phy_fill_lli(struct d40_phy_lli *lli,
-		     dma_addr_t data,
-		     u32 data_size,
-		     dma_addr_t next_lli,
-		     u32 reg_cfg,
-		     bool term_int,
-		     bool is_device,
-		     struct stedma40_half_channel_info *info)
+			    dma_addr_t data,
+			    u32 data_size,
+			    dma_addr_t next_lli,
+			    u32 reg_cfg,
+			    struct stedma40_half_channel_info *info,
+			    unsigned int flags)
 {
+	bool addr_inc = flags & LLI_ADDR_INC;
+	bool term_int = flags & LLI_TERM_INT;
 	unsigned int data_width = info->data_width;
 	int psize = info->psize;
 	int num_elems;
@@ -170,7 +171,7 @@ int d40_phy_fill_lli(struct d40_phy_lli *lli,
 	 * Distance to next element sized entry.
 	 * Usually the size of the element unless you want gaps.
 	 */
-	if (!is_device)
+	if (addr_inc)
 		lli->reg_elt |= (0x1 << data_width) <<
 			D40_SREG_ELEM_PHY_EIDX_POS;
 
@@ -210,11 +211,17 @@ int d40_phy_sg_to_lli(struct scatterlist *sg,
 	int i;
 	struct scatterlist *current_sg = sg;
 	dma_addr_t next_lli_phys;
-	dma_addr_t dst;
 	bool interrupt;
 	int err = 0;
+	unsigned long flags = 0;
+
+	if (!target)
+		flags |= LLI_ADDR_INC;
 
 	for_each_sg(sg, current_sg, sg_len, i) {
+		dma_addr_t sg_addr = sg_dma_address(current_sg);
+		unsigned int len = sg_dma_len(current_sg);
+		dma_addr_t dst = target ?: sg_addr;
 
 		total_size += sg_dma_len(current_sg);
 
@@ -228,19 +235,11 @@ int d40_phy_sg_to_lli(struct scatterlist *sg,
 
 		interrupt = cyclic ? cyclic_int : !next_lli_phys;
 
-		if (target)
-			dst = target;
-		else
-			dst = sg_dma_address(current_sg);
+		if (i == sg_len - 1)
+			flags |= LLI_TERM_INT;
 
-		err = d40_phy_fill_lli(&lli[i],
-				       dst,
-				       sg_dma_len(current_sg),
-				       next_lli_phys,
-				       reg_cfg,
-				       interrupt,
-				       target == dst,
-				       info);
+		err = d40_phy_fill_lli(&lli[i], dst, len, next_lli_phys,
+				       reg_cfg, info, flags);
 
 		if (err)
 			goto err;
@@ -308,11 +307,13 @@ void d40_log_lli_lcla_write(struct d40_log_lli *lcla,
 }
 
 void d40_log_fill_lli(struct d40_log_lli *lli,
-		      dma_addr_t data, u32 data_size,
-		      u32 reg_cfg,
-		      u32 data_width,
-		      bool addr_inc)
+			     dma_addr_t data, u32 data_size,
+			     u32 reg_cfg,
+			     u32 data_width,
+			     unsigned int flags)
 {
+	bool addr_inc = flags & LLI_ADDR_INC;
+
 	lli->lcsp13 = reg_cfg;
 
 	/* The number of elements to transfer */
@@ -338,7 +339,10 @@ int d40_log_sg_to_lli(struct scatterlist *sg,
 	int total_size = 0;
 	struct scatterlist *current_sg = sg;
 	int i;
-	bool autoinc = !dev_addr;
+	unsigned long flags = 0;
+
+	if (!dev_addr)
+		flags |= LLI_ADDR_INC;
 
 	for_each_sg(sg, current_sg, sg_len, i) {
 		dma_addr_t sg_addr = sg_dma_address(current_sg);
@@ -349,7 +353,7 @@ int d40_log_sg_to_lli(struct scatterlist *sg,
 
 		d40_log_fill_lli(&lli_sg[i], addr, len,
 				 lcsp13, data_width,
-				 autoinc);
+				 flags);
 	}
 	return total_size;
 }
