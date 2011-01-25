@@ -598,6 +598,23 @@ static void d40_desc_submit(struct d40_chan *d40c, struct d40_desc *desc)
 	list_add_tail(&desc->node, &d40c->active);
 }
 
+static void d40_phy_lli_load(struct d40_chan *chan, struct d40_desc *desc)
+{
+	struct d40_phy_lli *lli_dst = desc->lli_phy.dst;
+	struct d40_phy_lli *lli_src = desc->lli_phy.src;
+	void __iomem *base = chan_base(chan);
+
+	writel(lli_src->reg_cfg, base + D40_CHAN_REG_SSCFG);
+	writel(lli_src->reg_elt, base + D40_CHAN_REG_SSELT);
+	writel(lli_src->reg_ptr, base + D40_CHAN_REG_SSPTR);
+	writel(lli_src->reg_lnk, base + D40_CHAN_REG_SSLNK);
+
+	writel(lli_dst->reg_cfg, base + D40_CHAN_REG_SDCFG);
+	writel(lli_dst->reg_elt, base + D40_CHAN_REG_SDELT);
+	writel(lli_dst->reg_ptr, base + D40_CHAN_REG_SDPTR);
+	writel(lli_dst->reg_lnk, base + D40_CHAN_REG_SDLNK);
+}
+
 static void d40_desc_done(struct d40_chan *d40c, struct d40_desc *desc)
 {
 	list_add_tail(&desc->node, &d40c->done);
@@ -700,10 +717,7 @@ static int d40_desc_log_lli_to_lcxa(struct d40_chan *d40c,
 static void d40_desc_load(struct d40_chan *d40c, struct d40_desc *d40d)
 {
 	if (chan_is_physical(d40c)) {
-		d40_phy_lli_write(d40c->base->virtbase,
-				  d40c->phy_chan->num,
-				  d40d->lli_phy.dst,
-				  d40d->lli_phy.src);
+		d40_phy_lli_load(d40c, d40d);
 		d40d->lli_current = d40d->lli_len;
 	} else
 		(void) d40_desc_log_lli_to_lcxa(d40c, d40d, true);

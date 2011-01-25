@@ -338,11 +338,6 @@ int d40_phy_fill_lli(struct d40_phy_lli *lli,
 		     u32 data_width,
 		     bool is_device);
 
-void d40_phy_lli_write(void __iomem *virtbase,
-		       u32 phy_chan_num,
-		       struct d40_phy_lli *lli_dst,
-		       struct d40_phy_lli *lli_src);
-
 /* Logical channels */
 
 void d40_log_fill_lli(struct d40_log_lli *lli,
