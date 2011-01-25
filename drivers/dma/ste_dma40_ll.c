@@ -342,32 +342,32 @@ int d40_log_sg_to_dev(struct scatterlist *sg,
 	int i;
 
 	for_each_sg(sg, current_sg, sg_len, i) {
-		total_size += sg_dma_len(current_sg);
+		dma_addr_t sg_addr = sg_dma_address(current_sg);
+		unsigned int len = sg_dma_len(current_sg);
+		dma_addr_t src;
+		dma_addr_t dst;
+
+		total_size += len;
 
 		if (direction == DMA_TO_DEVICE) {
-			d40_log_fill_lli(&lli->src[i],
-					 sg_dma_address(current_sg),
-					 sg_dma_len(current_sg),
-					 lcsp->lcsp1, src_data_width,
-					 true);
-			d40_log_fill_lli(&lli->dst[i],
-					 dev_addr,
-					 sg_dma_len(current_sg),
-					 lcsp->lcsp3, dst_data_width,
-					 false);
+			src = sg_addr;
+			dst = dev_addr;
 		} else {
-			d40_log_fill_lli(&lli->dst[i],
-					 sg_dma_address(current_sg),
-					 sg_dma_len(current_sg),
-					 lcsp->lcsp3, dst_data_width,
-					 true);
-			d40_log_fill_lli(&lli->src[i],
-					 dev_addr,
-					 sg_dma_len(current_sg),
-					 lcsp->lcsp1, src_data_width,
-					 false);
+			src = dev_addr;
+			dst = sg_addr;
 		}
+
+		d40_log_fill_lli(&lli->src[i], src, len,
+					     lcsp->lcsp1,
+					     src_data_width,
+					     src == sg_addr);
+
+		d40_log_fill_lli(&lli->dst[i], dst, len,
+					     lcsp->lcsp3,
+					     dst_data_width,
+					     dst == sg_addr);
 	}
+
 	return total_size;
 }
 
