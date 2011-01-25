@@ -412,6 +412,12 @@ static void __iomem *chan_base(struct d40_chan *chan)
 	       chan->phy_chan->num * D40_DREG_PCDELTA;
 }
 
+#define d40_err(dev, format, arg...)		\
+	dev_err(dev, "[%s] " format, __func__, ## arg)
+
+#define chan_err(d40c, format, arg...)		\
+	d40_err(chan2dev(d40c), format, ## arg)
+
 static int d40_pool_lli_alloc(struct d40_desc *d40d,
 			      int lli_len, bool is_log)
 {
@@ -942,9 +948,9 @@ static int __d40_execute_command_phy(struct d40_chan *d40c,
 		}
 
 		if (i == D40_SUSPEND_MAX_IT) {
-			dev_err(&d40c->chan.dev->device,
-				"[%s]: unable to suspend the chl %d (log: %d) status %x\n",
-				__func__, d40c->phy_chan->num, d40c->log_num,
+			chan_err(d40c,
+				"unable to suspend the chl %d (log: %d) status %x\n",
+				d40c->phy_chan->num, d40c->log_num,
 				status);
 #ifdef CONFIG_STE_DMA40_DEBUG
 			sted40_history_dump();
@@ -1496,8 +1502,8 @@ static irqreturn_t d40_handle_interrupt(int irq, void *data)
 
 			dma_tc_handle(d40c);
 		} else {
-			dev_err(base->dev, "[%s] Error IRQ chan: %ld offset %d idx %d\n",
-				__func__, chan, il[row].offset, idx);
+			d40_err(base->dev, "IRQ chan: %ld offset %d idx %d\n",
+				chan, il[row].offset, idx);
 #ifdef CONFIG_STE_DMA40_DEBUG
 			sted40_history_dump();
 #endif
@@ -1522,52 +1528,45 @@ static int d40_validate_conf(struct d40_chan *d40c,
 	bool is_log = conf->mode == STEDMA40_MODE_LOGICAL;
 
 	if (!conf->dir) {
-		dev_err(&d40c->chan.dev->device, "[%s] Invalid direction.\n",
-			__func__);
+		chan_err(d40c, "Invalid direction.\n");
 		res = -EINVAL;
 	}
 
 	if (conf->dst_dev_type != STEDMA40_DEV_DST_MEMORY &&
 	   d40c->base->plat_data->dev_tx[conf->dst_dev_type] == 0) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Invalid TX channel address (%d)\n",
-			__func__, conf->dst_dev_type);
+		chan_err(d40c, "Invalid TX channel address (%d)\n",
+			 conf->dst_dev_type);
 		res = -EINVAL;
 	}
 
 	if (conf->src_dev_type != STEDMA40_DEV_SRC_MEMORY &&
 	   d40c->base->plat_data->dev_rx[conf->src_dev_type] == 0) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Invalid RX channel address (%d)\n",
-			__func__, conf->src_dev_type);
+		chan_err(d40c, "Invalid RX channel address (%d)\n",
+			conf->src_dev_type);
 		res = -EINVAL;
 	}
 
 	if (conf->dir == STEDMA40_MEM_TO_PERIPH &&
 	    dst_event_group == STEDMA40_DEV_DST_MEMORY) {
-		dev_err(&d40c->chan.dev->device, "[%s] Invalid dst\n",
-			__func__);
+		chan_err(d40c, "Invalid dst\n");
 		res = -EINVAL;
 	}
 
 	if (conf->dir == STEDMA40_PERIPH_TO_MEM &&
 	    src_event_group == STEDMA40_DEV_SRC_MEMORY) {
-		dev_err(&d40c->chan.dev->device, "[%s] Invalid src\n",
-			__func__);
+		chan_err(d40c, "Invalid src\n");
 		res = -EINVAL;
 	}
 
 	if (src_event_group == STEDMA40_DEV_SRC_MEMORY &&
 	    dst_event_group == STEDMA40_DEV_DST_MEMORY && is_log) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] No event line\n", __func__);
+		chan_err(d40c, "No event line\n");
 		res = -EINVAL;
 	}
 
 	if (conf->dir == STEDMA40_PERIPH_TO_PERIPH &&
 	    (src_event_group != dst_event_group)) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Invalid event group\n", __func__);
+		chan_err(d40c, "Invalid event group\n");
 		res = -EINVAL;
 	}
 
@@ -1576,9 +1575,7 @@ static int d40_validate_conf(struct d40_chan *d40c,
 		 * DMAC HW supports it. Will be added to this driver,
 		 * in case any dma client requires it.
 		 */
-		dev_err(&d40c->chan.dev->device,
-			"[%s] periph to periph not supported\n",
-			__func__);
+		chan_err(d40c, "periph to periph not supported\n");
 		res = -EINVAL;
 	}
 
@@ -1808,8 +1805,7 @@ static int d40_config_memcpy(struct d40_chan *d40c)
 		   dma_has_cap(DMA_SLAVE, cap)) {
 		d40c->dma_cfg = *d40c->base->plat_data->memcpy_conf_phy;
 	} else {
-		dev_err(&d40c->chan.dev->device, "[%s] No memcpy\n",
-			__func__);
+		chan_err(d40c, "No memcpy\n");
 		return -EINVAL;
 	}
 
@@ -1838,15 +1834,13 @@ static int d40_free_dma(struct d40_chan *d40c)
 		}
 
 	if (phy == NULL) {
-		dev_err(&d40c->chan.dev->device, "[%s] phy == null\n",
-			__func__);
+		chan_err(d40c, "phy == null\n");
 		return -EINVAL;
 	}
 
 	if (phy->allocated_src == D40_ALLOC_FREE &&
 	    phy->allocated_dst == D40_ALLOC_FREE) {
-		dev_err(&d40c->chan.dev->device, "[%s] channel already free\n",
-			__func__);
+		chan_err(d40c, "channel already free\n");
 		return -EINVAL;
 	}
 
@@ -1858,8 +1852,7 @@ static int d40_free_dma(struct d40_chan *d40c)
 		event = D40_TYPE_TO_EVENT(d40c->dma_cfg.src_dev_type);
 		is_src = true;
 	} else {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Unknown direction\n", __func__);
+		chan_err(d40c, "Unknown direction\n");
 		return -EINVAL;
 	}
 
@@ -1867,8 +1860,7 @@ static int d40_free_dma(struct d40_chan *d40c)
 
 	res = d40_channel_execute_command(d40c, D40_DMA_STOP);
 	if (res) {
-		dev_err(&d40c->chan.dev->device, "[%s] stop failed\n",
-			__func__);
+		chan_err(d40c, "stop failed\n");
 		d40_usage_dec(d40c);
 		return res;
 	}
@@ -1925,8 +1917,7 @@ static bool d40_is_paused(struct d40_chan *d40c)
 		event = D40_TYPE_TO_EVENT(d40c->dma_cfg.src_dev_type);
 		status = readl(chanbase + D40_CHAN_REG_SSLNK);
 	} else {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Unknown direction\n", __func__);
+		chan_err(d40c, "Unknown direction\n");
 		goto _exit;
 	}
 
@@ -1954,8 +1945,7 @@ struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
 	unsigned long flags;
 
 	if (d40c->phy_chan == NULL) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Unallocated channel.\n", __func__);
+		chan_err(d40c, "Unallocated channel.\n");
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -1972,8 +1962,7 @@ struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
 	if (chan_is_logical(d40c)) {
 
 		if (d40_pool_lli_alloc(d40d, sgl_len, true) < 0) {
-			dev_err(&d40c->chan.dev->device,
-				"[%s] Out of memory\n", __func__);
+			chan_err(d40c, "Out of memory\n");
 			goto err;
 		}
 
@@ -1990,8 +1979,7 @@ struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
 					 d40c->dma_cfg.dst_info.data_width);
 	} else {
 		if (d40_pool_lli_alloc(d40d, sgl_len, false) < 0) {
-			dev_err(&d40c->chan.dev->device,
-				"[%s] Out of memory\n", __func__);
+			chan_err(d40c, "Out of memory\n");
 			goto err;
 		}
 
@@ -2114,17 +2102,14 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
 	if (!d40c->configured) {
 		err = d40_config_memcpy(d40c);
 		if (err) {
-			dev_err(&d40c->chan.dev->device,
-				"[%s] Failed to configure memcpy channel\n",
-				__func__);
+			chan_err(d40c, "Failed to configure memcpy channel\n");
 			goto fail;
 		}
 	}
 
 	err = d40_allocate_channel(d40c, &is_free_phy);
 	if (err) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Failed to allocate channel\n", __func__);
+		chan_err(d40c, "Failed to allocate channel\n");
 		d40c->configured = false;
 		goto fail;
 	}
@@ -2177,8 +2162,7 @@ static void d40_free_chan_resources(struct dma_chan *chan)
 	unsigned long flags;
 
 	if (d40c->phy_chan == NULL) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Cannot free unallocated channel\n", __func__);
+		chan_err(d40c, "Cannot free unallocated channel\n");
 		return;
 	}
 
@@ -2187,8 +2171,7 @@ static void d40_free_chan_resources(struct dma_chan *chan)
 	err = d40_free_dma(d40c);
 
 	if (err)
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Failed to free channel\n", __func__);
+		chan_err(d40c, "Failed to free channel\n");
 	spin_unlock_irqrestore(&d40c->lock, flags);
 }
 
@@ -2205,8 +2188,7 @@ static struct dma_async_tx_descriptor *d40_prep_memcpy(struct dma_chan *chan,
 	int err = 0;
 
 	if (d40c->phy_chan == NULL) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Channel is not allocated.\n", __func__);
+		chan_err(d40c, "Channel is not allocated.\n");
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -2214,8 +2196,7 @@ static struct dma_async_tx_descriptor *d40_prep_memcpy(struct dma_chan *chan,
 	d40d = d40_desc_get(d40c);
 
 	if (d40d == NULL) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Descriptor is NULL\n", __func__);
+		chan_err(d40c, "Descriptor is NULL\n");
 		goto err;
 	}
 
@@ -2230,8 +2211,7 @@ static struct dma_async_tx_descriptor *d40_prep_memcpy(struct dma_chan *chan,
 	if (chan_is_logical(d40c)) {
 
 		if (d40_pool_lli_alloc(d40d, 1, true) < 0) {
-			dev_err(&d40c->chan.dev->device,
-				"[%s] Out of memory\n", __func__);
+			chan_err(d40c, "Out of memory\n");
 			goto err2;
 		}
 		d40d->lli_len = 1;
@@ -2254,8 +2234,7 @@ static struct dma_async_tx_descriptor *d40_prep_memcpy(struct dma_chan *chan,
 	} else {
 
 		if (d40_pool_lli_alloc(d40d, 1, false) < 0) {
-			dev_err(&d40c->chan.dev->device,
-				"[%s] Out of memory\n", __func__);
+			chan_err(d40c, "Out of memory\n");
 			goto err2;
 		}
 
@@ -2293,8 +2272,7 @@ static struct dma_async_tx_descriptor *d40_prep_memcpy(struct dma_chan *chan,
 	return &d40d->txd;
 
 err_fill_lli:
-	dev_err(&d40c->chan.dev->device,
-		"[%s] Failed filling in PHY LLI\n", __func__);
+	chan_err(d40c, "Failed filling in PHY LLI\n");
 err2:
 	d40_usage_dec(d40c);
 err:
@@ -2363,8 +2341,7 @@ static int d40_prep_slave_sg_log(struct d40_desc *d40d,
 	int total_size;
 
 	if (d40_pool_lli_alloc(d40d, sg_len, true) < 0) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Out of memory\n", __func__);
+		chan_err(d40c, "Out of memory\n");
 		return -ENOMEM;
 	}
 
@@ -2403,8 +2380,7 @@ static int d40_prep_slave_sg_phy(struct d40_desc *d40d,
 	int res;
 
 	if (d40_pool_lli_alloc(d40d, sgl_len, false) < 0) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Out of memory\n", __func__);
+		chan_err(d40c, "Out of memory\n");
 		return -ENOMEM;
 	}
 
@@ -2464,8 +2440,7 @@ d40_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 
 
 	if (d40c->phy_chan == NULL) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Cannot prepare unallocated channel\n", __func__);
+		chan_err(d40c, "Cannot prepare unallocated channel\n");
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -2485,9 +2460,7 @@ d40_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 	d40_usage_dec(d40c);
 
 	if (err) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Failed to prepare %s slave sg job: %d\n",
-			__func__,
+		chan_err(d40c, "Failed to prepare %s slave sg job: %d\n",
 			chan_is_logical(d40c) ? "log" : "phy", err);
 		goto err;
 	}
@@ -2519,9 +2492,7 @@ static enum dma_status d40_tx_status(struct dma_chan *chan,
 	int ret;
 
 	if (d40c->phy_chan == NULL) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Cannot read status of unallocated channel\n",
-			__func__);
+		chan_err(d40c, "Cannot read status of unallocated channel\n");
 		return -EINVAL;
 	}
 
@@ -2551,8 +2522,7 @@ static void d40_issue_pending(struct dma_chan *chan)
 	unsigned long flags;
 
 	if (d40c->phy_chan == NULL) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Channel is not allocated!\n", __func__);
+		chan_err(d40c, "Channel is not allocated!\n");
 		return;
 	}
 
@@ -2582,8 +2552,7 @@ static void d40_terminate_all(struct dma_chan *chan)
 
 	ret = d40_channel_execute_command(d40c, D40_DMA_STOP);
 	if (ret)
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Failed to stop channel\n", __func__);
+		chan_err(d40c, "Failed to stop channel\n");
 
 	d40_term_all(d40c);
 	d40_usage_dec(d40c);
@@ -2772,8 +2741,7 @@ static int d40_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
 	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
 
 	if (d40c->phy_chan == NULL) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Channel is not allocated!\n", __func__);
+		chan_err(d40c, "Channel is not allocated!\n");
 		return -EINVAL;
 	}
 
@@ -2925,16 +2893,13 @@ stedma40_cyclic_prep_sg(struct dma_chan *chan,
 	spin_lock_irqsave(&d40c->lock, flags);
 
 	if (d40c->phy_chan == NULL) {
-		dev_err(&chan->dev->device,
-			"[%s] Cannot prepare unallocated channel\n", __func__);
+		chan_err(d40c, "Cannot prepare unallocated channel\n");
 		err = -EINVAL;
 		goto out;
 	}
 
 	if (d40c->cdesc || d40c->busy) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Cannot prepare cyclic job for busy channel\n",
-			__func__);
+		chan_err(d40c, "Cannot prepare cyclic job for busy channel\n");
 		err = -EBUSY;
 		goto out;
 	}
@@ -2953,9 +2918,7 @@ stedma40_cyclic_prep_sg(struct dma_chan *chan,
 					    direction, dma_flags);
 
 	if (err) {
-		dev_err(&d40c->chan.dev->device,
-			"[%s] Failed to prepare %s slave sg job: %d\n",
-			__func__,
+		chan_err(d40c,"Failed to prepare %s slave sg job: %d\n",
 			chan_is_logical(d40c) ? "log" : "phy", err);
 		goto out2;
 	}
@@ -2967,9 +2930,7 @@ stedma40_cyclic_prep_sg(struct dma_chan *chan,
 	 * jobs.
 	 */
 	if (d40d->lli_current != d40d->lli_len) {
-		dev_err(&chan->dev->device,
-			"[%s] Couldn't prepare cyclic job: not enough LCLA",
-			__func__);
+		chan_err(d40c,"Couldn't prepare cyclic job: not enough LCLA");
 		err = -EBUSY;
 		goto out2;
 	}
@@ -3102,9 +3063,7 @@ static int __init d40_dmaengine_init(struct d40_base *base,
 	err = dma_async_device_register(&base->dma_slave);
 
 	if (err) {
-		dev_err(base->dev,
-			"[%s] Failed to register slave channels\n",
-			__func__);
+		d40_err(base->dev, "Failed to register slave channels\n");
 		goto failure1;
 	}
 
@@ -3119,9 +3078,8 @@ static int __init d40_dmaengine_init(struct d40_base *base,
 	err = dma_async_device_register(&base->dma_memcpy);
 
 	if (err) {
-		dev_err(base->dev,
-			"[%s] Failed to regsiter memcpy only channels\n",
-			__func__);
+		d40_err(base->dev,
+			"Failed to regsiter memcpy only channels\n");
 		goto failure2;
 	}
 
@@ -3138,9 +3096,8 @@ static int __init d40_dmaengine_init(struct d40_base *base,
 	err = dma_async_device_register(&base->dma_both);
 
 	if (err) {
-		dev_err(base->dev,
-			"[%s] Failed to register logical and physical capable channels\n",
-			__func__);
+		d40_err(base->dev,
+			"Failed to register logical and physical capable channels\n");
 		goto failure3;
 	}
 	return 0;
@@ -3306,8 +3263,7 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
 	clk = clk_get(&pdev->dev, NULL);
 
 	if (IS_ERR(clk)) {
-		dev_err(&pdev->dev, "[%s] No matching clock found\n",
-			__func__);
+		d40_err(&pdev->dev, "No matching clock found\n");
 		goto failure;
 	}
 
@@ -3334,9 +3290,8 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(dma_id_regs); i++) {
 		if (dma_id_regs[i].val !=
 		    readl(virtbase + dma_id_regs[i].reg)) {
-			dev_err(&pdev->dev,
-				"[%s] Unknown hardware! Expected 0x%x at 0x%x but got 0x%x\n",
-				__func__,
+			d40_err(&pdev->dev,
+				"Unknown hardware! Expected 0x%x at 0x%x but got 0x%x\n",
 				dma_id_regs[i].val,
 				dma_id_regs[i].reg,
 				readl(virtbase + dma_id_regs[i].reg));
@@ -3348,9 +3303,8 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
 	val = readl(virtbase + D40_DREG_PERIPHID2);
 
 	if ((val & 0xf) != D40_PERIPHID2_DESIGNER) {
-		dev_err(&pdev->dev,
-			"[%s] Unknown designer! Got %x wanted %x\n",
-			__func__, val & 0xf, D40_PERIPHID2_DESIGNER);
+		d40_err(&pdev->dev, "Unknown designer! Got %x wanted %x\n",
+			val & 0xf, D40_PERIPHID2_DESIGNER);
 		goto failure;
 	}
 
@@ -3376,7 +3330,7 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
 		       sizeof(struct d40_chan), GFP_KERNEL);
 
 	if (base == NULL) {
-		dev_err(&pdev->dev, "[%s] Out of memory\n", __func__);
+		d40_err(&pdev->dev, "Out of memory\n");
 		goto failure;
 	}
 
@@ -3556,9 +3510,8 @@ static int __init d40_lcla_allocate(struct d40_base *base)
 						base->lcla_pool.pages);
 		if (!page_list[i]) {
 
-			dev_err(base->dev,
-				"[%s] Failed to allocate %d pages.\n",
-				__func__, base->lcla_pool.pages);
+			d40_err(base->dev, "Failed to allocate %d pages.\n",
+				base->lcla_pool.pages);
 
 			for (j = 0; j < i; j++)
 				free_pages(page_list[j], base->lcla_pool.pages);
@@ -3630,9 +3583,7 @@ static int __init d40_probe(struct platform_device *pdev)
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "lcpa");
 	if (!res) {
 		ret = -ENOENT;
-		dev_err(&pdev->dev,
-			"[%s] No \"lcpa\" memory resource\n",
-			__func__);
+		d40_err(&pdev->dev, "No \"lcpa\" memory resource\n");
 		goto failure;
 	}
 	base->lcpa_size = resource_size(res);
@@ -3641,9 +3592,9 @@ static int __init d40_probe(struct platform_device *pdev)
 	if (request_mem_region(res->start, resource_size(res),
 			       D40_NAME " I/O lcpa") == NULL) {
 		ret = -EBUSY;
-		dev_err(&pdev->dev,
-			"[%s] Failed to request LCPA region 0x%x-0x%x\n",
-			__func__, res->start, res->end);
+		d40_err(&pdev->dev,
+			"Failed to request LCPA region 0x%x-0x%x\n",
+			res->start, res->end);
 		goto failure;
 	}
 
@@ -3659,9 +3610,7 @@ static int __init d40_probe(struct platform_device *pdev)
 	base->lcpa_base = ioremap(res->start, resource_size(res));
 	if (!base->lcpa_base) {
 		ret = -ENOMEM;
-		dev_err(&pdev->dev,
-			"[%s] Failed to ioremap LCPA region\n",
-			__func__);
+		d40_err(&pdev->dev, "Failed to ioremap LCPA region\n");
 		goto failure;
 	}
 	/* If lcla has to be located in ESRAM we don't need to allocate */
@@ -3670,27 +3619,22 @@ static int __init d40_probe(struct platform_device *pdev)
 							"lcla_esram");
 		if (!res) {
 			ret = -ENOENT;
-			dev_err(&pdev->dev,
-				"[%s] No \"lcla_esram\" memory resource\n",
-				__func__);
+			d40_err(&pdev->dev,
+				"No \"lcla_esram\" memory resource\n");
 			goto failure;
 		}
 		base->lcla_pool.base = ioremap(res->start,
 						resource_size(res));
 		if (!base->lcla_pool.base) {
 			ret = -ENOMEM;
-			dev_err(&pdev->dev,
-				"[%s] Failed to ioremap LCLA region\n",
-				__func__);
+			d40_err(&pdev->dev,"Failed to ioremap LCLA region\n");
 			goto failure;
 		}
 		writel(res->start, base->virtbase + D40_DREG_LCLA);
 	} else {
 		ret = d40_lcla_allocate(base);
 		if (ret) {
-			dev_err(&pdev->dev,
-				"[%s] Failed to allocate LCLA area\n",
-				__func__);
+			d40_err(&pdev->dev, "Failed to allocate LCLA area\n");
 			goto failure;
 		}
 	}
@@ -3707,9 +3651,8 @@ static int __init d40_probe(struct platform_device *pdev)
 	base->irq = platform_get_irq(pdev, 0);
 
 	ret = request_irq(base->irq, d40_handle_interrupt, 0, D40_NAME, base);
-
 	if (ret) {
-		dev_err(&pdev->dev, "[%s] No IRQ defined\n", __func__);
+		d40_err(&pdev->dev, "No IRQ defined\n");
 		goto failure;
 	}
 
@@ -3769,7 +3712,7 @@ failure:
 		kfree(base);
 	}
 
-	dev_err(&pdev->dev, "[%s] probe failed\n", __func__);
+	d40_err(&pdev->dev, "probe failed\n");
 	return ret;
 }
 
