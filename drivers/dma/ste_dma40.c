@@ -1974,11 +1974,9 @@ _exit:
 static int
 d40_prep_sg_log(struct d40_chan *chan, struct d40_desc *desc,
 		struct scatterlist *sg_src, struct scatterlist *sg_dst,
-		unsigned int sg_len, enum dma_data_direction direction,
-		dma_addr_t dev_addr)
+		unsigned int sg_len, dma_addr_t src_dev_addr,
+		dma_addr_t dst_dev_addr)
 {
-	dma_addr_t src_dev_addr = direction == DMA_FROM_DEVICE ? dev_addr : 0;
-	dma_addr_t dst_dev_addr = direction == DMA_TO_DEVICE ? dev_addr : 0;
 	struct stedma40_chan_cfg *cfg = &chan->dma_cfg;
 	struct stedma40_half_channel_info *src_info = &cfg->src_info;
 	struct stedma40_half_channel_info *dst_info = &cfg->dst_info;
@@ -2002,11 +2000,9 @@ d40_prep_sg_log(struct d40_chan *chan, struct d40_desc *desc,
 static int
 d40_prep_sg_phy(struct d40_chan *chan, struct d40_desc *desc,
 		struct scatterlist *sg_src, struct scatterlist *sg_dst,
-		unsigned int sg_len, enum dma_data_direction direction,
-		dma_addr_t dev_addr)
+		unsigned int sg_len, dma_addr_t src_dev_addr,
+		dma_addr_t dst_dev_addr)
 {
-	dma_addr_t src_dev_addr = direction == DMA_FROM_DEVICE ? dev_addr : 0;
-	dma_addr_t dst_dev_addr = direction == DMA_TO_DEVICE ? dev_addr : 0;
 	struct stedma40_chan_cfg *cfg = &chan->dma_cfg;
 	struct stedma40_half_channel_info *src_info = &cfg->src_info;
 	struct stedma40_half_channel_info *dst_info = &cfg->dst_info;
@@ -2098,7 +2094,8 @@ d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
 	    enum dma_data_direction direction, unsigned long dma_flags)
 {
 	struct d40_chan *chan = container_of(dchan, struct d40_chan, chan);
-	dma_addr_t dev_addr = 0;
+	dma_addr_t src_dev_addr = 0;
+	dma_addr_t dst_dev_addr = 0;
 	struct d40_desc *desc;
 	unsigned long flags;
 	int ret;
@@ -2114,15 +2111,21 @@ d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
 	if (desc == NULL)
 		goto err;
 
-	if (direction != DMA_NONE)
-		dev_addr = d40_get_dev_addr(chan, direction);
+	if (direction != DMA_NONE) {
+		dma_addr_t dev_addr = d40_get_dev_addr(chan, direction);
+
+		if (direction == DMA_FROM_DEVICE)
+			src_dev_addr = dev_addr;
+		else if (direction == DMA_TO_DEVICE)
+			dst_dev_addr = dev_addr;
+	}
 
 	if (chan_is_logical(chan))
 		ret = d40_prep_sg_log(chan, desc, sg_src, sg_dst,
-				      sg_len, direction, dev_addr);
+				      sg_len, src_dev_addr, dst_dev_addr);
 	else
 		ret = d40_prep_sg_phy(chan, desc, sg_src, sg_dst,
-				      sg_len, direction, dev_addr);
+				      sg_len, src_dev_addr, dst_dev_addr);
 
 	if (ret) {
 		chan_err(chan, "Failed to prepare %s sg job: %d\n",
@@ -2728,6 +2731,8 @@ stedma40_cyclic_prep_sg(struct dma_chan *chan,
 	unsigned long flags;
 	void *mem;
 	int err;
+	dma_addr_t src_dev_addr = 0;
+	dma_addr_t dst_dev_addr = 0;
 
 	mem = kzalloc(sizeof(struct stedma40_cyclic_desc)
 		      + sizeof(struct d40_desc), GFP_ATOMIC);
@@ -2765,12 +2770,17 @@ stedma40_cyclic_prep_sg(struct dma_chan *chan,
 
 	dev_addr = d40_get_dev_addr(d40c, direction);
 
+	if (direction == DMA_FROM_DEVICE)
+		src_dev_addr = dev_addr;
+	else if (direction == DMA_TO_DEVICE)
+		dst_dev_addr = dev_addr;
+
 	if (chan_is_logical(d40c))
 		err = d40_prep_sg_log(d40c, d40d, sgl, sgl,
-					sg_len, direction, dev_addr);
+					sg_len, src_dev_addr, dst_dev_addr);
 	else
 		err = d40_prep_sg_phy(d40c, d40d, sgl, sgl,
-					sg_len, direction, dev_addr);
+					sg_len, src_dev_addr, dst_dev_addr);
 
 	if (err) {
 		chan_err(d40c,"Failed to prepare %s slave sg job: %d\n",
