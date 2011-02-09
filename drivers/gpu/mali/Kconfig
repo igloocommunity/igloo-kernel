@@ -1,0 +1,7 @@
+config GPU_MALI
+       tristate "ARM Mali 200/300/400 support"
+       depends on ARM
+       ---help---
+       This enables support for the ARM Mali 200/300/400 family of GPUs.
+       Platform specific configuration is made in configuration files in the
+       drivers/gpu/mali/src folder
