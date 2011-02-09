@@ -52,6 +52,7 @@ static unsigned int fmax = 515633;
  * @sdio: variant supports SDIO
  * @st_clkdiv: true if using a ST-specific clock divider algorithm
  * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
+ * @non_power_of_2_blksize: true if block sizes can be other than power of two
  */
 struct variant_data {
 	unsigned int		clkreg;
@@ -62,6 +63,7 @@ struct variant_data {
 	bool			sdio;
 	bool			st_clkdiv;
 	bool			blksz_datactrl16;
+	bool			non_power_of_2_blksize;
 };
 
 static struct variant_data variant_arm = {
@@ -103,6 +105,7 @@ static struct variant_data variant_ux500v2 = {
 	.sdio			= true,
 	.st_clkdiv		= true,
 	.blksz_datactrl16	= true,
+	.non_power_of_2_blksize	= true,
 };
 
 /*
@@ -592,7 +595,6 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 	writel(host->size, base + MMCIDATALENGTH);
 
 	blksz_bits = ffs(data->blksz) - 1;
-	BUG_ON(1 << blksz_bits != data->blksz);
 
 	if (variant->blksz_datactrl16)
 		datactrl = MCI_DPSM_ENABLE | (data->blksz << 16);
@@ -995,11 +997,14 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
 static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 {
 	struct mmci_host *host = mmc_priv(mmc);
+	struct variant_data *variant = host->variant;
 	unsigned long flags;
 
 	WARN_ON(host->mrq != NULL);
 
-	if (mrq->data && !is_power_of_2(mrq->data->blksz)) {
+	if (mrq->data &&
+	    !variant->non_power_of_2_blksize &&
+	    !is_power_of_2(mrq->data->blksz)) {
 		dev_err(mmc_dev(mmc), "unsupported block size (%d bytes)\n",
 			mrq->data->blksz);
 		mrq->cmd->error = -EINVAL;
