@@ -885,6 +885,13 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 			pm_dev_dbg(dev, state, "legacy ");
 			error = legacy_suspend(dev, state, dev->bus->suspend);
 		}
+		if (error)
+			goto End;
+	}
+
+	if (dev->pwr_domain) {
+		pm_dev_dbg(dev, state, "power domain ");
+		pm_op(dev, &dev->pwr_domain->ops, state);
 	}
 
  End:
