@@ -444,8 +444,10 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 	if (cstates[target].ARM == ARM_ON) {
 
-		if (cstates[gov_cstate].ARM == ARM_OFF) {
 
+		switch(cstates[gov_cstate].ARM) {
+
+		case ARM_OFF:
 			ux500_ci_dbg_msg("WFI_prep");
 
 			/*
@@ -476,9 +478,8 @@ static int enter_sleep(struct cpuidle_device *dev,
 			smp_wmb();
 
 			context_restore_cpu_registers();
-
-		} else if (cstates[gov_cstate].ARM != ARM_ON) {
-
+			break;
+		case ARM_RET:
 			/*
 			 * Can not go ApIdle or deeper now, but it
 			 * might be possible later, so prepare for it
@@ -489,19 +490,16 @@ static int enter_sleep(struct cpuidle_device *dev,
 			 * ARM off mode. Use always-on-timer instead.
 			 */
 			migrate_to_always_on_timer(state);
-
-			ux500_ci_dbg_msg("WFI_prep2");
-			ux500_ci_dbg_log(CI_WFI, smp_processor_id());
-			__asm__ __volatile__
-				("dsb\n\t" "wfi\n\t" : : : "memory");
-
-
-		} else { /* Just WFI */
-
+			/* Fall through */
+		case ARM_ON:
 			ux500_ci_dbg_msg("WFI");
 			ux500_ci_dbg_log(CI_WFI, smp_processor_id());
 			__asm__ __volatile__
 				("dsb\n\t" "wfi\n\t" : : : "memory");
+			break;
+		default:
+			/* Cannot happen */
+			break;
 		}
 
 		restore_sequence(state);
