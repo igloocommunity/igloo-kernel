@@ -199,20 +199,27 @@ static void migrate_to_local_timer(struct cpu_state *state)
 	smp_wmb();
 }
 
-static void restore_sequence(struct cpu_state *state)
+static void restore_sequence(struct cpu_state *state, bool slept_well)
 {
 	unsigned long iflags;
 	ktime_t t;
 
+	if (!slept_well)
+		/* Recouple GIC with the interrupt bus */
+		ux500_pm_gic_recouple();
+
 	spin_lock_irqsave(&cpuidle_lock, iflags);
 
-	/*
-	 * Remove wake up time i.e. set wake up
-	 * far ahead
-	 */
-	t = ktime_add_us(ktime_get(), 1000000000); /* 16 minutes ahead */
-	state->sched_wake_up = t;
-	smp_wmb();
+	if (slept_well) {
+		/*
+		 * Remove wake up time i.e. set wake up
+		 * far ahead
+		 */
+		t = ktime_add_us(ktime_get(),
+				 1000000000); /* 16 minutes ahead */
+		state->sched_wake_up = t;
+		smp_wmb();
+	}
 
 	smp_rmb();
 	if (state->restore_arm_core) {
@@ -417,6 +424,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 	unsigned long iflags;
 	int idle_cpus;
 	u32 divps_rate;
+	bool slept_well = false;
 
 	local_irq_disable();
 
@@ -446,7 +454,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 	if (target < 0) {
 		/* "target" will be last_state in the cpuidle framework */
 		target = 0;
-		goto exit;
+		goto exit_fast;
 	}
 
 	if (cstates[target].ARM == ARM_ON) {
@@ -508,21 +516,16 @@ static int enter_sleep(struct cpuidle_device *dev,
 			/* Cannot happen */
 			break;
 		}
-
-		restore_sequence(state);
+		slept_well = true;
 		goto exit;
 	}
 
 	/* Decouple GIC from the interrupt bus */
 	ux500_pm_gic_decouple();
 
-	if (!ux500_pm_other_cpu_wfi()) {
+	if (!ux500_pm_other_cpu_wfi())
 		/* Other CPU was not in WFI => abort */
-		ux500_pm_gic_recouple();
-		migrate_to_local_timer(state);
-
 		goto exit;
-	}
 
 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
 			     PRCMU_WAKEUP(ABB));
@@ -532,22 +535,15 @@ static int enter_sleep(struct cpuidle_device *dev,
 	/* Check pending interrupts */
 	pending_int = ux500_pm_gic_pending_interrupt();
 
-	idle_cpus = atomic_read(&idle_cpus_counter);
-
 	/*
 	 * Check if we have a pending interrupt or if sleep
 	 * state has changed after GIC has been frozen
 	 */
 	if (pending_int ||
-	    (target != determine_sleep_state(idle_cpus, gov_cstate))) {
+	    (target != determine_sleep_state(atomic_read(&idle_cpus_counter),
+					     gov_cstate)))
 		/* Pending interrupt or sleep state has changed => abort */
-
-		/* Recouple GIC with the interrupt bus */
-		ux500_pm_gic_recouple();
-		migrate_to_local_timer(state);
-
 		goto exit;
-	}
 
 	/*
 	 * Copy GIC interrupt settings to
@@ -561,18 +557,9 @@ static int enter_sleep(struct cpuidle_device *dev,
 	divps_rate = ux500_pm_arm_on_ext_clk(cstates[target].ARM_PLL);
 
 	if (ux500_pm_prcmu_pending_interrupt()) {
-
 		/* An interrupt found => abort */
-
 		ux500_pm_arm_on_arm_pll(divps_rate);
-
-		/* Recouple GIC with the interrupt bus */
-		ux500_pm_gic_recouple();
-
-		migrate_to_local_timer(state);
-
 		goto exit;
-
 	}
 
 	/*
@@ -653,11 +640,13 @@ static int enter_sleep(struct cpuidle_device *dev,
 	/* The PRCMU restores ARM PLL and recouples the GIC */
 
 	context_restore_cpu_registers();
-	restore_sequence(state);
 
+	slept_well = true;
 exit:
+	restore_sequence(state, slept_well);
 	prcmu_disable_wakeups();
 
+exit_fast:
 	ux500_ci_dbg_log(CI_RUNNING, smp_processor_id());
 
 	atomic_dec(&idle_cpus_counter);
