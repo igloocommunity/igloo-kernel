@@ -108,6 +108,11 @@ static struct ux500_regulator ux500_atomic_regulators[] = {
 		.enable  = power_state_active_enable,
 		.disable = power_state_active_disable,
 	},
+	{
+		.name = "cryp1",
+		.enable  = power_state_active_enable,
+		.disable = power_state_active_disable,
+	},
 };
 
 struct ux500_regulator *__must_check ux500_regulator_get(struct device *dev)
@@ -121,6 +126,7 @@ struct ux500_regulator *__must_check ux500_regulator_get(struct device *dev)
 
 	return  ERR_PTR(-EINVAL);
 }
+EXPORT_SYMBOL_GPL(ux500_regulator_get);
 
 int ux500_regulator_atomic_enable(struct ux500_regulator *regulator)
 {
@@ -130,6 +136,7 @@ int ux500_regulator_atomic_enable(struct ux500_regulator *regulator)
 	}
 	return -EINVAL;
 }
+EXPORT_SYMBOL_GPL(ux500_regulator_atomic_enable);
 
 int ux500_regulator_atomic_disable(struct ux500_regulator *regulator)
 {
@@ -138,11 +145,13 @@ int ux500_regulator_atomic_disable(struct ux500_regulator *regulator)
 	else
 		return -EINVAL;
 }
+EXPORT_SYMBOL_GPL(ux500_regulator_atomic_disable);
 
 void ux500_regulator_put(struct ux500_regulator *regulator)
 {
 	/* Here for symetric reasons and for possible future use */
 }
+EXPORT_SYMBOL_GPL(ux500_regulator_put);
 
 static int u8500_regulator_enable(struct regulator_dev *rdev)
 {
