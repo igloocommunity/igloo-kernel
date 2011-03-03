@@ -342,16 +342,16 @@ int prcmu_qos_remove_notifier(int prcmu_qos_class,
 }
 EXPORT_SYMBOL_GPL(prcmu_qos_remove_notifier);
 
-#define PID_NAME_LEN 32
+#define USER_QOS_NAME_LEN 32
 
 static int prcmu_qos_power_open(struct inode *inode, struct file *filp,
 				long prcmu_qos_class)
 {
 	int ret;
-	char name[PID_NAME_LEN];
+	char name[USER_QOS_NAME_LEN];
 
 	filp->private_data = (void *)prcmu_qos_class;
-	snprintf(name, PID_NAME_LEN, "process_%d", current->pid);
+	snprintf(name, USER_QOS_NAME_LEN, "file_%08x", (unsigned int)filp);
 	ret = prcmu_qos_add_requirement(prcmu_qos_class, name,
 					PRCMU_QOS_DEFAULT_VALUE);
 	if (ret >= 0)
@@ -374,10 +374,10 @@ static int prcmu_qos_ddr_power_open(struct inode *inode, struct file *filp)
 static int prcmu_qos_power_release(struct inode *inode, struct file *filp)
 {
 	int prcmu_qos_class;
-	char name[PID_NAME_LEN];
+	char name[USER_QOS_NAME_LEN];
 
 	prcmu_qos_class = (long)filp->private_data;
-	snprintf(name, PID_NAME_LEN, "process_%d", current->pid);
+	snprintf(name, USER_QOS_NAME_LEN, "file_%08x", (unsigned int)filp);
 	prcmu_qos_remove_requirement(prcmu_qos_class, name);
 
 	return 0;
@@ -388,14 +388,14 @@ static ssize_t prcmu_qos_power_write(struct file *filp, const char __user *buf,
 {
 	s32 value;
 	int prcmu_qos_class;
-	char name[PID_NAME_LEN];
+	char name[USER_QOS_NAME_LEN];
 
 	prcmu_qos_class = (long)filp->private_data;
 	if (count != sizeof(s32))
 		return -EINVAL;
 	if (copy_from_user(&value, buf, sizeof(s32)))
 		return -EFAULT;
-	snprintf(name, PID_NAME_LEN, "process_%d", current->pid);
+	snprintf(name, USER_QOS_NAME_LEN, "file_%08x", (unsigned int)filp);
 	prcmu_qos_update_requirement(prcmu_qos_class, name, value);
 
 	return  sizeof(s32);
