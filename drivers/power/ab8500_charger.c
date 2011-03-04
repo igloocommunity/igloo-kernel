@@ -151,6 +151,7 @@ struct ab8500_charger_event_flags {
 	bool vbus_ovv;
 	bool usbchargernotok;
 	bool chgwdexp;
+	bool vbus_collapse;
 };
 
 struct ab8500_charger_usb_state {
@@ -236,6 +237,7 @@ static enum power_supply_property ab8500_charger_ac_props[] = {
 /* USB properties */
 static enum power_supply_property ab8500_charger_usb_props[] = {
 	POWER_SUPPLY_PROP_HEALTH,
+	POWER_SUPPLY_PROP_CURRENT_AVG,
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
@@ -486,9 +488,22 @@ static int ab8500_charger_max_usb_curr(struct ab8500_charger *di,
 	case USB_STAT_ACA_RID_C_NM:
 		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_1P5;
 		break;
+	case USB_STAT_RESERVED:
+		/*
+		 * This state is used to indicate that VBUS has dropped below
+		 * the detection level 4 times in a row. This is due to the
+		 * charger output current is set to high making the charger
+		 * voltage collapse. This have to be propagated through to
+		 * chargalg. This is done using the property
+		 * POWER_SUPPLY_PROP_CURRENT_AVG = 1
+		 */
+		di->flags.vbus_collapse = true;
+		dev_dbg(di->dev, "USB Type - USB_STAT_RESERVED "
+			"VBUS has collapsed\n");
+		ret = -1;
+		break;
 	case USB_STAT_HM_IDGND:
 	case USB_STAT_NOT_CONFIGURED:
-	case USB_STAT_RESERVED:
 	case USB_STAT_NOT_VALID_LINK:
 		dev_err(di->dev, "USB Type - Charging not allowed\n");
 		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P05;
@@ -1209,8 +1224,19 @@ static int ab8500_charger_update_charger_current(struct ux500_charger *charger,
 
 	ret = abx500_set_register_interruptible(di->dev, AB8500_CHARGER,
 		AB8500_CH_OPT_CRNTLVL_REG, (u8) curr_index);
-	if (ret)
+	if (ret) {
 		dev_err(di->dev, "%s write failed\n", __func__);
+		return ret;
+	}
+
+	/* Reset the main and usb drop input current measurement counter */
+	ret = abx500_set_register_interruptible(di->dev, AB8500_CHARGER,
+				AB8500_CHARGER_CTRL,
+				0x1);
+	if (ret) {
+		dev_err(di->dev, "%s write failed\n", __func__);
+		return ret;
+	}
 
 	return ret;
 }
@@ -1513,10 +1539,12 @@ static void ab8500_charger_check_usbchargernotok_work(struct work_struct *work)
 		dev_err(di->dev, "%s ab8500 read failed\n", __func__);
 		return;
 	}
-	if (reg_value & VBUS_CH_NOK)
+	if (reg_value & VBUS_CH_NOK) {
 		di->flags.usbchargernotok = true;
-	else
+	} else {
 		di->flags.usbchargernotok = false;
+		di->flags.vbus_collapse = false;
+	}
 
 	power_supply_changed(&di->usb_chg.psy);
 }
@@ -1964,6 +1992,16 @@ static int ab8500_charger_usb_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		val->intval = ab8500_charger_get_usb_current(di) * 1000;
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_AVG:
+		/*
+		 * This property is used to indicate when VBUS has collapsed
+		 * due to too high output current from the USB charger
+		 */
+		if (di->flags.vbus_collapse)
+			val->intval = 1;
+		else
+			val->intval = 0;
 		break;
 	default:
 		return -EINVAL;
