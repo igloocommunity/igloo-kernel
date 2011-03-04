@@ -613,21 +613,19 @@ static void ab8500_chargalg_check_temp(struct ab8500_chargalg *di)
 }
 
 /**
- * ab8500_chargalg_check_charger_health() - Check charger health
+ * ab8500_chargalg_check_charger_voltage() - Check charger voltage
  * @di:		pointer to the ab8500_chargalg structure
  *
- * Charger voltage and current is checked against maximum limits
+ * Charger voltage is checked against maximum limit
  */
-static void ab8500_chargalg_check_charger_health(struct ab8500_chargalg *di)
+static void ab8500_chargalg_check_charger_voltage(struct ab8500_chargalg *di)
 {
-	if (di->chg_info.usb_volt > di->bat->chg_params->usb_volt_max ||
-		di->chg_info.usb_curr > di->bat->chg_params->usb_curr_max)
+	if (di->chg_info.usb_volt > di->bat->chg_params->usb_volt_max)
 		di->chg_info.usb_chg_ok = false;
 	else
 		di->chg_info.usb_chg_ok = true;
 
-	if (di->chg_info.ac_volt > di->bat->chg_params->ac_volt_max ||
-		di->chg_info.ac_curr > di->bat->chg_params->ac_curr_max)
+	if (di->chg_info.ac_volt > di->bat->chg_params->ac_volt_max)
 		di->chg_info.ac_chg_ok = false;
 	else
 		di->chg_info.ac_chg_ok = true;
@@ -771,15 +769,21 @@ static enum maxim_ret ab8500_chargalg_chg_curr_maxim(struct ab8500_chargalg *di)
 static void handle_maxim_chg_curr(struct ab8500_chargalg *di)
 {
 	enum maxim_ret ret;
+	int result;
 
 	ret = ab8500_chargalg_chg_curr_maxim(di);
 	switch (ret) {
 	case MAXIM_RET_CHANGE:
-		ab8500_chargalg_update_chg_curr(di, di->ccm.current_iset);
+		result = ab8500_chargalg_update_chg_curr(di,
+			di->ccm.current_iset);
+		if (result)
+			dev_err(di->dev, "failed to set chg curr\n");
 		break;
 	case MAXIM_RET_IBAT_TOO_HIGH:
-		ab8500_chargalg_update_chg_curr(di,
+		result = ab8500_chargalg_update_chg_curr(di,
 			di->bat->bat_type[di->bat->batt_id].normal_cur_lvl);
+		if (result)
+			dev_err(di->dev, "failed to set chg curr\n");
 		break;
 
 	case MAXIM_RET_NOACTION:
@@ -1131,7 +1135,7 @@ static void ab8500_chargalg_algorithm(struct ab8500_chargalg *di)
 
 	ab8500_chargalg_end_of_charge(di);
 	ab8500_chargalg_check_temp(di);
-	ab8500_chargalg_check_charger_health(di);
+	ab8500_chargalg_check_charger_voltage(di);
 	charger_status = ab8500_chargalg_check_charger_connection(di);
 
 	/*
