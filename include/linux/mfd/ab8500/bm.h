@@ -163,21 +163,6 @@
 #define USB_0P4A			400
 #define USB_0P5A			500
 
-/* UsbChCurrLevel */
-#define USB_CH_IP_CUR_LVL_0P05		0x00
-#define USB_CH_IP_CUR_LVL_0P09		0x10
-#define USB_CH_IP_CUR_LVL_0P19		0x20
-#define USB_CH_IP_CUR_LVL_0P29		0x30
-#define USB_CH_IP_CUR_LVL_0P38		0x40
-#define USB_CH_IP_CUR_LVL_0P45		0x50
-#define USB_CH_IP_CUR_LVL_0P5		0x60
-#define USB_CH_IP_CUR_LVL_0P9		0xA0
-#define USB_CH_IP_CUR_LVL_1P0		0xB0
-#define USB_CH_IP_CUR_LVL_1P1		0xC0
-#define USB_CH_IP_CUR_LVL_1P3		0xD0
-#define USB_CH_IP_CUR_LVL_1P4		0xE0
-#define USB_CH_IP_CUR_LVL_1P5		0xF0
-
 #define LOW_BAT_3P1V			0x20
 #define LOW_BAT_2P3V			0x00
 #define LOW_BAT_RESET			0x01
