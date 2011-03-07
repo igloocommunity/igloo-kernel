@@ -45,7 +45,6 @@
 #define RTC_ICR_TIC	(1 << 1)
 
 static void __iomem *rtc_base;
-static void __iomem *rtt0_base;
 
 static void rtc_writel(unsigned long val, unsigned long addr)
 {
@@ -152,11 +151,9 @@ void rtc_rtt_timer_init(unsigned int cpu)
 
 	if (cpu_is_u8500()) {
 		rtc_base  = __io_address(U8500_RTC_BASE);
-		rtt0_base = __io_address(U8500_RTT0_BASE);
 		irq = IRQ_DB8500_RTC;
 	} else if (cpu_is_u5500()) {
 		rtc_base  = __io_address(U5500_RTC_BASE);
-		rtt0_base = __io_address(U5500_RTT0_BASE);
 		irq = IRQ_DB5500_RTC;
 	} else {
 		pr_err("timer-rtt: Unknown DB Asic!\n");
