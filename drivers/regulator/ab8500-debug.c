@@ -1786,8 +1786,7 @@ void ab8500_regulator_debug_restore(void)
 	ret = ab8500_regulator_record_state(AB8500_REGULATOR_STATE_RESUME_CORE);
 	if (ret < 0)
 		dev_err(&pdev->dev, "Failed to record resume state.\n");
-
-	for (i = 0; i < ARRAY_SIZE(ab8500_force_reg); i++) {
+	for (i = ARRAY_SIZE(ab8500_force_reg) - 1; i >= 0; i--) {
 		/* restore register value */
 		if (ab8500_force_reg[i].restore) {
 			ret = abx500_mask_and_set_register_interruptible(
