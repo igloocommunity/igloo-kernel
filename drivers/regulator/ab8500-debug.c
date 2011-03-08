@@ -1448,19 +1448,6 @@ struct ab8500_force_reg {
 static struct ab8500_force_reg ab8500_force_reg[] = {
 	{
 		/*
-		 * VpllVanaRegu
-		 * OTP: 0x01, HSI: 0x02, suspend: 0x01/0x0f (value/mask)
-		 * [3:2] VanaRegu[1:0] = Vana off
-		 * [1:0] VpllRegu[1:0] = Vpll HP
-		 */
-		.name = "VpllVanaRegu",
-		.bank = 0x04,
-		.addr = 0x06,
-		.mask = 0x0f,
-		.val  = 0x01,
-	},
-	{
-		/*
 		 * Vaux12Regu
 		 * OTP: 0x04, HSI: 0x00, suspend: 0x00/0x0f (value/mask)
 		 * [3:2] Vaux2Regu[1:0] = Vaux2 off
@@ -1629,19 +1616,6 @@ static struct ab8500_force_reg ab8500_force_reg[] = {
 		.addr = 0x05,
 		.mask = 0x0f,
 		.val  = 0x06,
-	},
-	{
-		/*
-		 * VpllVanaRegu
-		 * OTP: 0x01, HSI: 0x02, suspend: 0x02/0x0f (value/mask)
-		 * [3:2] VanaRegu[1:0] = Vana off
-		 * [1:0] VpllRegu[1:0] = Vpll in HW control
-		 */
-		.name = "VpllVanaRegu",
-		.bank = 0x04,
-		.addr = 0x06,
-		.mask = 0x0f,
-		.val  = 0x02,
 	},
 	{
 		/*
