@@ -23,7 +23,7 @@
 #define BOARD_PROFILE_BACKUPRAM1 (0x3)
 
 /* board profile option */
-#define OPTION_BOARD_VERSION_POWER 0x80
+#define OPTION_BOARD_VERSION_V5X 50
 
 /* for error prints */
 struct device *dev;
@@ -1853,7 +1853,7 @@ static int __devinit ab8500_regulator_debug_probe(struct platform_device *plf)
 			boot_info_backupram + BOARD_PROFILE_BACKUPRAM1);
 		dev_dbg(dev, "Board profile is 0x%02x\n", board_profile);
 
-		if (board_profile & OPTION_BOARD_VERSION_POWER)
+		if (board_profile >= OPTION_BOARD_VERSION_V5X)
 			setting_suspend_force = true;
 
 		iounmap(boot_info_backupram);
