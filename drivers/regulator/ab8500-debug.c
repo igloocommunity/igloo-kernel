@@ -1648,32 +1648,6 @@ static struct ab8500_force_reg ab8500_force_reg[] = {
 	},
 	{
 		/*
-		 * VBBSel1
-		 * OTP: 0x00, HSI: 0xdb, suspend: 0x00/0xff (value/mask)
-		 * [7:4] VBBPSel1[3:0] = [VBBP = VBBPFB]
-		 * [3:0] VBBNSel1[3:0] = [VBBN = 0 V]
-		 */
-		.name = "VBBSel1",
-		.bank = 0x04,
-		.addr = 0x11,
-		.mask = 0xff,
-		.val  = 0x00,
-	},
-	{
-		/*
-		 * VBBSel2
-		 * OTP: 0x00, HSI: N/A, suspend: 0x28/0xff (value/mask)
-		 * [7:4]   VBBPSel2[3:0] = [VBBP = VBBPFB]
-		 * [3:0]   VBBNSel2[3:0] = [VBBN = 0 V]
-		 */
-		.name = "VBBSel2",
-		.bank = 0x04,
-		.addr = 0x12,
-		.mask = 0xff,
-		.val  = 0x28,
-	},
-	{
-		/*
 		 * TVoutCtrl
 		 * OTP: N/A, HSI: N/A, suspend: 0x00/0x03 (value/mask)
 		 * [  2]   PlugTvOn = plug/unplug detection disabled
