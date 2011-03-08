@@ -605,6 +605,12 @@ static struct resource ab8500_fg_resources[] = {
 		.end = AB8500_INT_LOW_BAT_R,
 		.flags = IORESOURCE_IRQ,
 	},
+	{
+		.name = "CC_INT_CALIB",
+		.start = AB8500_INT_CC_INT_CALIB,
+		.end = AB8500_INT_CC_INT_CALIB,
+		.flags = IORESOURCE_IRQ,
+	},
 };
 
 static struct resource ab8500_chargalg_resources[] = {};
