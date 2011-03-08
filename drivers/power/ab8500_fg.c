@@ -84,6 +84,12 @@ static char *charge_state[] = {
 	"CHARGE_READOUT",
 };
 
+enum ab8500_fg_calibration_state {
+	AB8500_FG_CALIB_INIT,
+	AB8500_FG_CALIB_WAIT,
+	AB8500_FG_CALIB_END,
+};
+
 struct ab8500_fg_avg_cap {
 	int avg;
 	int samples[NBR_AVG_SAMPLES];
@@ -113,6 +119,7 @@ struct ab8500_fg_flags {
 	bool low_bat;
 	bool bat_ovv;
 	bool batt_unknown;
+	bool calibrate;
 };
 
 /**
@@ -130,6 +137,7 @@ struct ab8500_fg_flags {
  * @recovery_needed:	Indicate if recovery is needed
  * @high_curr_mode:	Indicate if we're in high current mode
  * @init_capacity:	Indicate if initial capacity measuring should be done
+ * @calib_state		State during offset calibration
  * @discharge_state:	Current discharge state
  * @charge_state:	Current charge state
  * @flags:		Structure for information about events triggered
@@ -161,6 +169,7 @@ struct ab8500_fg {
 	bool recovery_needed;
 	bool high_curr_mode;
 	bool init_capacity;
+	enum ab8500_fg_calibration_state calib_state;
 	enum ab8500_fg_discharge_state discharge_state;
 	enum ab8500_fg_charge_state charge_state;
 	struct ab8500_fg_flags flags;
@@ -1073,14 +1082,12 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
 	case AB8500_FG_DISCHARGE_INIT:
 		/* We use the FG IRQ to work on */
 		di->init_cnt = 0;
-		di->fg_samples = SEC_TO_SAMPLE(
-			di->bat->fg_params->init_timer);
+		di->fg_samples = SEC_TO_SAMPLE(di->bat->fg_params->init_timer);
 		ab8500_fg_coulomb_counter(di, true);
 		ab8500_fg_discharge_state_to(di,
 			AB8500_FG_DISCHARGE_INITMEASURING);
 
 		/* Intentional fallthrough */
-
 	case AB8500_FG_DISCHARGE_INITMEASURING:
 		/*
 		 * Discard a number of samples during startup.
@@ -1232,6 +1239,56 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
 }
 
 /**
+ * ab8500_fg_algorithm_calibrate() - Internal columb counter offset calibration
+ * @di:		pointer to the ab8500_fg structure
+ *
+ */
+static void ab8500_fg_algorithm_calibrate(struct ab8500_fg *di)
+{
+	int ret;
+
+	switch (di->calib_state) {
+	case AB8500_FG_CALIB_INIT:
+		dev_dbg(di->dev, "Calibration ongoing...\n");
+
+		ret = abx500_mask_and_set_register_interruptible(di->dev,
+			AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
+			CC_INT_CAL_N_AVG_MASK, CC_INT_CAL_SAMPLES_8);
+		if (ret < 0)
+			goto err;
+
+		ret = abx500_mask_and_set_register_interruptible(di->dev,
+			AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
+			CC_INTAVGOFFSET_ENA, CC_INTAVGOFFSET_ENA);
+		if (ret < 0)
+			goto err;
+		di->calib_state = AB8500_FG_CALIB_WAIT;
+		break;
+	case AB8500_FG_CALIB_END:
+		ret = abx500_mask_and_set_register_interruptible(di->dev,
+			AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
+			CC_MUXOFFSET, CC_MUXOFFSET);
+		if (ret < 0)
+			goto err;
+		di->flags.calibrate = false;
+		dev_dbg(di->dev, "Calibration done...\n");
+		queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
+		break;
+	case AB8500_FG_CALIB_WAIT:
+		dev_dbg(di->dev, "Calibration WFI\n");
+	default:
+		break;
+	}
+	return;
+err:
+	/* Something went wrong, don't calibrate then */
+	dev_err(di->dev, "failed to calibrate the CC\n");
+	di->flags.calibrate = false;
+	di->calib_state = AB8500_FG_CALIB_INIT;
+	queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
+}
+
+/**
  * ab8500_fg_algorithm() - Entry point for the FG algorithm
  * @di:		pointer to the ab8500_fg structure
  *
@@ -1239,10 +1296,14 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
  */
 static void ab8500_fg_algorithm(struct ab8500_fg *di)
 {
-	if (di->flags.charging)
-		ab8500_fg_algorithm_charging(di);
-	else
-		ab8500_fg_algorithm_discharging(di);
+	if (di->flags.calibrate)
+		ab8500_fg_algorithm_calibrate(di);
+	else {
+		if (di->flags.charging)
+			ab8500_fg_algorithm_charging(di);
+		else
+			ab8500_fg_algorithm_discharging(di);
+	}
 
 	dev_dbg(di->dev, "[FG_DATA] %d %d %d %d %d %d %d %d %d "
 		"%d %d %d %d %d %d %d\n",
@@ -1282,9 +1343,9 @@ static void ab8500_fg_periodic_work(struct work_struct *work)
 		ab8500_fg_calc_cap_discharge_voltage(di, true);
 		ab8500_fg_check_capacity_limits(di, true);
 		di->init_capacity = false;
-	} else {
+		queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
+	} else
 		ab8500_fg_algorithm(di);
-	}
 }
 
 /**
@@ -1336,6 +1397,21 @@ static void ab8500_fg_instant_work(struct work_struct *work)
 	struct ab8500_fg *di = container_of(work, struct ab8500_fg, fg_work);
 
 	ab8500_fg_algorithm(di);
+}
+
+/**
+ * ab8500_fg_cc_convend_handler() - isr to get battery avg current.
+ * @irq:       interrupt number
+ * @_di:       pointer to the ab8500_fg structure
+ *
+ * Returns IRQ status(IRQ_HANDLED)
+ */
+static irqreturn_t ab8500_fg_cc_int_calib_handler(int irq, void *_di)
+{
+	struct ab8500_fg *di = _di;
+	di->calib_state = AB8500_FG_CALIB_END;
+	queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
+	return IRQ_HANDLED;
 }
 
 /**
@@ -1690,6 +1766,7 @@ static struct ab8500_fg_interrupts ab8500_fg_irq[] = {
 	{"NCONV_ACCU", ab8500_fg_cc_convend_handler},
 	{"BATT_OVV", ab8500_fg_batt_ovv_handler},
 	{"LOW_BAT_F", ab8500_fg_lowbatf_handler},
+	{"CC_INT_CALIB", ab8500_fg_cc_int_calib_handler},
 };
 
 static int __devinit ab8500_fg_probe(struct platform_device *pdev)
@@ -1808,6 +1885,9 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, di);
 
+	/* Calibrate the fg first time */
+	di->flags.calibrate = true;
+	di->calib_state = AB8500_FG_CALIB_INIT;
 	/* Run the FG algorithm */
 	queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
 
