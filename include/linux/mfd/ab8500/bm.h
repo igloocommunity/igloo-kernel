@@ -192,6 +192,13 @@
 #define CC_PWR_UP_ENA			0x01
 #define CC_SAMPLES_40			0x28
 #define RD_NCONV_ACCU_REQ		0x01
+#define CC_CALIB			0x08
+#define CC_INTAVGOFFSET_ENA		0x10
+#define CC_MUXOFFSET			0x80
+#define CC_INT_CAL_N_AVG_MASK		0x60
+#define CC_INT_CAL_SAMPLES_16		0x40
+#define CC_INT_CAL_SAMPLES_8		0x20
+#define CC_INT_CAL_SAMPLES_4		0x00
 
 /* RTC constants */
 #define RTC_BUP_CH_ENA			0x10
