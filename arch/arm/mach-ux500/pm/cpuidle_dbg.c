@@ -333,7 +333,8 @@ static int stats_print(struct seq_file *s, void *p)
 			t_us = ktime_to_us(sh->time[i]);
 			perc = ktime_to_us(sh->time[i]);
 			do_div(t_us, 1000); /* to ms */
-			do_div(perc, total_us);
+			if (total_us != 0)
+				do_div(perc, total_us);
 
 			if (i == cstates_len)
 				seq_printf(s, "  - Running                : # "
