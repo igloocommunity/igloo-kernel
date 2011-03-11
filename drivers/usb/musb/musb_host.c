@@ -287,9 +287,10 @@ musb_start_urb(struct musb *musb, int is_in, struct musb_qh *qh)
 	default:
 start:
 		DBG(4, "Start TX%d %s\n", epnum,
-			hw_ep->tx_channel ? "dma" : "pio");
+			(hw_ep->tx_channel && !hw_ep->do_tx_pio) ?
+				"dma" : "pio");
 
-		if (!hw_ep->tx_channel)
+		if (!hw_ep->tx_channel || hw_ep->do_tx_pio)
 			musb_h_tx_start(hw_ep);
 		else if (is_cppi_enabled() || tusb_dma_omap())
 			musb_h_tx_dma_start(hw_ep);
@@ -628,7 +629,7 @@ static bool musb_tx_dma_program(struct dma_controller *dma,
 	u16			csr;
 	u8			mode;
 
-#ifdef	CONFIG_USB_INVENTRA_DMA
+#if defined(CONFIG_USB_INVENTRA_DMA) || defined(CONFIG_USB_UX500_DMA)
 	if (length > channel->max_len)
 		length = channel->max_len;
 
@@ -669,8 +670,6 @@ static bool musb_tx_dma_program(struct dma_controller *dma,
 
 	if (!dma->channel_program(channel, pkt_size, mode,
 			urb->transfer_dma + offset, length)) {
-		dma->channel_release(channel);
-		hw_ep->tx_channel = NULL;
 
 		csr = musb_readw(epio, MUSB_TXCSR);
 		csr &= ~(MUSB_TXCSR_AUTOSET | MUSB_TXCSR_DMAENAB);
@@ -805,11 +804,11 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
 		else
 			load_count = min((u32) packet_sz, len);
 
-		if (dma_channel && musb_tx_dma_program(dma_controller,
+		if (!dma_channel || !musb_tx_dma_program(dma_controller,
 					hw_ep, qh, urb, offset, len))
-			load_count = 0;
+			hw_ep->do_tx_pio = true;
 
-		if (load_count) {
+		if (hw_ep->do_tx_pio) {
 			/* PIO to load FIFO */
 			qh->segsize = load_count;
 			musb_write_fifo(hw_ep, load_count, buf);
@@ -1118,7 +1117,7 @@ void musb_host_tx(struct musb *musb, u8 epnum)
 	struct urb		*urb = next_urb(qh);
 	u32			status = 0;
 	void __iomem		*mbase = musb->mregs;
-	struct dma_channel	*dma;
+	struct dma_channel	*dma = NULL;
 	bool			transfer_pending = false;
 
 	musb_ep_select(mbase, epnum);
@@ -1131,7 +1130,13 @@ void musb_host_tx(struct musb *musb, u8 epnum)
 	}
 
 	pipe = urb->pipe;
-	dma = is_dma_capable() ? hw_ep->tx_channel : NULL;
+
+	if (hw_ep->do_tx_pio)
+		/* Only allow the flag for one packet. */
+		hw_ep->do_tx_pio = false;
+	else if (is_dma_capable())
+		dma = hw_ep->tx_channel;
+
 	DBG(4, "OUT/TX%d end, csr %04x%s\n", epnum, tx_csr,
 			dma ? ", dma" : "");
 
@@ -1551,7 +1556,7 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 
 	/* FIXME this is _way_ too much in-line logic for Mentor DMA */
 
-#ifndef CONFIG_USB_INVENTRA_DMA
+#if !defined(CONFIG_USB_INVENTRA_DMA) && !defined(CONFIG_USB_UX500_DMA)
 	if (rx_csr & MUSB_RXCSR_H_REQPKT)  {
 		/* REVISIT this happened for a while on some short reads...
 		 * the cleanup still needs investigation... looks bad...
@@ -1583,7 +1588,7 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 			| MUSB_RXCSR_RXPKTRDY);
 		musb_writew(hw_ep->regs, MUSB_RXCSR, val);
 
-#ifdef CONFIG_USB_INVENTRA_DMA
+#if defined(CONFIG_USB_INVENTRA_DMA) || defined(CONFIG_USB_UX500_DMA)
 		if (usb_pipeisoc(pipe)) {
 			struct usb_iso_packet_descriptor *d;
 
@@ -1639,7 +1644,7 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 		}
 
 		/* we are expecting IN packets */
-#ifdef CONFIG_USB_INVENTRA_DMA
+#if defined(CONFIG_USB_INVENTRA_DMA) || defined(CONFIG_USB_UX500_DMA)
 		if (dma) {
 			struct dma_controller	*c;
 			u16			rx_count;
@@ -1747,10 +1752,9 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 				dma->desired_mode, buf, length);
 
 			if (!ret) {
-				c->channel_release(dma);
-				hw_ep->rx_channel = NULL;
 				dma = NULL;
-				/* REVISIT reset CSR */
+				/* Restore CSR */
+				musb_writew(epio, MUSB_RXCSR, rx_csr);
 			}
 		}
 #endif	/* Mentor DMA */
