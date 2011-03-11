@@ -17,6 +17,7 @@
 #include <linux/uaccess.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#include <linux/amba/serial.h>
 
 #include <plat/gpio.h>
 #include <asm/hardware/gic.h>
@@ -95,6 +96,9 @@ void ux500_ci_dbg_msg(char *dbg_string)
 
 bool ux500_ci_dbg_force_ape_on(void)
 {
+	if (readw(uart_base + UART01x_FR) & UART01x_FR_BUSY)
+		return true;
+
 	return force_APE_on;
 }
 
