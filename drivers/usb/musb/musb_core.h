@@ -324,6 +324,7 @@ struct musb_hw_ep {
 
 	u8			rx_reinit;
 	u8			tx_reinit;
+	bool			do_tx_pio;
 #endif
 
 #ifdef CONFIG_USB_GADGET_MUSB_HDRC
