@@ -1448,28 +1448,14 @@ struct ab8500_force_reg {
 static struct ab8500_force_reg ab8500_force_reg[] = {
 	{
 		/*
-		 * Vaux12Regu
-		 * OTP: 0x04, HSI: 0x00, suspend: 0x00/0x0f (value/mask)
-		 * [3:2] Vaux2Regu[1:0] = Vaux2 off
-		 * [1:0] Vaux1Regu[1:0] = Vaux1 off
-		 */
-		.name = "Vaux12Regu",
-		.bank = 0x04,
-		.addr = 0x09,
-		.mask = 0x0f,
-		.val  = 0x00,
-	},
-	{
-		/*
 		 * VRF1Vaux3Regu
 		 * OTP: 0x04, HSI: 0x08, suspend: 0x08/0x0f (value/mask)
 		 * [3:2] VRF1Regu[1:0] = VRF1 in HW control
-		 * [1:0] Vaux3Regu[1:0] =  Vaux3 off
 		 */
 		.name = "VRF1Vaux3Regu",
 		.bank = 0x04,
 		.addr = 0x0a,
-		.mask = 0x0f,
+		.mask = 0x0c,
 		.val  = 0x08,
 	},
 	{
@@ -1485,35 +1471,6 @@ static struct ab8500_force_reg ab8500_force_reg[] = {
 		.bank = 0x02,
 		.addr = 0x0c,
 		.mask = 0x07,
-		.val  = 0x00,
-	},
-	{
-		/*
-		 * ReguMisc1
-		 * OTP: 0x10, HSI: 0x10, suspend: 0x10/0x3e (value/mask)
-		 * [5:3] VintCore12Sel[2:0] = Vintcore 1.25v
-		 * [  2] VintCore12Ena = VintCore12 off
-		 * [  1] VTVoutEna = VTVout off
-		 */
-		.name = "ReguMisc1",
-		.bank = 0x03,
-		.addr = 0x80,
-		.mask = 0x3e,
-		.val  = 0x10,
-	},
-	{
-		/*
-		 * VaudioSupply
-		 * OTP: 0x00, HSI: 0x00, suspend: 0x00/0x1e (value/mask)
-		 * [  4] Vamic2Ena = Vamic2 off
-		 * [  3] Vamic1Ena = Vamic1 off
-		 * [  2] VdmicEna = Vdmic off
-		 * [  1] VaudioEna = Vaudio off
-		 */
-		.name = "VaudioSupply",
-		.bank = 0x03,
-		.addr = 0x83,
-		.mask = 0x1e,
 		.val  = 0x00,
 	},
 	{
@@ -1563,11 +1520,7 @@ static struct ab8500_force_reg ab8500_force_reg[] = {
 		/*
 		 * ReguSysClkReq1HPValid1
 		 * OTP: 0x00, HSI: 0x16, suspend: 0x17/0xff (value/mask)
-		 * [  7] Vaux3SysClkReq1HPValid = no connection
-		 * [  6] Vaux2SysClkReq1HPValid = no connection
-		 * [  5] Vaux1SysClkReq1HPValid = no connection
 		 * [  4] VpllSysClkReq1HPValid = Vpll set by SysClkReq1
-		 * [  3] VanaSysClkReq1HPValid = no connection
 		 * [  2] Vsmps3SysClkReq1HPValid = Vsmps3 set by SysClkReq1
 		 * [  1] Vsmps2SysClkReq1HPValid = Vsmsp2 set by SysClkReq1
 		 * [  0] Vsmps1SysClkReq1HPValid = Vsmps1 set by SysClkReq1
@@ -1575,7 +1528,7 @@ static struct ab8500_force_reg ab8500_force_reg[] = {
 		.name = "ReguSysClkReq1HPValid1",
 		.bank = 0x03,
 		.addr = 0x07,
-		.mask = 0xff,
+		.mask = 0x17,
 		.val  = 0x17,
 	},
 	{
