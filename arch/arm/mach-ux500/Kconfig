@@ -28,6 +28,12 @@ config MACH_U8500
 	help
 	  Include support for the mop500 development platform.
 
+config MACH_U8500_SNOWBALL
+	bool "U8500 Snowball platform"
+	depends on UX500_SOC_DB8500
+	help
+	  Include support for the snowball development platform.
+
 config MACH_U5500
 	bool "U5500 Development platform"
 	depends on UX500_SOC_DB5500
