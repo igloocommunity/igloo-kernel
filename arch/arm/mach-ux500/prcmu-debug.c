@@ -24,7 +24,14 @@ enum ape_opp_debug {
 	NUM_APE_OPP_DEBUG,
 };
 
-struct state_history {
+enum ddr_opp_debug {
+	DDR_25_OPP_DEBUG,
+	DDR_50_OPP_DEBUG,
+	DDR_100_OPP_DEBUG,
+	NUM_DDR_OPP_DEBUG,
+};
+
+struct ape_state_history {
 	ktime_t start;
 	u32 state;
 	u32 counter[NUM_APE_OPP_DEBUG];
@@ -32,7 +39,16 @@ struct state_history {
 	spinlock_t lock;
 };
 
-static struct state_history *sh;
+struct ddr_state_history {
+	ktime_t start;
+	u32 state;
+	u32 counter[NUM_DDR_OPP_DEBUG];
+	ktime_t time[NUM_DDR_OPP_DEBUG];
+	spinlock_t lock;
+};
+
+static struct ape_state_history *ape_sh;
+static struct ddr_state_history *ddr_sh;
 
 void prcmu_debug_ape_opp_log(u8 opp)
 {
@@ -47,18 +63,44 @@ void prcmu_debug_ape_opp_log(u8 opp)
 		state = APE_100_OPP_DEBUG;
 
 	now = ktime_get();
-	spin_lock_irqsave(&sh->lock, flags);
+	spin_lock_irqsave(&ape_sh->lock, flags);
 
-	dtime = ktime_sub(now, sh->start);
-	sh->time[state] = ktime_add(sh->time[state], dtime);
-	sh->start = now;
-	sh->counter[state]++;
-	sh->state = state;
+	dtime = ktime_sub(now, ape_sh->start);
+	ape_sh->time[state] = ktime_add(ape_sh->time[state], dtime);
+	ape_sh->start = now;
+	ape_sh->counter[state]++;
+	ape_sh->state = state;
 
-	spin_unlock_irqrestore(&sh->lock, flags);
+	spin_unlock_irqrestore(&ape_sh->lock, flags);
 }
 
-static ssize_t stats_write(struct file *file,
+void prcmu_debug_ddr_opp_log(u8 opp)
+{
+	ktime_t now;
+	ktime_t dtime;
+	unsigned long flags;
+	int state;
+
+	if (opp == DDR_25_OPP)
+		state = DDR_25_OPP_DEBUG;
+	else if (opp == DDR_50_OPP)
+		state = DDR_50_OPP_DEBUG;
+	else
+		state = DDR_100_OPP_DEBUG;
+
+	now = ktime_get();
+	spin_lock_irqsave(&ddr_sh->lock, flags);
+
+	dtime = ktime_sub(now, ddr_sh->start);
+	ddr_sh->time[state] = ktime_add(ddr_sh->time[state], dtime);
+	ddr_sh->start = now;
+	ddr_sh->counter[state]++;
+	ddr_sh->state = state;
+
+	spin_unlock_irqrestore(&ddr_sh->lock, flags);
+}
+
+static ssize_t ape_stats_write(struct file *file,
 			   const char __user *user_buf,
 			   size_t count, loff_t *ppos)
 {
@@ -67,19 +109,40 @@ static ssize_t stats_write(struct file *file,
 
 	pr_info("/nreset\n");
 
-	spin_lock_irqsave(&sh->lock, flags);
+	spin_lock_irqsave(&ape_sh->lock, flags);
 	for (i = 0; i < NUM_APE_OPP_DEBUG; i++) {
-		sh->counter[i] = 0;
-		sh->time[i] = ktime_set(0, 0);
+		ape_sh->counter[i] = 0;
+		ape_sh->time[i] = ktime_set(0, 0);
 	}
 
-	sh->start = ktime_get();
-	spin_unlock_irqrestore(&sh->lock, flags);
+	ape_sh->start = ktime_get();
+	spin_unlock_irqrestore(&ape_sh->lock, flags);
 
 	return count;
 }
 
-static int stats_print(struct seq_file *s, void *p)
+static ssize_t ddr_stats_write(struct file *file,
+			   const char __user *user_buf,
+			   size_t count, loff_t *ppos)
+{
+	unsigned long flags;
+	int i;
+
+	pr_info("/nreset\n");
+
+	spin_lock_irqsave(&ddr_sh->lock, flags);
+	for (i = 0; i < NUM_DDR_OPP_DEBUG; i++) {
+		ddr_sh->counter[i] = 0;
+		ddr_sh->time[i] = ktime_set(0, 0);
+	}
+
+	ddr_sh->start = ktime_get();
+	spin_unlock_irqrestore(&ddr_sh->lock, flags);
+
+	return count;
+}
+
+static int ape_stats_print(struct seq_file *s, void *p)
 {
 	int i;
 	unsigned long flags;
@@ -90,39 +153,93 @@ static int stats_print(struct seq_file *s, void *p)
 	s64 perc;
 	s64 total_us;
 
-	spin_lock_irqsave(&sh->lock, flags);
+	spin_lock_irqsave(&ape_sh->lock, flags);
 	/* Update time in state */
 	now = ktime_get();
-	dtime = ktime_sub(now, sh->start);
-	sh->time[sh->state] = ktime_add(sh->time[sh->state], dtime);
-	sh->start = now;
+	dtime = ktime_sub(now, ape_sh->start);
+	ape_sh->time[ape_sh->state] =
+		ktime_add(ape_sh->time[ape_sh->state], dtime);
+	ape_sh->start = now;
 
 	/* Now print the stats */
 	total = ktime_set(0, 0);
 
 	for (i = 0; i < NUM_APE_OPP_DEBUG; i++)
-		total = ktime_add(total, sh->time[i]);
+		total = ktime_add(total, ape_sh->time[i]);
 	total_us = ktime_to_us(total);
 	do_div(total_us, 100);
 
 	for (i = 0; i < NUM_APE_OPP_DEBUG; i++) {
-		t_us = ktime_to_us(sh->time[i]);
-		perc = ktime_to_us(sh->time[i]);
+		t_us = ktime_to_us(ape_sh->time[i]);
+		perc = ktime_to_us(ape_sh->time[i]);
 		do_div(t_us, 1000); /* to ms */
 		do_div(perc, total_us);
 		if (i == APE_50_OPP_DEBUG)
-			seq_printf(s, "%s: # %u in %d ms %d\n",
+			seq_printf(s, "%s: # %u in %d ms %d%%\n",
 				   "APE OPP 50% ",
-				   sh->counter[i],
+				   ape_sh->counter[i],
 				   (u32) t_us, (u32)perc);
 		else
-			seq_printf(s, "%s: # %u in %d ms %d\n",
+			seq_printf(s, "%s: # %u in %d ms %d%%\n",
 				   "APE OPP 100%",
-				   sh->counter[i],
+				   ape_sh->counter[i],
 				   (u32) t_us, (u32)perc);
 
 	}
-	spin_unlock_irqrestore(&sh->lock, flags);
+	spin_unlock_irqrestore(&ape_sh->lock, flags);
+	return 0;
+}
+
+static int ddr_stats_print(struct seq_file *s, void *p)
+{
+	int i;
+	unsigned long flags;
+	ktime_t total;
+	ktime_t now;
+	ktime_t dtime;
+	s64 t_us;
+	s64 perc;
+	s64 total_us;
+
+	spin_lock_irqsave(&ddr_sh->lock, flags);
+	/* Update time in state */
+	now = ktime_get();
+	dtime = ktime_sub(now, ddr_sh->start);
+	ddr_sh->time[ddr_sh->state] =
+		ktime_add(ddr_sh->time[ddr_sh->state], dtime);
+	ddr_sh->start = now;
+
+	/* Now print the stats */
+	total = ktime_set(0, 0);
+
+	for (i = 0; i < NUM_DDR_OPP_DEBUG; i++)
+		total = ktime_add(total, ddr_sh->time[i]);
+	total_us = ktime_to_us(total);
+	do_div(total_us, 100);
+
+	for (i = 0; i < NUM_DDR_OPP_DEBUG; i++) {
+		t_us = ktime_to_us(ddr_sh->time[i]);
+		perc = ktime_to_us(ddr_sh->time[i]);
+		do_div(t_us, 1000); /* to ms */
+		do_div(perc, total_us);
+		if (i == DDR_25_OPP_DEBUG)
+			seq_printf(s, "%s: # %u in %d ms %d%%\n",
+				   "DDR OPP 25% ",
+				   ddr_sh->counter[i],
+				   (u32) t_us, (u32)perc);
+		else if (i == DDR_50_OPP_DEBUG)
+			seq_printf(s, "%s: # %u in %d ms %d%%\n",
+				   "DDR OPP 50% ",
+				   ddr_sh->counter[i],
+				   (u32) t_us, (u32)perc);
+		else
+			seq_printf(s, "%s: # %u in %d ms %d%%\n",
+				   "DDR OPP 100%",
+				   ddr_sh->counter[i],
+				   (u32) t_us, (u32)perc);
+
+	}
+	spin_unlock_irqrestore(&ddr_sh->lock, flags);
 	return 0;
 }
 
@@ -151,6 +268,18 @@ static int ape_opp_read(struct seq_file *s, void *p)
 			"unknown", opp);
 }
 
+static int ddr_opp_read(struct seq_file *s, void *p)
+{
+	int opp;
+
+	opp = prcmu_get_ddr_opp();
+	return seq_printf(s, "%s (%d)\n",
+			(opp == DDR_100_OPP) ? "100%" :
+			(opp == DDR_50_OPP) ? "50%" :
+			(opp == DDR_25_OPP) ? "25%" :
+			"unknown", opp);
+}
+
 static int arm_opp_open_file(struct inode *inode, struct file *file)
 {
 	return single_open(file, arm_opp_read, inode->i_private);
@@ -161,9 +290,19 @@ static int ape_opp_open_file(struct inode *inode, struct file *file)
 	return single_open(file, ape_opp_read, inode->i_private);
 }
 
-static int stats_open_file(struct inode *inode, struct file *file)
+static int ddr_opp_open_file(struct inode *inode, struct file *file)
 {
-	return single_open(file, stats_print, inode->i_private);
+	return single_open(file, ddr_opp_read, inode->i_private);
+}
+
+static int ape_stats_open_file(struct inode *inode, struct file *file)
+{
+	return single_open(file, ape_stats_print, inode->i_private);
+}
+
+static int ddr_stats_open_file(struct inode *inode, struct file *file)
+{
+	return single_open(file, ddr_stats_print, inode->i_private);
 }
 
 static const struct file_operations arm_opp_fops = {
@@ -182,9 +321,26 @@ static const struct file_operations ape_opp_fops = {
 	.owner = THIS_MODULE,
 };
 
-static const struct file_operations stats_fops = {
-	.open = stats_open_file,
-	.write = stats_write,
+static const struct file_operations ddr_opp_fops = {
+	.open = ddr_opp_open_file,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations ape_stats_fops = {
+	.open = ape_stats_open_file,
+	.write = ape_stats_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations ddr_stats_fops = {
+	.open = ddr_stats_open_file,
+	.write = ddr_stats_write,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = single_release,
@@ -201,12 +357,22 @@ static int setup_debugfs(void)
 		goto fail;
 
 	file = debugfs_create_file("ape_stats", (S_IRUGO | S_IWUGO),
-				   dir, NULL, &stats_fops);
+				   dir, NULL, &ape_stats_fops);
+	if (IS_ERR_OR_NULL(file))
+		goto fail;
+
+	file = debugfs_create_file("ddr_stats", (S_IRUGO | S_IWUGO),
+				   dir, NULL, &ddr_stats_fops);
 	if (IS_ERR_OR_NULL(file))
 		goto fail;
 
 	file = debugfs_create_file("ape_opp", (S_IRUGO),
 				   dir, NULL, &ape_opp_fops);
+	if (IS_ERR_OR_NULL(file))
+		goto fail;
+
+	file = debugfs_create_file("ddr_opp", (S_IRUGO),
+				   dir, NULL, &ddr_opp_fops);
 	if (IS_ERR_OR_NULL(file))
 		goto fail;
 
@@ -226,14 +392,22 @@ fail:
 
 int prcmu_debug_init(void)
 {
-	sh = kzalloc(sizeof(struct state_history), GFP_KERNEL);
-	if (sh < 0) {
+	ape_sh = kzalloc(sizeof(struct ape_state_history), GFP_KERNEL);
+	if (ape_sh < 0) {
 		pr_err("prcmu debug: kzalloc failed\n");
 		return -ENOMEM;
 	}
 
-	spin_lock_init(&sh->lock);
-	sh->start = ktime_get();
+	ddr_sh = kzalloc(sizeof(struct ddr_state_history), GFP_KERNEL);
+	if (ddr_sh < 0) {
+		pr_err("prcmu debug: kzalloc failed\n");
+		return -ENOMEM;
+	}
+
+	spin_lock_init(&ape_sh->lock);
+	spin_lock_init(&ddr_sh->lock);
+	ape_sh->start = ktime_get();
+	ddr_sh->start = ktime_get();
 	setup_debugfs();
 	return 0;
 }
