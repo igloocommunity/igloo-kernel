@@ -41,6 +41,7 @@
 #include <linux/notifier.h>
 #include <linux/rculist.h>
 #include <trace/kernel.h>
+#include <trace/stm.h>
 
 #include <asm/uaccess.h>
 
@@ -782,6 +783,9 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	trace_kernel_vprintk(_RET_IP_, printk_buf, printed_len);
 
 	p = printk_buf;
+
+	/* Send printk buffer to MIPI STM trace hardware too if enable */
+	stm_dup_printk(printk_buf, printed_len);
 
 	/* Do we have a loglevel in the string? */
 	if (p[0] == '<') {
