@@ -13,9 +13,11 @@
 
 #ifdef CONFIG_UX500_PRCMU_DEBUG
 void prcmu_debug_ape_opp_log(u8 opp);
+void prcmu_debug_ddr_opp_log(u8 opp);
 int prcmu_debug_init(void);
 #else
 static inline void prcmu_debug_ape_opp_log(u8 opp) {}
+static inline void prcmu_debug_ddr_opp_log(u8 opp) {}
 static inline int prcmu_debug_init(void) {}
 #endif
 #endif
