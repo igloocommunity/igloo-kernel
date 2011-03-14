@@ -37,6 +37,7 @@
 #include "ste-dma40-db8500.h"
 #include "devices-db8500.h"
 #include "board-mop500.h"
+#include "board-snowball.h"
 #include "board-mop500-regulators.h"
 
 static struct ab8500_platform_data ab8500_platdata = {
@@ -224,6 +225,8 @@ static void __init mop500_uart_init(void)
 static void __init mop500_init_machine(void)
 {
 	u8500_init_devices();
+
+	snowball_pins_init();
 
 	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
 
