@@ -146,6 +146,7 @@ static void update_target(int target)
 				       extreme_value);
 				return;
 			}
+			prcmu_debug_ddr_opp_log(op);
 			prcmu_set_ddr_opp(op);
 		} else {
 			switch (extreme_value) {
