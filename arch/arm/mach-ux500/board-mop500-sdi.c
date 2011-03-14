@@ -28,10 +28,17 @@
 static u32 mop500_sdi0_vdd_handler(struct device *dev, unsigned int vdd,
 				   unsigned char power_mode)
 {
+	int gpio;
+
+	if (!machine_is_snowball())
+		gpio = GPIO_SDMMC_EN;
+	else
+               gpio = SNOWBALL_SDMMC_EN_GPIO;
+
 	if (power_mode == MMC_POWER_UP)
-		gpio_set_value_cansleep(GPIO_SDMMC_EN, 1);
+		gpio_set_value_cansleep(gpio, 1);
 	else if (power_mode == MMC_POWER_OFF)
-		gpio_set_value_cansleep(GPIO_SDMMC_EN, 0);
+		gpio_set_value_cansleep(gpio, 0);
 
 	return MCI_ST_FBCLKEN | MCI_ST_CMDDIREN | MCI_ST_DATA0DIREN |
 	       MCI_ST_DATA2DIREN;
@@ -230,7 +237,10 @@ void __init mop500_sdi_init(void)
 	/* PoP:ed eMMC on top of DB8500 v1.0 has problems with high speed */
 	if (!cpu_is_u8500v10())
 		mop500_sdi2_data.capabilities |= MMC_CAP_MMC_HIGHSPEED;
-	db8500_add_sdi2(&mop500_sdi2_data);
+
+	/* sdi2 on snowball is in ATL_B mode for FSMC (LAN) */
+	if (!machine_is_snowball())
+		db8500_add_sdi2(&mop500_sdi2_data);
 
 	/* On-board eMMC */
 	db8500_add_sdi4(&mop500_sdi4_data);
@@ -238,10 +248,17 @@ void __init mop500_sdi_init(void)
 	/* SDIO WLAN */
 	db8500_add_sdi1(&mop500_sdi1_data);
 
-	if (machine_is_hrefv60()) {
-		mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;
-		sdi0_en = HREFV60_SDMMC_EN_GPIO;
-		sdi0_vsel = HREFV60_SDMMC_1V8_3V_GPIO;
+	if (machine_is_hrefv60() || machine_is_snowball()) {
+		if (machine_is_hrefv60()) {
+			mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;
+			sdi0_en = HREFV60_SDMMC_EN_GPIO;
+			sdi0_vsel = HREFV60_SDMMC_1V8_3V_GPIO;
+		} else if (machine_is_snowball()) {
+			mop500_sdi0_data.gpio_cd = SNOWBALL_SDMMC_CD_GPIO;
+			mop500_sdi0_data.cd_invert = true;
+			sdi0_en = SNOWBALL_SDMMC_EN_GPIO;
+			sdi0_vsel = SNOWBALL_SDMMC_1V8_3V_GPIO;
+		}
 		sdi0_configure();
 	}
 	/*
