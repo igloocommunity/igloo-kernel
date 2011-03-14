@@ -41,6 +41,8 @@
 #include <linux/cpu.h>
 #include <linux/notifier.h>
 #include <linux/rculist.h>
+#include <trace/kernel.h>
+#include <trace/stm.h>
 
 #include <asm/uaccess.h>
 
@@ -892,6 +894,9 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 			}
 		}
 	}
+
+	/* Send printk buffer to MIPI STM trace hardware too if enable */
+	stm_dup_printk(printk_buf, printed_len);
 
 	/*
 	 * Copy the output into log_buf. If the caller didn't provide
