@@ -18,7 +18,9 @@ obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
 				board-mop500-uib.o board-mop500-stuib.o \
 				board-mop500-u8500uib.o \
 				board-mop500-pins.o \
-				board-mop500-msp.o board-mop500-bm.o
+				board-mop500-msp.o board-mop500-bm.o \
+obj-$(CONFIG_MACH_U8500_SNOWBALL) += board-snowball.o \
+				board-mop500-regulators.o
 obj-$(CONFIG_MACH_U5500)	+= board-u5500.o board-u5500-sdi.o
 obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
 obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
