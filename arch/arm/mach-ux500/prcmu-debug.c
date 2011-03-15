@@ -280,6 +280,37 @@ static int ddr_opp_read(struct seq_file *s, void *p)
 			"unknown", opp);
 }
 
+static int cpufreq_delay_read(struct seq_file *s, void *p)
+{
+	return seq_printf(s, "%lu\n", prcmu_qos_get_cpufreq_opp_delay());
+}
+
+static ssize_t cpufreq_delay_write(struct file *file,
+				   const char __user *user_buf,
+				   size_t count, loff_t *ppos)
+{
+
+	char buf[32];
+	ssize_t buf_size;
+	long unsigned int i;
+
+	/* Get userspace string and assure termination */
+	buf_size = min(count, (sizeof(buf)-1));
+	if (copy_from_user(buf, user_buf, buf_size))
+		return -EFAULT;
+	buf[buf_size] = 0;
+
+	if (strict_strtoul(buf, 0, &i) != 0)
+		return buf_size;
+
+	prcmu_qos_set_cpufreq_opp_delay(i);
+
+	pr_info("prcmu debug: changed delay between cpufreq change and QoS "
+		 "requirement to %lu.\n", i);
+
+	return buf_size;
+}
+
 static int arm_opp_open_file(struct inode *inode, struct file *file)
 {
 	return single_open(file, arm_opp_read, inode->i_private);
@@ -303,6 +334,11 @@ static int ape_stats_open_file(struct inode *inode, struct file *file)
 static int ddr_stats_open_file(struct inode *inode, struct file *file)
 {
 	return single_open(file, ddr_stats_print, inode->i_private);
+}
+
+static int cpufreq_delay_open_file(struct inode *inode, struct file *file)
+{
+	return single_open(file, cpufreq_delay_read, inode->i_private);
 }
 
 static const struct file_operations arm_opp_fops = {
@@ -347,6 +383,15 @@ static const struct file_operations ddr_stats_fops = {
 	.owner = THIS_MODULE,
 };
 
+static const struct file_operations cpufreq_delay_fops = {
+	.open = cpufreq_delay_open_file,
+	.write = cpufreq_delay_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.owner = THIS_MODULE,
+};
+
 static int setup_debugfs(void)
 {
 	struct dentry *dir;
@@ -378,6 +423,11 @@ static int setup_debugfs(void)
 
 	file = debugfs_create_file("arm_opp", (S_IRUGO),
 				   dir, NULL, &arm_opp_fops);
+	if (IS_ERR_OR_NULL(file))
+		goto fail;
+
+	file = debugfs_create_file("opp_cpufreq_delay", (S_IRUGO),
+				   dir, NULL, &cpufreq_delay_fops);
 	if (IS_ERR_OR_NULL(file))
 		goto fail;
 

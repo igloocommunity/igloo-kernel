@@ -92,6 +92,18 @@ static struct prcmu_qos_object *prcmu_qos_array[] = {
 
 static DEFINE_SPINLOCK(prcmu_qos_lock);
 
+static unsigned long cpufreq_opp_delay = HZ / 5;
+
+unsigned long prcmu_qos_get_cpufreq_opp_delay()
+{
+	return cpufreq_opp_delay;
+}
+
+void prcmu_qos_set_cpufreq_opp_delay(unsigned long n)
+{
+	cpufreq_opp_delay = n;
+}
+
 /* static helper function */
 static s32 max_compare(s32 v1, s32 v2)
 {
@@ -470,7 +482,8 @@ static int qos_delayed_cpufreq_notifier(struct notifier_block *nb,
 		 * one.
 		 */
 		if (new_ddr_target != cpufreq_requirement_set)
-			schedule_delayed_work(&qos_delayed_work_up, HZ/5);
+			schedule_delayed_work(&qos_delayed_work_up,
+					      cpufreq_opp_delay);
 	} else {
 		cancel_delayed_work_sync(&qos_delayed_work_up);
 		/*
@@ -478,7 +491,8 @@ static int qos_delayed_cpufreq_notifier(struct notifier_block *nb,
 		 * one.
 		 */
 		if (new_ddr_target != cpufreq_requirement_set)
-			schedule_delayed_work(&qos_delayed_work_down, HZ/5);
+			schedule_delayed_work(&qos_delayed_work_down,
+					      cpufreq_opp_delay);
 	}
 
 	return 0;
