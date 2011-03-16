@@ -185,6 +185,19 @@
 #define BATT_OVV_TH_3P7			0x00
 #define BATT_OVV_TH_4P75		0x01
 
+/* VBUS OVV constants */
+#define VBUS_OVV_SELECT_MASK		0x78
+#define VBUS_OVV_SELECT_5P6V		0x00
+#define VBUS_OVV_SELECT_5P7V		0x08
+#define VBUS_OVV_SELECT_5P8V		0x10
+#define VBUS_OVV_SELECT_5P9V		0x18
+#define VBUS_OVV_SELECT_6P0V		0x20
+#define VBUS_OVV_SELECT_6P1V		0x28
+#define VBUS_OVV_SELECT_6P2V		0x30
+#define VBUS_OVV_SELECT_6P3V		0x38
+
+#define VBUS_AUTO_IN_CURR_LIM_ENA	0x04
+
 /* Fuel Gauge constants */
 #define RESET_ACCU			0x02
 #define READ_REQ			0x01
