@@ -1521,32 +1521,6 @@ static struct ab8500_force_reg ab8500_force_reg[] = {
 	},
 	{
 		/*
-		 * Vsmps1Regu
-		 * OTP: 0x05, HSI: 0x05, suspend: 0x06/0x0f (value/mask)
-		 * [3:2] Vsmps1SelCtrl = Vsmps1 voltage set by Vsmps1Sel2
-		 * [1:0] Vsmps1Regu[1:0] = Vsmsp1 in HW control
-		 */
-		.name = "Vsmps1Regu",
-		.bank = 0x04,
-		.addr = 0x03,
-		.mask = 0x0f,
-		.val  = 0x06,
-	},
-	{
-		/*
-		 * Vsmps2Regu
-		 * OTP: 0x05, HSI: 0x06, suspend: 0x06/0x0f (value/mask)
-		 * [3:2] Vsmps2SelCtrl[1:0] = Vsmps2 voltage set by Vsmps2Sel2
-		 * [1:0] Vsmps2Regu[1:0] = Vsmps2 in HW control
-		 */
-		.name = "Vsmps2Regu",
-		.bank = 0x04,
-		.addr = 0x04,
-		.mask = 0x0f,
-		.val  = 0x06,
-	},
-	{
-		/*
 		 * Vsmsp3Regu
 		 * OTP: 0x01, HSI: 0x01, suspend: 0x06/0x0f (value/mask)
 		 * [3:2] Vsmps3SelCtrl[1:0] = Vsmps3 voltage set by Vsmps3Sel2
