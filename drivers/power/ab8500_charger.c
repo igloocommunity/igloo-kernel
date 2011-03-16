@@ -181,13 +181,13 @@ struct ab8500_charger_usb_state {
  * @usb:		Structure that holds the USB charger properties
  * @charger_wq:		Work queue for the IRQs and checking HW state
  * @check_hw_failure_work:	Work for checking HW state
+ * @check_usbchgnotok_work:	Work for checking USB charger not ok status
  * @kick_wd_work:		Work for kicking the charger watchdog in case
  *				of ABB rev 1.* due to the watchog logic bug
  * @ac_work:			Work for checking AC charger connection
  * @detect_usb_type_work:	Work for detecting the USB type connected
  * @usb_link_status_work:	Work for checking the new USB link status
  * @usb_state_changed_work:	Work for checking USB state
- * @check_usbchgnotok_work:	Work for checking USB charger not ok status
  * @check_main_thermal_prot_work:
  *				Work for checking Main thermal status
  * @check_usb_thermal_prot_work:
@@ -212,12 +212,12 @@ struct ab8500_charger {
 	struct ab8500_charger_info usb;
 	struct workqueue_struct *charger_wq;
 	struct delayed_work check_hw_failure_work;
+	struct delayed_work check_usbchgnotok_work;
 	struct delayed_work kick_wd_work;
 	struct work_struct ac_work;
 	struct work_struct detect_usb_type_work;
 	struct work_struct usb_link_status_work;
 	struct work_struct usb_state_changed_work;
-	struct work_struct check_usbchgnotok_work;
 	struct work_struct check_main_thermal_prot_work;
 	struct work_struct check_usb_thermal_prot_work;
 	struct otg_transceiver *otg;
@@ -1528,9 +1528,10 @@ static void ab8500_charger_check_usbchargernotok_work(struct work_struct *work)
 {
 	int ret;
 	u8 reg_value;
+	bool prev_status;
 
 	struct ab8500_charger *di = container_of(work,
-		struct ab8500_charger, check_usbchgnotok_work);
+		struct ab8500_charger, check_usbchgnotok_work.work);
 
 	/* Check if the status bit for usbchargernotok is still active */
 	ret = abx500_get_register_interruptible(di->dev,
@@ -1539,14 +1540,20 @@ static void ab8500_charger_check_usbchargernotok_work(struct work_struct *work)
 		dev_err(di->dev, "%s ab8500 read failed\n", __func__);
 		return;
 	}
+	prev_status = di->flags.usbchargernotok;
+
 	if (reg_value & VBUS_CH_NOK) {
 		di->flags.usbchargernotok = true;
+		/* Check again in 1sec */
+		queue_delayed_work(di->charger_wq,
+			&di->check_usbchgnotok_work, HZ);
 	} else {
 		di->flags.usbchargernotok = false;
 		di->flags.vbus_collapse = false;
 	}
 
-	power_supply_changed(&di->usb_chg.psy);
+	if (prev_status != di->flags.usbchargernotok)
+		power_supply_changed(&di->usb_chg.psy);
 }
 
 /**
@@ -1794,23 +1801,6 @@ static irqreturn_t ab8500_charger_usbchthprotf_handler(int irq, void *_di)
 }
 
 /**
- * ab8500_charger_usbchargernotokf_handler() - USB charger ok detected
- * @irq:       interrupt number
- * @_di:       pointer to the ab8500_charger structure
- *
- * Returns IRQ status(IRQ_HANDLED)
- */
-static irqreturn_t ab8500_charger_usbchargernotokf_handler(int irq, void *_di)
-{
-	struct ab8500_charger *di = _di;
-
-	dev_dbg(di->dev, "Allowed USB charger detected\n");
-	queue_work(di->charger_wq, &di->check_usbchgnotok_work);
-
-	return IRQ_HANDLED;
-}
-
-/**
  * ab8500_charger_usbchargernotokr_handler() - USB charger not ok detected
  * @irq:       interrupt number
  * @_di:       pointer to the ab8500_charger structure
@@ -1822,7 +1812,7 @@ static irqreturn_t ab8500_charger_usbchargernotokr_handler(int irq, void *_di)
 	struct ab8500_charger *di = _di;
 
 	dev_dbg(di->dev, "Not allowed USB charger detected\n");
-	queue_work(di->charger_wq, &di->check_usbchgnotok_work);
+	queue_delayed_work(di->charger_wq, &di->check_usbchgnotok_work, 0);
 
 	return IRQ_HANDLED;
 }
@@ -2026,6 +2016,7 @@ static int ab8500_charger_init_hw_registers(struct ab8500_charger *di)
 	case AB8500_CUT1P1:
 		break;
 	case AB8500_CUT2P0:
+	default:
 		ret = abx500_set_register_interruptible(di->dev,
 			AB8500_CHARGER,
 			AB8500_CH_VOLT_LVL_MAX_REG, CH_VOL_LVL_4P6);
@@ -2045,14 +2036,13 @@ static int ab8500_charger_init_hw_registers(struct ab8500_charger *di)
 		}
 
 		break;
-	default:
-		goto out;
 	}
 
-	/* VBUS OVV set to 6.3V */
+	/* VBUS OVV set to 6.3V and enable automatic current limitiation */
 	ret = abx500_set_register_interruptible(di->dev,
 		AB8500_CHARGER,
-		AB8500_USBCH_CTRL2_REG, 0x78);
+		AB8500_USBCH_CTRL2_REG,
+		VBUS_OVV_SELECT_6P3V | VBUS_AUTO_IN_CURR_LIM_ENA);
 	if (ret) {
 		dev_err(di->dev, "failed to set VBUS OVV\n");
 		goto out;
@@ -2146,7 +2136,6 @@ static struct ab8500_charger_interrupts ab8500_charger_irq[] = {
 	{"USB_LINK_STATUS", ab8500_charger_usblinkstatus_handler},
 	{"USB_CH_TH_PROT_R", ab8500_charger_usbchthprotr_handler},
 	{"USB_CH_TH_PROT_F", ab8500_charger_usbchthprotf_handler},
-	{"USB_CHARGER_NOT_OKF", ab8500_charger_usbchargernotokf_handler},
 	{"USB_CHARGER_NOT_OKR", ab8500_charger_usbchargernotokr_handler},
 	{"VBUS_OVV", ab8500_charger_vbusovv_handler},
 	{"CH_WD_EXP", ab8500_charger_chwdexp_handler},
@@ -2360,6 +2349,9 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 	/* Init work for HW failure check */
 	INIT_DELAYED_WORK_DEFERRABLE(&di->check_hw_failure_work,
 		ab8500_charger_check_hw_failure_work);
+	INIT_DELAYED_WORK_DEFERRABLE(&di->check_usbchgnotok_work,
+		ab8500_charger_check_usbchargernotok_work);
+
 
 	/*
 	 * For ABB revision 1.0 and 1.1 there is a bug in the watchdog
@@ -2384,8 +2376,6 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 		ab8500_charger_usb_state_changed_work);
 
 	/* Init work for checking HW status */
-	INIT_WORK(&di->check_usbchgnotok_work,
-		ab8500_charger_check_usbchargernotok_work);
 	INIT_WORK(&di->check_main_thermal_prot_work,
 		ab8500_charger_check_main_thermal_prot_work);
 	INIT_WORK(&di->check_usb_thermal_prot_work,

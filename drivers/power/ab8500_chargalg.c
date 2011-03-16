@@ -733,9 +733,11 @@ static enum maxim_ret ab8500_chargalg_chg_curr_maxim(struct ab8500_chargalg *di)
 	delta_i = di->ccm.original_iset - di->batt_data.inst_curr;
 
 	if (di->events.vbus_collapsed) {
-		dev_dbg(di->dev, "Charger voltage has collapsed\n");
-		if (di->ccm.wait_cnt++ == 0) {
+		dev_dbg(di->dev, "Charger voltage has collapsed %d\n",
+				di->ccm.wait_cnt);
+		if (di->ccm.wait_cnt == 0) {
 			dev_dbg(di->dev, "lowering current\n");
+			di->ccm.wait_cnt++;
 			di->ccm.condition_cnt = di->bat->maxi->wait_cycles;
 			di->ccm.max_current =
 				di->ccm.current_iset - di->ccm.test_delta_i;
@@ -745,7 +747,7 @@ static enum maxim_ret ab8500_chargalg_chg_curr_maxim(struct ab8500_chargalg *di)
 		} else {
 			dev_dbg(di->dev, "waiting\n");
 			/* Let's go in here twice before lowering curr again */
-			di->ccm.wait_cnt = (di->ccm.wait_cnt + 1) % 4;
+			di->ccm.wait_cnt = (di->ccm.wait_cnt + 1) % 3;
 			return MAXIM_RET_NOACTION;
 		}
 	}
