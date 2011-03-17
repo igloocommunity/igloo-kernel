@@ -26,6 +26,9 @@
 
 #define ARM_THRESHOLD_FREQ (400000)
 
+static int qos_delayed_cpufreq_notifier(struct notifier_block *,
+					unsigned long, void *);
+
 static s32 cpufreq_requirement_queued;
 static s32 cpufreq_requirement_set;
 
@@ -99,8 +102,25 @@ unsigned long prcmu_qos_get_cpufreq_opp_delay()
 	return cpufreq_opp_delay;
 }
 
+static struct notifier_block qos_delayed_cpufreq_notifier_block = {
+	.notifier_call = qos_delayed_cpufreq_notifier,
+};
+
 void prcmu_qos_set_cpufreq_opp_delay(unsigned long n)
 {
+	if (n == 0) {
+		cpufreq_unregister_notifier(&qos_delayed_cpufreq_notifier_block,
+					    CPUFREQ_TRANSITION_NOTIFIER);
+		prcmu_qos_update_requirement(PRCMU_QOS_DDR_OPP, "cpufreq",
+					     PRCMU_QOS_DEFAULT_VALUE);
+		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP, "cpufreq",
+					     PRCMU_QOS_DEFAULT_VALUE);
+		cpufreq_requirement_set = PRCMU_QOS_DEFAULT_VALUE;
+		cpufreq_requirement_queued = PRCMU_QOS_DEFAULT_VALUE;
+	} else if (cpufreq_opp_delay != 0) {
+		cpufreq_register_notifier(&qos_delayed_cpufreq_notifier_block,
+					    CPUFREQ_TRANSITION_NOTIFIER);
+	}
 	cpufreq_opp_delay = n;
 }
 
@@ -497,10 +517,6 @@ static int qos_delayed_cpufreq_notifier(struct notifier_block *nb,
 
 	return 0;
 }
-
-static struct notifier_block qos_delayed_cpufreq_notifier_block = {
-	.notifier_call = qos_delayed_cpufreq_notifier,
-};
 
 static int __init prcmu_qos_power_init(void)
 {
