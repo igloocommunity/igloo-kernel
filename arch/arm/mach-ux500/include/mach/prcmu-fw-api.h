@@ -257,6 +257,7 @@ int prcmu_set_ddr_opp(u8 opp);
 int prcmu_get_ddr_opp(void);
 unsigned long prcmu_qos_get_cpufreq_opp_delay(void);
 void prcmu_qos_set_cpufreq_opp_delay(unsigned long);
+void prcmu_qos_force_opp(int, s32);
 /* NOTE! Use regulator framework instead */
 int prcmu_set_hwacc(u16 hw_acc_dev, u8 state);
 int prcmu_set_epod(u16 epod_id, u8 epod_state);
@@ -368,6 +369,8 @@ static inline unsigned long prcmu_qos_get_cpufreq_opp_delay(void)
 }
 
 static inline void prcmu_qos_set_cpufreq_opp_delay(unsigned long n) {}
+
+void prcmu_qos_force_opp(int prcmu_qos_class, s32 i) {}
 
 static inline int prcmu_set_hwacc(u16 hw_acc_dev, u8 state)
 {
