@@ -16,6 +16,8 @@
 #include <linux/slab.h>
 #include <linux/device.h>
 #include <linux/notifier.h>
+#include <linux/clk.h>
+#include <linux/err.h>
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
@@ -164,6 +166,7 @@ static struct {
 #define UX500_NR_PRCC_BANKS 5
 static struct {
 	void __iomem *base;
+	struct clk *clk;
 	u32 bus_clk;
 	u32 kern_clk;
 } context_prcc[UX500_NR_PRCC_BANKS];
@@ -242,10 +245,14 @@ static void save_prcc(void)
 	int i;
 
 	for (i = 0; i < UX500_NR_PRCC_BANKS; i++) {
+		clk_enable(context_prcc[i].clk);
+
 		context_prcc[i].bus_clk =
 			readl(context_prcc[i].base + PRCC_BCK_STATUS);
 		context_prcc[i].kern_clk =
 			readl(context_prcc[i].base + PRCC_KCK_STATUS);
+
+		clk_disable(context_prcc[i].clk);
 	}
 }
 
@@ -254,10 +261,14 @@ static void restore_prcc(void)
 	int i;
 
 	for (i = 0; i < UX500_NR_PRCC_BANKS; i++) {
+		clk_enable(context_prcc[i].clk);
+
 		writel(context_prcc[i].bus_clk,
 		       context_prcc[i].base + PRCC_BCK_EN);
 		writel(context_prcc[i].kern_clk,
 		       context_prcc[i].base + PRCC_KCK_EN);
+
+		clk_disable(context_prcc[i].clk);
 	}
 }
 
@@ -874,6 +885,16 @@ static int __init context_init(void)
 	context_prcc[2].base = ioremap(U8500_CLKRST3_BASE, SZ_4K);
 	context_prcc[3].base = ioremap(U8500_CLKRST5_BASE, SZ_4K);
 	context_prcc[4].base = ioremap(U8500_CLKRST6_BASE, SZ_4K);
+
+	for (i = 0; i < ARRAY_SIZE(context_prcc); i++) {
+		const int clusters[] = {1, 2, 3, 5, 6};
+		char clkname[10];
+
+		snprintf(clkname, sizeof(clkname), "PERIPH%d", clusters[i]);
+
+		context_prcc[i].clk = clk_get_sys(clkname, NULL);
+		BUG_ON(IS_ERR(context_prcc[i].clk));
+	}
 
 	if (cpu_is_u8500()) {
 		u8500_context_init();
