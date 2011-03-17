@@ -280,6 +280,44 @@ static int ddr_opp_read(struct seq_file *s, void *p)
 			"unknown", opp);
 }
 
+static ssize_t opp_write(struct file *file,
+				   const char __user *user_buf,
+			 size_t count, loff_t *ppos, int prcmu_qos_class)
+{
+	char buf[32];
+	ssize_t buf_size;
+	long unsigned int i;
+
+	/* Get userspace string and assure termination */
+	buf_size = min(count, (sizeof(buf)-1));
+	if (copy_from_user(buf, user_buf, buf_size))
+		return -EFAULT;
+	buf[buf_size] = 0;
+
+	if (strict_strtoul(buf, 0, &i) != 0)
+		return buf_size;
+
+	prcmu_qos_force_opp(prcmu_qos_class, i);
+
+	pr_info("prcmu debug: forced OPP for %d to %d\n", prcmu_qos_class, i);
+
+	return buf_size;
+}
+
+static ssize_t ddr_opp_write(struct file *file,
+				   const char __user *user_buf,
+				   size_t count, loff_t *ppos)
+{
+	return opp_write(file, user_buf, count, ppos, PRCMU_QOS_DDR_OPP);
+}
+
+static ssize_t ape_opp_write(struct file *file,
+				   const char __user *user_buf,
+				   size_t count, loff_t *ppos)
+{
+	return opp_write(file, user_buf, count, ppos, PRCMU_QOS_APE_OPP);
+}
+
 static int cpufreq_delay_read(struct seq_file *s, void *p)
 {
 	return seq_printf(s, "%lu\n", prcmu_qos_get_cpufreq_opp_delay());
@@ -351,6 +389,7 @@ static const struct file_operations arm_opp_fops = {
 
 static const struct file_operations ape_opp_fops = {
 	.open = ape_opp_open_file,
+	.write = ape_opp_write,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = single_release,
@@ -359,6 +398,7 @@ static const struct file_operations ape_opp_fops = {
 
 static const struct file_operations ddr_opp_fops = {
 	.open = ddr_opp_open_file,
+	.write = ddr_opp_write,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = single_release,
