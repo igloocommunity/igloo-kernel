@@ -376,6 +376,10 @@ static int usb_db8500_tx_dma_cfg[] = {
  */
 void __init u8500_init_devices(void)
 {
+#ifdef CONFIG_STM_TRACE
+	/* Early init for STM tracing */
+	platform_device_register(&ux500_stm_device);
+#endif
 	if (cpu_is_u8500ed())
 		dma40_u8500ed_fixup();
 
