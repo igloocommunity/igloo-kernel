@@ -73,6 +73,18 @@ struct bt_security {
 #define BT_ERR(fmt, arg...)  printk(KERN_ERR "%s: " fmt "\n" , __func__ , ## arg)
 #define BT_DBG(fmt, arg...)  pr_debug("%s: " fmt "\n" , __func__ , ## arg)
 
+#define BT_SCO_PARAMETERS	8
+struct bt_sco_parameters {
+	__u32 tx_bandwidth;
+	__u32 rx_bandwidth;
+	__u16 max_latency;
+	__u16 voice_setting;
+	__u8  retrans_effort;
+	__u16 pkt_type;
+} __packed;
+
+#define BT_NO_AUTORETRY	9
+
 /* Connection and socket states */
 enum {
 	BT_CONNECTED = 1, /* Equal to TCP_ESTABLISHED to make net code happy */
