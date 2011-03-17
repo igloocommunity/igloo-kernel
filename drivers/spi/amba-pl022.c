@@ -520,7 +520,7 @@ static void giveback(struct pl022 *pl022)
 	clk_disable(pl022->clk);
 	amba_pclk_disable(pl022->adev);
 	amba_vcore_disable(pl022->adev);
-    pm_runtime_put(&pl022->adev->dev);
+	pm_runtime_put(&pl022->adev->dev);
 }
 
 /**
@@ -2291,14 +2291,6 @@ static struct vendor_data vendor_db5500_pl023 = {
 	.extended_cr = true,
 	.pl023 = true,
 	.loopback = true,
-};
-
-static struct vendor_data vendor_db5500_pl023 = {
-	.fifodepth = 32,
-	.max_bpw = 32,
-	.unidir = false,
-	.extended_cr = true,
-	.pl023 = true,
 };
 
 static struct amba_id pl022_ids[] = {
