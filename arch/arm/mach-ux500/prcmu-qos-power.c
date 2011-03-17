@@ -55,6 +55,7 @@ struct prcmu_qos_object {
 	struct miscdevice prcmu_qos_power_miscdev;
 	char *name;
 	s32 default_value;
+	s32 force_value;
 	atomic_t target_value;
 	s32 (*comparitor)(s32, s32);
 };
@@ -71,6 +72,7 @@ static struct prcmu_qos_object ape_opp_qos = {
 	.name = "ape_opp",
 	/* Target value in % APE OPP */
 	.default_value = 50,
+	.force_value = 0,
 	.target_value = ATOMIC_INIT(0),
 	.comparitor = max_compare
 };
@@ -83,6 +85,7 @@ static struct prcmu_qos_object ddr_opp_qos = {
 	.name = "ddr_opp",
 	/* Target value in % DDR OPP */
 	.default_value = 25,
+	.force_value = 0,
 	.target_value = ATOMIC_INIT(0),
 	.comparitor = max_compare
 };
@@ -140,18 +143,27 @@ static void update_target(int target)
 
 	spin_lock_irqsave(&prcmu_qos_lock, flags);
 	extreme_value = prcmu_qos_array[target]->default_value;
-	list_for_each_entry(node,
-			&prcmu_qos_array[target]->requirements.list, list) {
-		extreme_value = prcmu_qos_array[target]->comparitor(
-				extreme_value, node->value);
-	}
-	if (atomic_read(&prcmu_qos_array[target]->target_value)
-	    != extreme_value) {
+
+	if (prcmu_qos_array[target]->force_value != 0) {
+		extreme_value = prcmu_qos_array[target]->force_value;
 		update = 1;
-		atomic_set(&prcmu_qos_array[target]->target_value,
-			   extreme_value);
-		pr_debug("prcmu qos: new target for qos %d is %d\n", target,
-			 atomic_read(&prcmu_qos_array[target]->target_value));
+	} else {
+		list_for_each_entry(node,
+				    &prcmu_qos_array[target]->requirements.list,
+				    list) {
+			extreme_value = prcmu_qos_array[target]->comparitor(
+				extreme_value, node->value);
+		}
+		if (atomic_read(&prcmu_qos_array[target]->target_value)
+		    != extreme_value) {
+			update = 1;
+			atomic_set(&prcmu_qos_array[target]->target_value,
+				   extreme_value);
+			pr_debug("prcmu qos: new target for qos %d is %d\n",
+				 target, atomic_read(
+					 &prcmu_qos_array[target]->target_value
+					 ));
+		}
 	}
 	spin_unlock_irqrestore(&prcmu_qos_lock, flags);
 
@@ -199,6 +211,12 @@ static void update_target(int target)
 			prcmu_debug_ape_opp_log(op);
 		}
 	}
+}
+
+void prcmu_qos_force_opp(int prcmu_qos_class, s32 i)
+{
+	prcmu_qos_array[prcmu_qos_class]->force_value = i;
+	update_target(prcmu_qos_class);
 }
 
 /**
