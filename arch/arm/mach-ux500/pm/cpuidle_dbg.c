@@ -9,6 +9,8 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/io.h>
+#include <linux/clk.h>
+#include <linux/err.h>
 #include <linux/delay.h>
 #include <linux/workqueue.h>
 #include <linux/irq.h>
@@ -46,6 +48,7 @@ static DEFINE_PER_CPU(struct state_history, *state_history);
 static struct delayed_work cpuidle_work;
 static u32 dbg_console_enable = 1;
 static void __iomem *uart_base;
+static struct clk *uart_clk;
 
  /* Blocks ApSleep and ApDeepSleep */
 static bool force_APE_on;
@@ -96,8 +99,12 @@ void ux500_ci_dbg_msg(char *dbg_string)
 
 bool ux500_ci_dbg_force_ape_on(void)
 {
-	if (readw(uart_base + UART01x_FR) & UART01x_FR_BUSY)
+	clk_enable(uart_clk);
+	if (readw(uart_base + UART01x_FR) & UART01x_FR_BUSY) {
+		clk_disable(uart_clk);
 		return true;
+	}
+	clk_disable(uart_clk);
 
 	return force_APE_on;
 }
@@ -144,6 +151,7 @@ void ux500_ci_dbg_console_check_uart(void)
 	if (!dbg_console_enable)
 		return;
 
+	clk_enable(uart_clk);
 	spin_lock_irqsave(&dbg_lock, flags);
 	status = readw(uart_base + UART011_MIS);
 
@@ -153,6 +161,7 @@ void ux500_ci_dbg_console_check_uart(void)
 	} else {
 		spin_unlock_irqrestore(&dbg_lock, flags);
 	}
+	clk_disable(uart_clk);
 }
 
 void ux500_ci_dbg_console(void)
@@ -510,6 +519,7 @@ fail:
 
 void ux500_ci_dbg_init(void)
 {
+	char clkname[10];
 	int cpu;
 	struct state_history *sh;
 
@@ -550,6 +560,10 @@ void ux500_ci_dbg_init(void)
 		uart_base = ioremap(U8500_UART2_BASE, SZ_4K);
 		break;
 	}
+
+	snprintf(clkname, sizeof(clkname), "uart%d", CONFIG_UX500_DEBUG_UART);
+	uart_clk = clk_get_sys(clkname, NULL);
+	BUG_ON(IS_ERR(uart_clk));
 
 	INIT_DELAYED_WORK(&cpuidle_work, dbg_cpuidle_work_function);
 
