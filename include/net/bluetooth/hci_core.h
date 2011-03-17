@@ -249,6 +249,7 @@ struct hci_conn {
 	__u8		type;
 	__u8		out;
 	__u8		attempt;
+	__u8		no_autoretry;
 	__u8		dev_class[3];
 	__u8		features[8];
 	__u8		ssp_mode;
@@ -288,6 +289,8 @@ struct hci_conn {
 	struct hci_dev	*hdev;
 	void		*l2cap_data;
 	void		*sco_data;
+
+	struct bt_sco_parameters	*sco_parameters;
 
 	struct hci_conn	*link;
 
@@ -446,14 +449,14 @@ void hci_setup_sync(struct hci_conn *conn, __u16 handle);
 void hci_sco_setup(struct hci_conn *conn, __u8 status);
 
 struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type,
-					__u16 pkt_type, bdaddr_t *dst);
+					 bdaddr_t *dst);
 int hci_conn_del(struct hci_conn *conn);
 void hci_conn_hash_flush(struct hci_dev *hdev);
 void hci_conn_check_pending(struct hci_dev *hdev);
 
-struct hci_conn *hci_connect(struct hci_dev *hdev, int type,
-						__u16 pkt_type, bdaddr_t *dst,
-						__u8 sec_level, __u8 auth_type);
+struct hci_conn *hci_connect(struct hci_dev *hdev, int type, bdaddr_t *dst,
+				__u8 sec_level, __u8 auth_type,
+				struct bt_sco_parameters *sco_parameters);
 int hci_conn_check_link_mode(struct hci_conn *conn);
 int hci_conn_check_secure(struct hci_conn *conn, __u8 sec_level);
 int hci_conn_security(struct hci_conn *conn, __u8 sec_level, __u8 auth_type);
