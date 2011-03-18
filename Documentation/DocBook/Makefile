@@ -15,7 +15,7 @@ DOCBOOKS := z8530book.xml mcabook.xml device-drivers.xml \
 	    80211.xml debugobjects.xml sh.xml regulator.xml \
 	    alsa-driver-api.xml writing-an-alsa-driver.xml \
 	    tracepoint.xml media.xml drm.xml \
-        i2s.xml
+	    i2s.xml msp.xml
 
 ###
 # The build process is as follows (targets):
