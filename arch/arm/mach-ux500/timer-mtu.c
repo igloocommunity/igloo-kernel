@@ -33,7 +33,6 @@
 static u32	u8500_count;		/* accumulated count */
 static u32	u8500_cycle;		/* write-once */
 static __iomem void *mtu0_base;
-static __iomem void *mtu1_base;
 
 /*
  * U8500 sched_clock implementation. It has a resolution of
@@ -56,10 +55,10 @@ unsigned long long sched_clock(void)
 {
 	unsigned long long v;
 
-	if (unlikely(!mtu1_base))
+	if (unlikely(!mtu0_base))
 		return 0;
 
-	v = cnt32_to_63(0xffffffff - readl(mtu1_base + MTU_VAL(0)));
+	v = cnt32_to_63(0xffffffff - readl(mtu0_base + MTU_VAL(1)));
 	return (v * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
 }
 
@@ -102,7 +101,7 @@ static void __init setup_sched_clock(unsigned long tclk)
  */
 static cycle_t u8500_read_timer(struct clocksource *cs)
 {
-	u32 count = readl(mtu1_base + MTU_VAL(0));
+	u32 count = readl(mtu0_base + MTU_VAL(1));
 	return ~count;
 }
 /*
@@ -221,7 +220,7 @@ void mtu_timer_reset(void)
 	u32 cr;
 
 	writel(0, mtu0_base + MTU_CR(0)); /* off */
-	writel(0, mtu1_base + MTU_CR(0)); /* off */
+	writel(0, mtu0_base + MTU_CR(1)); /* off */
 
 	/* Timer: configure load and background-load, and fire it up */
 	writel(u8500_cycle, mtu0_base + MTU_LR(0));
@@ -231,30 +230,26 @@ void mtu_timer_reset(void)
 	writel(cr | MTU_CRn_ENA, mtu0_base + MTU_CR(0));
 
 	/* CS: configure load and background-load, and fire it up */
-	writel(u8500_cycle, mtu1_base + MTU_LR(0));
-	writel(u8500_cycle, mtu1_base + MTU_BGLR(0));
+	writel(u8500_cycle, mtu0_base + MTU_LR(1));
+	writel(u8500_cycle, mtu0_base + MTU_BGLR(1));
 	cr = (MTU_CRn_PRESCALE_1 << 2) | MTU_CRn_32BITS;
-	writel(cr, mtu1_base + MTU_CR(0));
-	writel(cr | MTU_CRn_ENA, mtu1_base + MTU_CR(0));
+	writel(cr, mtu0_base + MTU_CR(1));
+	writel(cr | MTU_CRn_ENA, mtu0_base + MTU_CR(1));
 }
 
 void __init mtu_timer_init(void)
 {
 	unsigned long rate;
 	struct clk *clk0;
-	struct clk *clk1;
 	int bits;
 
 	clk0 = clk_get_sys("mtu0", NULL);
 	BUG_ON(IS_ERR(clk0));
 
-	clk1 = clk_get_sys("mtu1", NULL);
-	BUG_ON(IS_ERR(clk1));
+	rate = clk_get_rate(clk0);
 
 	clk_enable(clk0);
-	clk_enable(clk1);
 
-	rate = clk_get_rate(clk0);
 	/*
 	 * Set scale and timer for sched_clock
 	 */
@@ -264,13 +259,10 @@ void __init mtu_timer_init(void)
 	/* Save global pointer to mtu, used by functions above */
 	if (cpu_is_u5500()) {
 		mtu0_base = __io_address(U5500_MTU0_BASE);
-		mtu1_base = __io_address(U5500_MTU1_BASE);
 	} else if (cpu_is_u8500ed()) {
 		mtu0_base = __io_address(U8500_MTU0_BASE_ED);
-		mtu1_base = __io_address(U8500_MTU1_BASE_ED);
 	} else if (cpu_is_u8500()) {
 		mtu0_base = __io_address(U8500_MTU0_BASE);
-		mtu1_base = __io_address(U8500_MTU1_BASE);
 	} else
 		ux500_unknown_soc();
 
@@ -293,4 +285,3 @@ void __init mtu_timer_init(void)
 	set_delay_fn(mtu_timer_delay_loop);
 #endif
 }
-
