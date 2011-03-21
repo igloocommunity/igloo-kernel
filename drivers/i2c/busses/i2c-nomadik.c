@@ -435,7 +435,8 @@ static int read_i2c(struct nmk_i2c_dev *dev)
 
 	if (timeout == 0) {
 		/* controller has timedout, re-init the h/w */
-		dev_err(&dev->pdev->dev, "controller timed out, re-init h/w\n");
+		dev_err(&dev->pdev->dev, "Read from Slave 0x%x timed out\n",
+				dev->cli.slave_adr);
 		(void) init_hw(dev);
 		status = -ETIMEDOUT;
 	}
@@ -499,7 +500,8 @@ static int write_i2c(struct nmk_i2c_dev *dev)
 
 	if (timeout == 0) {
 		/* controller has timedout, re-init the h/w */
-		dev_err(&dev->pdev->dev, "controller timed out, re-init h/w\n");
+		dev_err(&dev->pdev->dev, "Write to slave 0x%x timed out\n",
+				dev->cli.slave_adr);
 		(void) init_hw(dev);
 		status = -ETIMEDOUT;
 	}
@@ -561,6 +563,7 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
 	int i;
 	u32 cause;
 	struct nmk_i2c_dev *dev = i2c_get_adapdata(i2c_adap);
+	u32 i2c_sr;
 
 	dev->busy = true;
 
@@ -597,14 +600,22 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
 			status = write_i2c(dev);
 		}
 		if (status || (dev->result)) {
-			/* get the abort cause */
-			cause =	(readl(dev->virtbase + I2C_SR) >> 4) & 0x7;
-			dev_err(&dev->pdev->dev, "%s\n",
-				cause >= ARRAY_SIZE(abort_causes)
-				? "unknown reason" : abort_causes[cause]);
+			i2c_sr = readl(dev->virtbase + I2C_SR);
+			/*
+			 * Check if the controller I2C operation status is set
+			 * to ABORT(11b).
+			 */
+			if (((i2c_sr >> 2) & 0x3) == 0x3) {
+				/* get the abort cause */
+				cause =	(i2c_sr >> 4)
+					& 0x7;
+				dev_err(&dev->pdev->dev, "%s\n", cause >=
+						ARRAY_SIZE(abort_causes) ?
+						"unknown reason" :
+						abort_causes[cause]);
+			}
 
 			status = status ? status : dev->result;
-
 			goto out;
 		}
 		udelay(I2C_DELAY);
