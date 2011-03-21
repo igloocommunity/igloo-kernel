@@ -251,8 +251,6 @@ static int init_hw(struct nmk_i2c_dev *dev)
 {
 	int stat;
 
-	clk_enable(dev->clk);
-
 	stat = flush_i2c_fifo(dev);
 	if (stat)
 		goto exit;
@@ -267,8 +265,6 @@ static int init_hw(struct nmk_i2c_dev *dev)
 	dev->cli.operation = I2C_NO_OPERATION;
 
 exit:
-	clk_disable(dev->clk);
-
 	udelay(I2C_DELAY);
 	return stat;
 }
