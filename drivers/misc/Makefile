@@ -43,3 +43,4 @@ obj-$(CONFIG_PCH_PHUB)		+= pch_phub.o
 obj-y				+= ti-st/
 obj-$(CONFIG_AB8500_PWM)	+= ab8500-pwm.o
 obj-$(CONFIG_STE_AUDIO_IO_DEV)	+= audio_io_dev/
+obj-$(CONFIG_HWMEM)            += hwmem/
