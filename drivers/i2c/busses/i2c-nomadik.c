@@ -151,6 +151,7 @@ struct i2c_nmk_client {
  * @stop: stop condition
  * @xfer_complete: acknowledge completion for a I2C message
  * @result: controller propogated result
+ * @busy: Busy doing transfer
  */
 struct nmk_i2c_dev {
 	struct platform_device		*pdev;
@@ -163,6 +164,7 @@ struct nmk_i2c_dev {
 	int 				stop;
 	struct completion		xfer_complete;
 	int 				result;
+	bool				busy;
 };
 
 /* controller's abort causes */
@@ -257,7 +259,7 @@ static int init_hw(struct nmk_i2c_dev *dev)
 
 	stat = flush_i2c_fifo(dev);
 	if (stat)
-		return stat;
+		goto exit;
 
 	/* disable the controller */
 	i2c_clr_bit(dev->virtbase + I2C_CR , I2C_CR_PE);
@@ -268,10 +270,11 @@ static int init_hw(struct nmk_i2c_dev *dev)
 
 	dev->cli.operation = I2C_NO_OPERATION;
 
+exit:
 	clk_disable(dev->clk);
 
 	udelay(I2C_DELAY);
-	return 0;
+	return stat;
 }
 
 /* enable peripheral, master mode operation */
@@ -562,9 +565,11 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
 	u32 cause;
 	struct nmk_i2c_dev *dev = i2c_get_adapdata(i2c_adap);
 
+	dev->busy = true;
+
 	status = init_hw(dev);
 	if (status)
-		return status;
+		goto out2;
 
 	clk_enable(dev->clk);
 
@@ -575,7 +580,9 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
 		if (unlikely(msgs[i].flags & I2C_M_TEN)) {
 			dev_err(&dev->pdev->dev, "10 bit addressing"
 					"not supported\n");
-			return -EINVAL;
+
+			status = -EINVAL;
+			goto out;
 		}
 		dev->cli.slave_adr	= msgs[i].addr;
 		dev->cli.buffer		= msgs[i].buf;
@@ -600,12 +607,16 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
 			dev_err(&dev->pdev->dev, "%s\n",
 				cause >= ARRAY_SIZE(abort_causes)
 				? "unknown reason" : abort_causes[cause]);
-			clk_disable(dev->clk);
-			return status;
+
+			goto out;
 		}
 		udelay(I2C_DELAY);
 	}
+
+out:
 	clk_disable(dev->clk);
+out2:
+	dev->busy = false;
 
 	/* return the no. messages processed */
 	if (status)
@@ -805,6 +816,21 @@ static irqreturn_t i2c_irq_handler(int irq, void *arg)
 	return IRQ_HANDLED;
 }
 
+
+#ifdef CONFIG_PM
+static int nmk_i2c_suspend(struct platform_device *pdev, pm_message_t mesg)
+{
+	struct nmk_i2c_dev *dev = platform_get_drvdata(pdev);
+
+	if (dev->busy)
+		return -EBUSY;
+	else
+		return 0;
+}
+#else
+#define nmk_i2c_suspend	NULL
+#endif
+
 static unsigned int nmk_i2c_functionality(struct i2c_adapter *adap)
 {
 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
@@ -830,7 +856,7 @@ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err_no_mem;
 	}
-
+	dev->busy = false;
 	dev->pdev = pdev;
 	platform_set_drvdata(pdev, dev);
 
@@ -887,12 +913,6 @@ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
 
 	i2c_set_adapdata(adap, dev);
 
-	ret = init_hw(dev);
-	if (ret != 0) {
-		dev_err(&pdev->dev, "error in initializing i2c hardware\n");
-		goto err_init_hw;
-	}
-
 	dev_info(&pdev->dev, "initialize %s on virtual "
 		"base %p\n", adap->name, dev->virtbase);
 
@@ -904,7 +924,6 @@ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
 
 	return 0;
 
- err_init_hw:
  err_add_adap:
 	clk_put(dev->clk);
  err_no_clk:
@@ -951,6 +970,7 @@ static struct platform_driver nmk_i2c_driver = {
 	},
 	.probe = nmk_i2c_probe,
 	.remove = __devexit_p(nmk_i2c_remove),
+	.suspend = nmk_i2c_suspend,
 };
 
 static int __init nmk_i2c_init(void)
