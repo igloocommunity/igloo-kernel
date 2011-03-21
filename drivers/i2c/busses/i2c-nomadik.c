@@ -22,6 +22,7 @@
 #include <linux/err.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/pm_runtime.h>
 
 #include <plat/i2c.h>
 
@@ -567,6 +568,8 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
 
 	dev->busy = true;
 
+	pm_runtime_get_sync(&dev->pdev->dev);
+
 	status = init_hw(dev);
 	if (status)
 		goto out2;
@@ -624,6 +627,8 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
 out:
 	clk_disable(dev->clk);
 out2:
+	pm_runtime_put_sync(&dev->pdev->dev);
+
 	dev->busy = false;
 
 	/* return the no. messages processed */
@@ -826,18 +831,49 @@ static irqreturn_t i2c_irq_handler(int irq, void *arg)
 
 
 #ifdef CONFIG_PM
-static int nmk_i2c_suspend(struct platform_device *pdev, pm_message_t mesg)
+static int nmk_i2c_suspend(struct device *dev)
 {
-	struct nmk_i2c_dev *dev = platform_get_drvdata(pdev);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct nmk_i2c_dev *nmk_i2c = platform_get_drvdata(pdev);
 
-	if (dev->busy)
+	if (nmk_i2c->busy)
 		return -EBUSY;
-	else
-		return 0;
+
+	/*
+	 * During system suspend, runtime suspend transitions are disabled.
+	 * This check and direct call are here so that even if some driver
+	 * performs i2c transactions in its suspend rountine, we would properly
+	 * runtime suspend the i2c driver.
+	 */
+	if (!pm_runtime_suspended(dev))
+		if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_suspend)
+			dev->bus->pm->runtime_suspend(dev);
+
+	return 0;
+}
+
+static int nmk_i2c_resume(struct device *dev)
+{
+	if (!pm_runtime_suspended(dev))
+		if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_resume)
+			dev->bus->pm->runtime_resume(dev);
+
+	return 0;
 }
 #else
 #define nmk_i2c_suspend	NULL
+#define nmk_i2c_resume	NULL
 #endif
+
+/*
+ * We use noirq so that we suspend late and resume before the wakeup interrupt
+ * to ensure that we do the !pm_runtime_suspended() check in resume before
+ * there has been a regular pm runtime resume (via pm_runtime_get_sync()).
+ */
+static const struct dev_pm_ops nmk_i2c_pm = {
+	.suspend_noirq	= nmk_i2c_suspend,
+	.resume_noirq	= nmk_i2c_resume,
+};
 
 static unsigned int nmk_i2c_functionality(struct i2c_adapter *adap)
 {
@@ -894,6 +930,9 @@ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
 		goto err_irq;
 	}
 
+	pm_suspend_ignore_children(&pdev->dev, true);
+	pm_runtime_enable(&pdev->dev);
+
 	dev->clk = clk_get(&pdev->dev, NULL);
 	if (IS_ERR(dev->clk)) {
 		dev_err(&pdev->dev, "could not get i2c clock\n");
@@ -936,6 +975,7 @@ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
  err_add_adap:
 	clk_put(dev->clk);
  err_no_clk:
+	pm_runtime_disable(&pdev->dev);
 	free_irq(dev->irq, dev);
  err_irq:
 	iounmap(dev->virtbase);
@@ -966,6 +1006,7 @@ static int __devexit nmk_i2c_remove(struct platform_device *pdev)
 	if (res)
 		release_mem_region(res->start, resource_size(res));
 	clk_put(dev->clk);
+	pm_runtime_disable(&pdev->dev);
 	platform_set_drvdata(pdev, NULL);
 	kfree(dev);
 
@@ -976,10 +1017,10 @@ static struct platform_driver nmk_i2c_driver = {
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = DRIVER_NAME,
+		.pm = &nmk_i2c_pm,
 	},
 	.probe = nmk_i2c_probe,
 	.remove = __devexit_p(nmk_i2c_remove),
-	.suspend = nmk_i2c_suspend,
 };
 
 static int __init nmk_i2c_init(void)
