@@ -252,6 +252,8 @@ static int init_hw(struct nmk_i2c_dev *dev)
 {
 	int stat;
 
+	clk_enable(dev->clk);
+
 	stat = flush_i2c_fifo(dev);
 	if (stat)
 		goto exit;
@@ -432,9 +434,10 @@ static int read_i2c(struct nmk_i2c_dev *dev)
 	}
 
 	if (timeout == 0) {
-		/* Controller timed out */
-		dev_err(&dev->pdev->dev, "read from slave 0x%x timed out\n",
+		/* controller has timedout, re-init the h/w */
+		dev_err(&dev->pdev->dev, "Read from Slave 0x%x timed out\n",
 				dev->cli.slave_adr);
+		(void) init_hw(dev);
 		status = -ETIMEDOUT;
 	}
 	return status;
@@ -519,9 +522,10 @@ static int write_i2c(struct nmk_i2c_dev *dev)
 	}
 
 	if (timeout == 0) {
-		/* Controller timed out */
-		dev_err(&dev->pdev->dev, "write to slave 0x%x timed out\n",
+		/* controller has timedout, re-init the h/w */
+		dev_err(&dev->pdev->dev, "Write to slave 0x%x timed out\n",
 				dev->cli.slave_adr);
+		(void) init_hw(dev);
 		status = -ETIMEDOUT;
 	}
 
