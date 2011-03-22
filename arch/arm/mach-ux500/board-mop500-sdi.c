@@ -20,6 +20,7 @@
 #include "devices-db8500.h"
 #include "board-mop500.h"
 #include "ste-dma40-db8500.h"
+#include "../../../drivers/mmc/host/mmci.h" /* to avoid MCI_ST* redefinition */
 
 /*
  * SDI 0 (MicroSD slot)
@@ -59,8 +60,8 @@ static u32 mop500_sdi0_vdd_handler(struct device *dev, unsigned int vdd,
 		break;
 	}
 
-	return MCI_FBCLKEN | MCI_CMDDIREN | MCI_DATA0DIREN |
-	       MCI_DATA2DIREN | MCI_DATA31DIREN;
+	return MCI_ST_FBCLKEN | MCI_ST_CMDDIREN | MCI_ST_DATA0DIREN |
+	       MCI_ST_DATA2DIREN;
 }
 
 #ifdef CONFIG_STE_DMA40
@@ -130,6 +131,50 @@ void mop500_sdi_tc35892_init(void)
 	sdi0_vsel = GPIO_SDMMC_1V8_3V_SEL;
 	sdi0_configure();
 }
+
+/*
+ * SDI1 (SDIO WLAN)
+ */
+#ifdef CONFIG_STE_DMA40
+#ifdef MMC_WITH_DMA
+static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
+	.dir = STEDMA40_PERIPH_TO_MEM,
+	.src_dev_type = DB8500_DMA_DEV32_SD_MM1_RX,
+	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
+	.src_info.data_width = STEDMA40_WORD_WIDTH,
+	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+};
+
+static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
+	.dir = STEDMA40_MEM_TO_PERIPH,
+	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
+	.dst_dev_type = DB8500_DMA_DEV32_SD_MM1_TX,
+	.src_info.data_width = STEDMA40_WORD_WIDTH,
+	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+};
+#endif
+#endif
+
+/*
+ * TODO 1: SDIO power management not fully supported.
+ * TODO 2: SDIO with DMA not yet supported.
+ */
+static struct mmci_platform_data mop500_sdi1_data = {
+	.ocr_mask	= MMC_VDD_29_30,
+	.f_max		= 15000000,
+	.capabilities	= MMC_CAP_4_BIT_DATA |
+				MMC_CAP_SDIO_IRQ |
+				MMC_CAP_BROKEN_SDIO_CMD53,
+	.gpio_cd	= -1,
+	.gpio_wp	= -1,
+#ifdef MMC_WITH_DMA /* To be verified. */
+#ifdef CONFIG_STE_DMA40
+	.dma_filter	= stedma40_filter,
+	.dma_rx_param	= &sdi1_dma_cfg_rx,
+	.dma_tx_param	= &sdi1_dma_cfg_tx,
+#endif
+#endif
+};
 
 /*
  * SDI 2 (POP eMMC, not on DB8500ed)
