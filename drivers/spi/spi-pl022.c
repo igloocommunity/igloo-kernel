@@ -924,6 +924,12 @@ static int configure_dma(struct pl022 *pl022)
 	struct dma_async_tx_descriptor *rxdesc;
 	struct dma_async_tx_descriptor *txdesc;
 
+	/* DMA burstsize should be same as the FIFO trigger level */
+	rx_conf.src_maxburst = pl022->rx_lev_trig ? 1 <<
+		(pl022->rx_lev_trig + 1) : pl022->rx_lev_trig;
+	tx_conf.dst_maxburst = pl022->tx_lev_trig ? 1 <<
+		(pl022->tx_lev_trig + 1) : pl022->tx_lev_trig;
+
 	/* Check that the channels are available */
 	if (!rxchan || !txchan)
 		return -ENODEV;
@@ -1547,6 +1553,7 @@ static void pump_messages(struct work_struct *work)
 	pm_runtime_get_sync(&pl022->adev->dev);
 	amba_vcore_enable(pl022->adev);
 	amba_pclk_enable(pl022->adev);
+	pm_runtime_get_sync(&pl022->adev->dev);
 	clk_enable(pl022->clk);
 	restore_state(pl022);
 	flush(pl022);
@@ -2189,6 +2196,9 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 	pm_runtime_enable(dev);
 	pm_runtime_resume(dev);
 
+	pm_runtime_enable(dev);
+	pm_runtime_resume(dev);
+
 	pl022->clk = clk_get(&adev->dev, NULL);
 	if (IS_ERR(pl022->clk)) {
 		status = PTR_ERR(pl022->clk);
@@ -2279,6 +2289,7 @@ pl022_remove(struct amba_device *adev)
 	free_irq(adev->irq[0], pl022);
 	clk_disable(pl022->clk);
 	clk_put(pl022->clk);
+	pm_runtime_disable(&adev->dev);
 	iounmap(pl022->virtbase);
 	amba_release_regions(adev);
 	tasklet_disable(&pl022->pump_transfers);
@@ -2363,6 +2374,14 @@ static struct vendor_data vendor_db5500_pl023 = {
 	.extended_cr = true,
 	.pl023 = true,
 	.loopback = true,
+};
+
+static struct vendor_data vendor_db5500_pl023 = {
+	.fifodepth = 32,
+	.max_bpw = 32,
+	.unidir = false,
+	.extended_cr = true,
+	.pl023 = true,
 };
 
 static struct amba_id pl022_ids[] = {
