@@ -498,6 +498,7 @@ config HWMEM
 	  can be used by hardware. It also enables accessing hwmem allocated
 	  memory buffers through a secure id which can be shared across processes.
 
+source "drivers/misc/Kconfig.stm"
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
