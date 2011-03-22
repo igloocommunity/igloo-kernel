@@ -42,6 +42,7 @@
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
 #include <linux/scatterlist.h>
+#include <linux/pm_runtime.h>
 
 /*
  * This macro is used to define some register default values.
@@ -391,6 +392,8 @@ struct pl022 {
 	struct sg_table			sgt_tx;
 	char				*dummypage;
 #endif
+	enum ssp_rx_level_trig		rx_lev_trig;
+	enum ssp_tx_level_trig		tx_lev_trig;
 };
 
 /**
@@ -517,6 +520,7 @@ static void giveback(struct pl022 *pl022)
 	clk_disable(pl022->clk);
 	amba_pclk_disable(pl022->adev);
 	amba_vcore_disable(pl022->adev);
+    pm_runtime_put(&pl022->adev->dev);
 }
 
 /**
@@ -923,6 +927,12 @@ static int configure_dma(struct pl022 *pl022)
 	struct dma_chan *txchan = pl022->dma_tx_channel;
 	struct dma_async_tx_descriptor *rxdesc;
 	struct dma_async_tx_descriptor *txdesc;
+
+	/* DMA burstsize should be same as the FIFO trigger level */
+	rx_conf.src_maxburst = pl022->rx_lev_trig ? 1 <<
+		(pl022->rx_lev_trig + 1) : pl022->rx_lev_trig;
+	tx_conf.dst_maxburst = pl022->tx_lev_trig ? 1 <<
+		(pl022->tx_lev_trig + 1) : pl022->tx_lev_trig;
 
 	/* Check that the channels are available */
 	if (!rxchan || !txchan)
@@ -1498,6 +1508,7 @@ static void pump_messages(struct work_struct *work)
 	 */
 	amba_vcore_enable(pl022->adev);
 	amba_pclk_enable(pl022->adev);
+	pm_runtime_get_sync(&pl022->adev->dev);
 	clk_enable(pl022->clk);
 	restore_state(pl022);
 	flush(pl022);
@@ -1874,6 +1885,9 @@ static int pl022_setup(struct spi_device *spi)
 		goto err_config_params;
 	}
 
+	pl022->rx_lev_trig = chip_info->rx_lev_trig;
+	pl022->tx_lev_trig = chip_info->tx_lev_trig;
+
 	/* Now set controller state based on controller data */
 	chip->xfer_type = chip_info->com_mode;
 	if (!chip_info->cs_control) {
@@ -2095,6 +2109,9 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
 	       adev->res.start, pl022->virtbase);
 
+	pm_runtime_enable(dev);
+	pm_runtime_resume(dev);
+
 	pl022->clk = clk_get(&adev->dev, NULL);
 	if (IS_ERR(pl022->clk)) {
 		status = PTR_ERR(pl022->clk);
@@ -2188,6 +2205,7 @@ pl022_remove(struct amba_device *adev)
 	free_irq(adev->irq[0], pl022);
 	clk_disable(pl022->clk);
 	clk_put(pl022->clk);
+	pm_runtime_disable(&adev->dev);
 	iounmap(pl022->virtbase);
 	amba_release_regions(adev);
 	tasklet_disable(&pl022->pump_transfers);
@@ -2273,6 +2291,14 @@ static struct vendor_data vendor_db5500_pl023 = {
 	.extended_cr = true,
 	.pl023 = true,
 	.loopback = true,
+};
+
+static struct vendor_data vendor_db5500_pl023 = {
+	.fifodepth = 32,
+	.max_bpw = 32,
+	.unidir = false,
+	.extended_cr = true,
+	.pl023 = true,
 };
 
 static struct amba_id pl022_ids[] = {
