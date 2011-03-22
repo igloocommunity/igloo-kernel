@@ -173,6 +173,7 @@ struct mmc_host {
 						/* DDR mode at 1.2V */
 #define MMC_CAP_POWER_OFF_CARD	(1 << 13)	/* Can power off after boot */
 #define MMC_CAP_BUS_WIDTH_TEST	(1 << 14)	/* CMD14/CMD19 bus width ok */
+#define MMC_CAP_BROKEN_SDIO_CMD53 (1 << 15)	/* Broken CMD53 byte mode */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
