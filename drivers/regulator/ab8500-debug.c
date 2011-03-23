@@ -1506,34 +1506,6 @@ static struct ab8500_force_reg ab8500_force_reg[] = {
 	},
 	{
 		/*
-		 * ReguSysClkReq1HPValid1
-		 * OTP: 0x00, HSI: 0x16, suspend: 0x17/0xff (value/mask)
-		 * [  4] VpllSysClkReq1HPValid = Vpll set by SysClkReq1
-		 * [  2] Vsmps3SysClkReq1HPValid = Vsmps3 set by SysClkReq1
-		 * [  1] Vsmps2SysClkReq1HPValid = Vsmsp2 set by SysClkReq1
-		 * [  0] Vsmps1SysClkReq1HPValid = Vsmps1 set by SysClkReq1
-		 */
-		.name = "ReguSysClkReq1HPValid1",
-		.bank = 0x03,
-		.addr = 0x07,
-		.mask = 0x17,
-		.val  = 0x17,
-	},
-	{
-		/*
-		 * Vsmsp3Regu
-		 * OTP: 0x01, HSI: 0x01, suspend: 0x06/0x0f (value/mask)
-		 * [3:2] Vsmps3SelCtrl[1:0] = Vsmps3 voltage set by Vsmps3Sel2
-		 * [1:0] Vsmps3Regu[1:0] = Vsmps3 in HW control
-		 */
-		.name = "Vsmps3Regu",
-		.bank = 0x04,
-		.addr = 0x05,
-		.mask = 0x0f,
-		.val  = 0x06,
-	},
-	{
-		/*
 		 * SysUlpClkCtrl1
 		 * OTP: 0x00, HSI: 0x00, suspend: 0x00/0x0f (value/mask)
 		 * [  3] 4500SysClkReq = inactive
