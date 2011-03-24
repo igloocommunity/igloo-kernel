@@ -29,14 +29,17 @@ static unsigned long twd_timer_rate;
 static unsigned long twd_periphclk_prescaler;
 static unsigned long twd_target_rate;
 
+static DEFINE_PER_CPU(unsigned long, twd_ctrl);
+static DEFINE_PER_CPU(unsigned long, twd_load);
+
 static void twd_set_mode(enum clock_event_mode mode,
 			struct clock_event_device *clk)
 {
 	unsigned long ctrl;
-	unsigned long prescale;
+	int this_cpu = smp_processor_id();
 
-	prescale = __raw_readl(twd_base + TWD_TIMER_CONTROL) &
-			TWD_TIMER_CONTROL_PRESCALE_MASK;
+	__raw_writel(per_cpu(twd_load, this_cpu),
+				 twd_base + TWD_TIMER_LOAD);
 
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
@@ -55,20 +58,22 @@ static void twd_set_mode(enum clock_event_mode mode,
 		ctrl = 0;
 	}
 
-	ctrl |= prescale;
+	ctrl |= per_cpu(twd_ctrl, this_cpu) & TWD_TIMER_CONTROL_PRESCALE_MASK;
 
 	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
+	per_cpu(twd_ctrl, this_cpu) = ctrl;
 }
 
 static int twd_set_next_event(unsigned long evt,
 			struct clock_event_device *unused)
 {
-	unsigned long ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
+	int this_cpu = smp_processor_id();
 
-	ctrl |= TWD_TIMER_CONTROL_ENABLE;
+	per_cpu(twd_ctrl, this_cpu) |= TWD_TIMER_CONTROL_ENABLE;
 
 	__raw_writel(evt, twd_base + TWD_TIMER_COUNTER);
-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
+	__raw_writel(per_cpu(twd_ctrl, this_cpu),
+				 twd_base + TWD_TIMER_CONTROL);
 
 	return 0;
 }
@@ -94,8 +99,8 @@ int twd_timer_ack(void)
  */
 static void twd_update_cpu_frequency(unsigned long new_rate)
 {
-	u32 ctrl;
 	int prescaler;
+	int this_cpu = smp_processor_id();
 
 	BUG_ON(twd_periphclk_prescaler == 0 || twd_target_rate == 0);
 
@@ -104,10 +109,10 @@ static void twd_update_cpu_frequency(unsigned long new_rate)
 	prescaler = DIV_ROUND_UP(twd_timer_rate, twd_target_rate);
 	prescaler = clamp(prescaler - 1, 0, 0xFF);
 
-	ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
-	ctrl &= ~TWD_TIMER_CONTROL_PRESCALE_MASK;
-	ctrl |= prescaler << 8;
-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
+	per_cpu(twd_ctrl, this_cpu) &= ~TWD_TIMER_CONTROL_PRESCALE_MASK;
+	per_cpu(twd_ctrl, this_cpu) |= prescaler << 8;
+	__raw_writel(per_cpu(twd_ctrl, this_cpu),
+				 twd_base + TWD_TIMER_CONTROL);
 }
 
 static void twd_update_cpu_frequency_on_cpu(void *data)
@@ -157,7 +162,11 @@ static void __cpuinit twd_calibrate_rate(void)
 		waitjiffies += 5;
 
 				 /* enable, no interrupt or reload */
-		__raw_writel(0x1, twd_base + TWD_TIMER_CONTROL);
+		__raw_writel(TWD_TIMER_CONTROL_ENABLE,
+					 twd_base + TWD_TIMER_CONTROL);
+
+		per_cpu(twd_ctrl, smp_processor_id()) =
+			TWD_TIMER_CONTROL_ENABLE;
 
 				 /* maximum value */
 		__raw_writel(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
@@ -180,7 +189,6 @@ static void __cpuinit twd_calibrate_rate(void)
 static void __cpuinit __twd_timer_setup(struct clock_event_device *clk,
 	unsigned long target_rate, unsigned int periphclk_prescaler)
 {
-	unsigned long load;
 	unsigned long cpu_rate;
 	unsigned long twd_tick_rate;
 
@@ -196,9 +204,7 @@ static void __cpuinit __twd_timer_setup(struct clock_event_device *clk,
 		twd_tick_rate = twd_timer_rate;
 	}
 
-	load = twd_tick_rate / HZ;
-
-	__raw_writel(load, twd_base + TWD_TIMER_LOAD);
+	per_cpu(twd_load, smp_processor_id()) = twd_tick_rate / HZ;
 
 	clk->name = "local_timer";
 #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && \
@@ -249,6 +255,11 @@ arch_initcall(twd_timer_setup_cpufreq);
  */
 void twd_timer_stop(void)
 {
-	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
+	int this_cpu = smp_processor_id();
+	per_cpu(twd_ctrl, this_cpu) &= ~(TWD_TIMER_CONTROL_ENABLE |
+									 TWD_TIMER_CONTROL_IT_ENABLE);
+	__raw_writel(per_cpu(twd_ctrl, this_cpu),
+				 twd_base + TWD_TIMER_CONTROL);
+
 }
 #endif
