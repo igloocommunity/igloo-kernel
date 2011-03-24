@@ -87,6 +87,7 @@ struct regulator {
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs;
 #endif
+	int use;
 };
 
 static int _regulator_is_enabled(struct regulator_dev *rdev);
@@ -608,6 +609,32 @@ static ssize_t regulator_suspend_standby_state_show(struct device *dev,
 static DEVICE_ATTR(suspend_standby_state, 0444,
 		regulator_suspend_standby_state_show, NULL);
 
+static ssize_t regulator_use_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct regulator_dev *rdev = dev_get_drvdata(dev);
+	struct regulator *reg;
+	size_t size = 0;
+
+	if (rdev->use_count == 0)
+		return sprintf(buf, "no users\n");
+
+	list_for_each_entry(reg, &rdev->consumer_list, list) {
+		if (!reg->use)
+			continue;
+
+		if (reg->dev != NULL)
+			size += sprintf((buf + size), "%s (%d) ",
+					dev_name(reg->dev), reg->use);
+		else
+			size += sprintf((buf + size), "unknown (%d) ",
+					reg->use);
+	}
+	size += sprintf((buf + size), "\n");
+
+	return size;
+}
+static DEVICE_ATTR(use, 0444, regulator_use_show, NULL);
 
 /*
  * These are the only attributes are present for all regulators.
@@ -1489,6 +1516,8 @@ int regulator_enable(struct regulator *regulator)
 
 	if (ret != 0 && rdev->supply)
 		regulator_disable(rdev->supply);
+	else
+		regulator->use++;
 
 	return ret;
 }
@@ -1561,6 +1590,9 @@ int regulator_disable(struct regulator *regulator)
 
 	if (ret == 0 && rdev->supply)
 		regulator_disable(rdev->supply);
+
+	if (ret == 0)
+		regulator->use--;
 
 	return ret;
 }
@@ -2600,6 +2632,10 @@ static int add_regulator_attributes(struct regulator_dev *rdev)
 	struct device		*dev = &rdev->dev;
 	struct regulator_ops	*ops = rdev->desc->ops;
 	int			status = 0;
+
+	status = device_create_file(dev, &dev_attr_use);
+	if (status < 0)
+		dev_warn(dev, "Create sysfs file \"use\" failed");
 
 	/* some attributes need specific methods to be displayed */
 	if ((ops->get_voltage && ops->get_voltage(rdev) >= 0) ||
