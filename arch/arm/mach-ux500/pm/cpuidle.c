@@ -426,7 +426,7 @@ static int determine_sleep_state(int idle_cpus,
 static int enter_sleep(struct cpuidle_device *dev,
 		       struct cpuidle_state *ci_state)
 {
-	ktime_t t1, t2;
+	ktime_t t1, t2, t3;
 	s64 diff;
 	int ret;
 	bool pending_int;
@@ -500,8 +500,10 @@ static int enter_sleep(struct cpuidle_device *dev,
 			 * Save return address to SRAM and set this
 			 * CPU in WFI
 			 */
-			ux500_ci_dbg_log(CI_WFI, smp_processor_id());
+			ux500_ci_dbg_log(CI_WFI, t1);
 			context_save_to_sram_and_wfi(false);
+
+			t3 = ktime_get();
 
 			state->ready_deep_sleep = false;
 			smp_wmb();
@@ -522,7 +524,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 			/* Fall through */
 		case ARM_ON:
 			ux500_ci_dbg_msg("WFI");
-			ux500_ci_dbg_log(CI_WFI, smp_processor_id());
+			ux500_ci_dbg_log(CI_WFI, t1);
 			__asm__ __volatile__
 				("dsb\n\t" "wfi\n\t" : : : "memory");
 			break;
@@ -603,8 +605,6 @@ static int enter_sleep(struct cpuidle_device *dev,
 		spin_unlock_irqrestore(&cpuidle_lock, iflags);
 	}
 
-	ux500_ci_dbg_log(target, smp_processor_id());
-
 	if (cstates[target].ARM == ARM_OFF) {
 		/* Save gic settings */
 		context_varm_save_common();
@@ -639,6 +639,8 @@ static int enter_sleep(struct cpuidle_device *dev,
 	 */
 	context_clean_l1_cache_all();
 
+	ux500_ci_dbg_log(target, t1);
+
 	prcmu_set_power_state(cstates[target].pwrst,
 			      cstates[target].UL_PLL,
 			      /* Is actually the AP PLL */
@@ -651,6 +653,8 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 	context_save_to_sram_and_wfi(cstates[target].ARM == ARM_OFF);
 
+	t3 = ktime_get();
+
 	/* The PRCMU restores ARM PLL and recouples the GIC */
 
 	context_restore_cpu_registers();
@@ -661,7 +665,8 @@ exit:
 	prcmu_disable_wakeups();
 
 exit_fast:
-	ux500_ci_dbg_log(CI_RUNNING, smp_processor_id());
+	/* No latency measurements on running, so passing t1 does not matter */
+	ux500_ci_dbg_log(CI_RUNNING, t1);
 
 	atomic_dec(&idle_cpus_counter);
 
@@ -681,6 +686,8 @@ exit_fast:
 	ret = (int)diff;
 
 	ux500_ci_dbg_console_check_uart();
+	if (slept_well)
+		ux500_ci_dbg_wake_leave(target, t3);
 
 	local_irq_enable();
 
