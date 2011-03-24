@@ -36,11 +36,25 @@
 #define UART011_MIS_RXIS (1 << 4) /* receive interrupt status */
 #define UART011_MIS 0x40 /* Masked interrupt status register */
 
+struct state_history_state {
+	u32 counter;
+	ktime_t time;
+
+	u32 enter_latency_count;
+	ktime_t enter_latency_sum;
+	ktime_t enter_latency_min;
+	ktime_t enter_latency_max;
+
+	u32 exit_latency_count;
+	ktime_t exit_latency_sum;
+	ktime_t exit_latency_min;
+	ktime_t exit_latency_max;
+};
+
 struct state_history {
 	ktime_t start;
 	u32 state;
-	u32 *counter;
-	ktime_t *time;
+	struct state_history_state *states;
 };
 static DEFINE_PER_CPU(struct state_history, *state_history);
 
@@ -53,6 +67,7 @@ static struct clk *uart_clk;
 static bool force_APE_on;
 static bool reset_timer;
 static int deepest_allowed_state = CONFIG_U8500_CPUIDLE_DEEPEST_STATE;
+static u32 measure_latency;
 
 static struct cstate *cstates;
 static int cstates_len;
@@ -190,20 +205,40 @@ static void dbg_cpuidle_work_function(struct work_struct *work)
 }
 
 static void state_record_time(struct state_history *sh, enum ci_pwrst pstate,
-			      ktime_t now)
+			      ktime_t now, ktime_t start, bool latency)
 {
 	ktime_t dtime;
+	struct state_history_state *shs;
+
+	sh->state = pstate;
+
+	shs = &sh->states[sh->state];
 
 	dtime = ktime_sub(now, sh->start);
-	sh->time[sh->state] = ktime_add(sh->time[sh->state], dtime);
+	shs->time = ktime_add(shs->time, dtime);
 
 	sh->start = now;
 
-	sh->state = pstate;
-	sh->counter[sh->state]++;
+	if (latency && pstate != CI_RUNNING && measure_latency) {
+		ktime_t this = ktime_sub(now, start);
+		shs->enter_latency_count++;
+		shs->enter_latency_sum =
+			ktime_add(shs->enter_latency_sum,
+				  this);
+
+		if (ktime_to_us(this) >
+		    ktime_to_us(shs->enter_latency_max))
+			shs->enter_latency_max = this;
+
+		if (ktime_to_us(this) <
+		    ktime_to_us(shs->enter_latency_min))
+			shs->enter_latency_min = this;
+	}
+
+	shs->counter++;
 }
 
-void ux500_ci_dbg_log(enum ci_pwrst pstate, int this_cpu)
+void ux500_ci_dbg_log(enum ci_pwrst pstate, ktime_t enter_time)
 {
 	int i;
 	ktime_t now;
@@ -211,6 +246,9 @@ void ux500_ci_dbg_log(enum ci_pwrst pstate, int this_cpu)
 	unsigned long flags;
 	struct state_history *sh;
 	struct state_history *sh_other;
+	int this_cpu;
+
+	this_cpu = smp_processor_id();
 
 	now = ktime_get();
 
@@ -225,7 +263,7 @@ void ux500_ci_dbg_log(enum ci_pwrst pstate, int this_cpu)
 	if (pstate == sh->state)
 		goto done;
 
-	state_record_time(sh, pstate, now);
+	state_record_time(sh, pstate, now, enter_time, true);
 
 	/*
 	 * Update other cpus, (this_cpu = A, other cpus = B) if:
@@ -249,16 +287,99 @@ void ux500_ci_dbg_log(enum ci_pwrst pstate, int this_cpu)
 			continue;
 
 		if (pstate == CI_RUNNING && sh_other->state != CI_WFI) {
-			state_record_time(sh_other, CI_WFI, now);
+			state_record_time(sh_other, CI_WFI, now,
+					  enter_time, false);
 			continue;
 		}
 		/*
 		 * This cpu is something else than running or wfi, both must be
 		 * in the same state.
 		 */
-		state_record_time(sh_other, pstate, now);
+		state_record_time(sh_other, pstate, now, enter_time, true);
 	}
 done:
+	spin_unlock_irqrestore(&dbg_lock, flags);
+}
+extern void __iomem *rtc_base;
+#define RTC_TDR		0x20
+
+#define TICKS_PER_NS (1000000000/32768)
+
+static void wake_up_latency(u32 *count,
+			    ktime_t d,
+			    ktime_t *sum,
+			    ktime_t *min,
+			    ktime_t *max)
+{
+	unsigned long flags;
+
+
+	spin_lock_irqsave(&dbg_lock, flags);
+
+	(*count)++;
+	(*sum) = ktime_add((*sum), d);
+
+	if (ktime_to_us(d) > ktime_to_us(*max))
+		(*max) = d;
+
+	if (ktime_to_us(d) < ktime_to_us((*min)))
+		(*min) = d;
+
+	spin_unlock_irqrestore(&dbg_lock, flags);
+}
+
+void ux500_ci_dbg_wake_leave(enum ci_pwrst pstate, ktime_t t)
+{
+	struct state_history *sh;
+	ktime_t d;
+
+	if (pstate < CI_IDLE || !measure_latency)
+		return;
+
+	d = ktime_sub(ktime_get(), t);
+
+	sh = per_cpu(state_history, smp_processor_id());
+
+	wake_up_latency(&sh->states[pstate].exit_latency_count,
+			d,
+			&sh->states[pstate].exit_latency_sum,
+			&sh->states[pstate].exit_latency_min,
+			&sh->states[pstate].exit_latency_max);
+}
+
+static void state_history_reset(void)
+{
+	unsigned long flags;
+	unsigned int cpu;
+	int i;
+	struct state_history *sh;
+
+	spin_lock_irqsave(&dbg_lock, flags);
+
+	for_each_possible_cpu(cpu) {
+		sh = per_cpu(state_history, cpu);
+		for (i = 0; i <= cstates_len; i++) {
+			sh->states[i].counter = 0;
+			sh->states[i].time = ktime_set(0, 0);
+
+			sh->states[i].enter_latency_count = 0;
+			sh->states[i].enter_latency_min = ktime_set(0,
+								    10000000);
+			sh->states[i].enter_latency_max = ktime_set(0, 0);
+			sh->states[i].enter_latency_sum = ktime_set(0, 0);
+
+			sh->states[i].exit_latency_count = 0;
+			sh->states[i].exit_latency_min = ktime_set(0,
+								   10000000);
+			sh->states[i].exit_latency_max = ktime_set(0, 0);
+			sh->states[i].exit_latency_sum = ktime_set(0, 0);
+
+		}
+
+		for (i = 0; i <= cstates_len; i++)
+			sh->start = ktime_get();
+		sh->state = cstates_len; /* CI_RUNNING */
+	}
 	spin_unlock_irqrestore(&dbg_lock, flags);
 }
 
@@ -266,7 +387,6 @@ static ssize_t set_deepest_state(struct file *file,
 				 const char __user *user_buf,
 				 size_t count, loff_t *ppos)
 {
-
 	char buf[32];
 	ssize_t buf_size;
 	long unsigned int i;
@@ -306,26 +426,9 @@ static ssize_t stats_write(struct file *file,
 			   const char __user *user_buf,
 			   size_t count, loff_t *ppos)
 {
-	unsigned long flags;
-	unsigned int cpu;
-	int i;
-	struct state_history *sh;
 
-	printk(KERN_INFO "\nreset\n");
-
-	for_each_possible_cpu(cpu) {
-		sh = per_cpu(state_history, cpu);
-		spin_lock_irqsave(&dbg_lock, flags);
-		for (i = 0; i < cstates_len; i++) {
-			sh->counter[i] = 0;
-			sh->time[i] = ktime_set(0, 0);
-			sh->start = ktime_get();
-		}
-
-		sh->state = CI_RUNNING;
-		spin_unlock_irqrestore(&dbg_lock, flags);
-	}
-
+	pr_info("\nreset\n");
+	state_history_reset();
 	return count;
 }
 
@@ -339,6 +442,10 @@ static int stats_print(struct seq_file *s, void *p)
 	s64 t_us;
 	s64 perc;
 	s64 total_us;
+	ktime_t init_time, zero_time;
+
+	init_time = ktime_set(0, 10000000);
+	zero_time = ktime_set(0, 0);
 
 	for_each_possible_cpu(cpu) {
 		sh = per_cpu(state_history, cpu);
@@ -348,25 +455,69 @@ static int stats_print(struct seq_file *s, void *p)
 		total = ktime_set(0, 0);
 
 		for (i = 0; i < cstates_len; i++)
-			total = ktime_add(total, sh->time[i]);
+			total = ktime_add(total, sh->states[i].time);
+
 		total_us = ktime_to_us(total);
 		do_div(total_us, 100);
 
 		for (i = 0; i < cstates_len; i++) {
+			s64 avg_enter = 0;
+			s64 avg_exit = 0;
+			if (measure_latency) {
+				avg_enter = ktime_to_us(sh->states[i].enter_latency_sum);
+				avg_exit = ktime_to_us(sh->states[i].exit_latency_sum);
+			}
 
-			t_us = ktime_to_us(sh->time[i]);
-			perc = ktime_to_us(sh->time[i]);
+			t_us = ktime_to_us(sh->states[i].time);
+			perc = ktime_to_us(sh->states[i].time);
 			do_div(t_us, 1000); /* to ms */
-			if (total_us != 0)
+			if (total_us)
 				do_div(perc, total_us);
+			if (sh->states[i].enter_latency_count && measure_latency)
+				do_div(avg_enter, sh->states[i].enter_latency_count);
 
-			seq_printf(s, "%d - %s: # %u in %d ms %d%%\n",
+			if (sh->states[i].exit_latency_count && measure_latency)
+				do_div(avg_exit, sh->states[i].exit_latency_count);
+
+			seq_printf(s, "\n%d - %s: # %u in %d ms %d%%",
 				   i, cstates[i].desc,
-				   sh->counter[i],
+				   sh->states[i].counter,
 				   (u32) t_us, (u32)perc);
+			if (i == CI_RUNNING)
+				continue;
+
+			if (!ktime_equal(sh->states[i].enter_latency_min,
+					 init_time) && measure_latency) {
+				if (ktime_equal(sh->states[i].enter_latency_min,
+						zero_time))
+					seq_printf(s, " (enter: min < 30");
+				else
+					seq_printf(s, " (enter: min %lld",
+						   ktime_to_us(sh->states[i].enter_latency_min));
+
+				seq_printf(s, " avg %lld max %lld us)",
+					   avg_enter,
+					   ktime_to_us(sh->states[i].enter_latency_max));
+			}
+
+			if (!ktime_equal(sh->states[i].exit_latency_min,
+					 init_time) && measure_latency) {
+
+				if (ktime_equal(sh->states[i].exit_latency_min,
+						zero_time))
+					seq_printf(s, " (exit: min < 30");
+				else
+					seq_printf(s, " (exit: min %lld",
+						   ktime_to_us(sh->states[i].exit_latency_min));
+
+				seq_printf(s, " avg %lld max %lld us)",
+					   avg_exit,
+					   ktime_to_us(sh->states[i].exit_latency_max));
+			}
 		}
 		spin_unlock_irqrestore(&dbg_lock, flags);
 	}
+	seq_printf(s, "\n");
 	return 0;
 }
 
@@ -383,7 +534,7 @@ static int ap_family_show(struct seq_file *s, void *iter)
 
 	for (i = 0 ; i < cstates_len; i++) {
 		if (cstates[i].state == (enum ci_pwrst)s->private)
-			count += sh->counter[i];
+			count += sh->states[i].counter;
 	}
 
 	seq_printf(s, "%u\n", count);
@@ -458,6 +609,11 @@ static void setup_debugfs(void)
 					       &dbg_console_enable)))
 		goto fail;
 
+	if (IS_ERR_OR_NULL(debugfs_create_bool("measure_latency",
+					       S_IWUGO | S_IRUGO, cpuidle_dir,
+					       &measure_latency)))
+		goto fail;
+
 	if (IS_ERR_OR_NULL(debugfs_create_file("ap_idle", S_IRUGO,
 					       cpuidle_dir,
 					       (void *)CI_IDLE,
@@ -491,6 +647,7 @@ void ux500_ci_dbg_init(void)
 {
 	char clkname[10];
 	int cpu;
+
 	struct state_history *sh;
 
 	cstates = ux500_ci_get_cstates(&cstates_len);
@@ -499,17 +656,20 @@ void ux500_ci_dbg_init(void)
 		per_cpu(state_history, cpu) = kzalloc(sizeof(struct state_history),
 						      GFP_KERNEL);
 		sh = per_cpu(state_history, cpu);
-		sh->counter = kzalloc(sizeof(u32) * cstates_len,
-				      GFP_KERNEL);
-		sh->time = kzalloc(sizeof(ktime_t) * cstates_len,
-				   GFP_KERNEL);
+		sh->states = kzalloc(sizeof(struct state_history_state)
+				     * cstates_len,
+				     GFP_KERNEL);
+	}
 
+	state_history_reset();
+
+	for_each_possible_cpu(cpu) {
+		sh = per_cpu(state_history, cpu);
 		/* Only first CPU used during boot */
 		if (cpu == 0)
 			sh->state = CI_RUNNING;
 		else
 			sh->state = CI_WFI;
-		sh->start = ktime_get();
 	}
 
 	setup_debugfs();
@@ -547,8 +707,7 @@ void ux500_ci_dbg_remove(void)
 
 	for_each_possible_cpu(cpu) {
 		sh = per_cpu(state_history, cpu);
-		kfree(sh->time);
-		kfree(sh->counter);
+		kfree(sh->states);
 		kfree(sh);
 	}
 
