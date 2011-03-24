@@ -313,8 +313,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 	 */
 	percpu_timer_setup();
 
-	calibrate_delay();
-
 	smp_store_cpu_info(cpu);
 
 	/*
