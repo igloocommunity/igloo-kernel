@@ -1907,28 +1907,30 @@ static void ab5500_mask_work(struct work_struct *work)
 	}
 }
 
-static void ab5500_mask(unsigned int irq)
+static void ab5500_mask(struct irq_data *data)
 {
 	unsigned long flags;
 	struct ab5500 *ab;
+ 	int irq;
+ 
+ 	ab = irq_data_get_irq_chip_data(data);
+	irq = data->irq - ab->irq.base;
 
-	ab = get_irq_chip_data(irq);
-	irq -= ab->irq_base;
-
-	spin_lock_irqsave(&ab->event_lock, flags);
+ 	spin_lock_irqsave(&ab->event_lock, flags);
 	ab->event_mask[irq / 8] |= BIT(irq % 8);
 	spin_unlock_irqrestore(&ab->event_lock, flags);
 
 	schedule_work(&ab->mask_work);
 }
 
-static void ab5500_unmask(unsigned int irq)
+static void ab5500_unmask(struct irq_data *data)
 {
 	unsigned long flags;
 	struct ab5500 *ab;
-
-	ab = get_irq_chip_data(irq);
-	irq -= ab->irq_base;
+ 	int irq;
+ 
+ 	ab = irq_data_get_irq_chip_data(data);
+	irq = data->irq - ab->irq.base;
 
 	spin_lock_irqsave(&ab->event_lock, flags);
 	ab->event_mask[irq / 8] &= ~BIT(irq % 8);
