@@ -327,6 +327,24 @@ ENTRY(v6_dma_unmap_area)
 	mov	pc, lr
 ENDPROC(v6_dma_unmap_area)
 
+/*
+ *	clean_dcache_all()
+ *
+ *	Clean the whole D-cache.
+ */
+ENTRY(v6_clean_dcache_all)
+	mov	pc, lr
+ENDPROC(v6_clean_dcache_all)
+
+/*
+ *	flush_dcache_all()
+ *
+ *	Flush the whole D-cache.
+ */
+ENTRY(v6_flush_dcache_all)
+	mov	pc, lr
+ENDPROC(v6_flush_dcache_all)
+
 	__INITDATA
 
 	.type	v6_cache_fns, #object
@@ -338,6 +356,8 @@ ENTRY(v6_cache_fns)
 	.long	v6_coherent_kern_range
 	.long	v6_coherent_user_range
 	.long	v6_flush_kern_dcache_area
+	.long	v6_clean_dcache_all
+	.long	v6_flush_dcache_all
 	.long	v6_dma_map_area
 	.long	v6_dma_unmap_area
 	.long	v6_dma_flush_range

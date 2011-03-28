@@ -127,6 +127,24 @@ ENTRY(v3_dma_map_area)
 ENDPROC(v3_dma_unmap_area)
 ENDPROC(v3_dma_map_area)
 
+/*
+ *	clean_dcache_all()
+ *
+ *	Clean the whole D-cache.
+ */
+ENTRY(v3_clean_dcache_all)
+	mov	pc, lr
+ENDPROC(v3_clean_dcache_all)
+
+/*
+ *	flush_dcache_all()
+ *
+ *	Flush the whole D-cache.
+ */
+ENTRY(v3_flush_dcache_all)
+	mov	pc, lr
+ENDPROC(v3_flush_dcache_all)
+
 	__INITDATA
 
 	.type	v3_cache_fns, #object
@@ -138,6 +156,8 @@ ENTRY(v3_cache_fns)
 	.long	v3_coherent_kern_range
 	.long	v3_coherent_user_range
 	.long	v3_flush_kern_dcache_area
+	.long	v3_clean_dcache_all
+	.long	v3_flush_dcache_all
 	.long	v3_dma_map_area
 	.long	v3_dma_unmap_area
 	.long	v3_dma_flush_range

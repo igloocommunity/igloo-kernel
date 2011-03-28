@@ -240,6 +240,24 @@ ENTRY(fa_dma_unmap_area)
 	mov	pc, lr
 ENDPROC(fa_dma_unmap_area)
 
+/*
+ *	clean_dcache_all()
+ *
+ *	Clean the whole D-cache.
+ */
+ENTRY(fa_clean_dcache_all)
+	mov	pc, lr
+ENDPROC(fa_clean_dcache_all)
+
+/*
+ *	flush_dcache_all()
+ *
+ *	Flush the whole D-cache.
+ */
+ENTRY(fa_flush_dcache_all)
+	mov	pc, lr
+ENDPROC(fa_flush_dcache_all)
+
 	__INITDATA
 
 	.type	fa_cache_fns, #object
@@ -251,6 +269,8 @@ ENTRY(fa_cache_fns)
 	.long	fa_coherent_kern_range
 	.long	fa_coherent_user_range
 	.long	fa_flush_kern_dcache_area
+	.long	fa_clean_dcache_all
+	.long	fa_flush_dcache_all
 	.long	fa_dma_map_area
 	.long	fa_dma_unmap_area
 	.long	fa_dma_flush_range
