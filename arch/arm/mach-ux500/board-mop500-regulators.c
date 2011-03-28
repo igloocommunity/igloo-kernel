@@ -303,10 +303,10 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
 	 */
 	INIT_REGULATOR_REGISTER(AB8500_VSMPS3REGU,             0x06),
 	/*
-	 * Vsmps3Sel1               = 0.9 V
+	 * Vsmps3Sel1               = 1.0 V
 	 * NOTE! PRCMU register
 	 */
-	INIT_REGULATOR_REGISTER(AB8500_VSMPS3SEL1,             0x10),
+	INIT_REGULATOR_REGISTER(AB8500_VSMPS3SEL1,             0x18),
 	/*
 	 * VPll                     = Hw controlled
 	 * VanaRegu                 = force off
