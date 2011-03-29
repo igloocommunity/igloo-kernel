@@ -1273,7 +1273,7 @@ int __init db8500_clk_init(void)
 	 */
 	clk_enable(&apeatclk);
 	clk_enable(&apetraceclk);
-#ifdef CONFIG_DEBUG_NO_LAUTERBACH
+#ifdef CONFIG_UX500_DEBUG_NO_LAUTERBACH
 	clk_disable(&apeatclk);
 	clk_disable(&apetraceclk);
 #endif
