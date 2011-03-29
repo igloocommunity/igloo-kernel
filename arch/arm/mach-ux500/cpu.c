@@ -19,7 +19,7 @@
 #include <mach/hardware.h>
 #include <mach/setup.h>
 #include <mach/devices.h>
-#include <mach/prcmu.h>
+#include <mach/prcmu-fw-api.h>
 
 #include "clock.h"
 

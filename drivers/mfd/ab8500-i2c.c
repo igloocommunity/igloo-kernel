@@ -12,7 +12,7 @@
 #include <linux/platform_device.h>
 #include <linux/mfd/ab8500.h>
 
-#include <mach/prcmu.h>
+#include <mach/prcmu-fw-api.h>
 
 static int ab8500_i2c_write(struct ab8500 *ab8500, u16 addr, u8 data)
 {
