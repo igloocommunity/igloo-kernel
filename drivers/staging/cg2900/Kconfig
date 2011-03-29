@@ -32,7 +32,9 @@ config STLC2690_CHIP
 
 config CG2900_UART
 	tristate "Support CG2900 UART transport"
-	depends on CG2900 && BT
+	depends on CG2900
+	select BT
+	select BT_HCIUART
 	help
 	  UART driver for ST-Ericsson CG2900 Connectivity Controller.
 	  Contains functions for setting baud rate and to transport

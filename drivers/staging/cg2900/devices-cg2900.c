@@ -275,6 +275,7 @@ static int dcg2900_init(struct cg2900_chip_dev *dev)
 finished:
 	dev->b_data = info;
 	return 0;
+
 err_handling_free_gpio_bt:
 	gpio_free(info->bt_gpio);
 err_handling_free_gpio_gbf:
