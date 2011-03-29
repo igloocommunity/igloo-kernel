@@ -1,0 +1,6 @@
+config U8500_CPUFREQ
+	tristate "CPUFreq support"
+	depends on UX500_SOC_DB8500 && CPU_FREQ
+	default y
+	help
+	  Add support for CPU Frequency scaling for U8500.
