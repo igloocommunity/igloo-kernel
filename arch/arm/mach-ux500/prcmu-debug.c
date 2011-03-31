@@ -299,7 +299,7 @@ static ssize_t opp_write(struct file *file,
 
 	prcmu_qos_force_opp(prcmu_qos_class, i);
 
-	pr_info("prcmu debug: forced OPP for %d to %d\n", prcmu_qos_class, i);
+	pr_info("prcmu debug: forced OPP for %d to %d\n", prcmu_qos_class, (int)i);
 
 	return buf_size;
 }
