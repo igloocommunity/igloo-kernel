@@ -300,7 +300,8 @@ static pin_cfg_t mop500_pins_hrefv60[] = {
 	/* Proximity Sensor */
 	GPIO217_GPIO		| PIN_INPUT_PULLUP,
 
-
+	/* SD card detect */
+	GPIO95_GPIO	| PIN_INPUT_PULLUP,
 };
 
 static pin_cfg_t snowball_pins[] = {
