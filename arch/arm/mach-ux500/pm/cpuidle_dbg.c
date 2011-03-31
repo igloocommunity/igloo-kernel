@@ -311,7 +311,7 @@ static ssize_t stats_write(struct file *file,
 
 		for (i = 0; i <= cstates_len; i++)
 			sh->start = ktime_get();
-		sh->state = CI_RUNNING;
+		sh->state = cstates_len; /* CI_RUNNING */
 		spin_unlock_irqrestore(&sh->lock, flags);
 	}
 
@@ -537,7 +537,7 @@ void ux500_ci_dbg_init(void)
 		spin_lock_init(&sh->lock);
 		/* Only first CPU used during boot */
 		if (cpu == 0)
-			sh->state = CI_RUNNING;
+			sh->state = cstates_len; /* CI_RUNNING */
 		else
 			sh->state  = CI_WFI;
 		sh->start = ktime_get();
