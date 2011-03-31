@@ -54,6 +54,7 @@ static unsigned int fmax = 515633;
  * @pwrreg_powerup: power up value for MMCIPOWER register
  * @non_power_of_2_blksize: variant supports block sizes that are not
  *		a power of two.
+ * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
  */
 struct variant_data {
 	unsigned int		clkreg;
@@ -65,6 +66,7 @@ struct variant_data {
 	bool			st_clkdiv;
 	unsigned int		pwrreg_powerup;
 	bool			non_power_of_2_blksize;
+	bool			blksz_datactrl16;
 };
 
 static struct variant_data variant_arm = {
@@ -93,6 +95,19 @@ static struct variant_data variant_ux500 = {
 	.st_clkdiv		= true,
 	.pwrreg_powerup		= MCI_PWR_ON,
 	.non_power_of_2_blksize	= true,
+};
+
+static struct variant_data variant_ux500v2 = {
+	.fifosize		= 30 * 4,
+	.fifohalfsize		= 8 * 4,
+	.clkreg			= MCI_CLK_ENABLE,
+	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
+	.datalength_bits	= 24,
+	.sdio			= true,
+	.st_clkdiv		= true,
+	.pwrreg_powerup		= MCI_PWR_ON,
+	.non_power_of_2_blksize	= true,
+	.blksz_datactrl16	= true,
 };
 
 /*
@@ -496,7 +511,10 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 
 	blksz_bits = ffs(data->blksz) - 1;
 
-	datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
+	if (variant->blksz_datactrl16)
+		datactrl = MCI_DPSM_ENABLE | (data->blksz << 16);
+	else
+		datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
 
 	if (data->flags & MMC_DATA_READ)
 		datactrl |= MCI_DPSM_DIRECTION;
@@ -1458,8 +1476,13 @@ static struct amba_id mmci_ids[] = {
 	},
 	{
 		.id     = 0x00480180,
-		.mask   = 0x00ffffff,
+		.mask   = 0xf0ffffff,
 		.data	= &variant_ux500,
+	},
+	{
+		.id     = 0x10480180,
+		.mask   = 0xf0ffffff,
+		.data	= &variant_ux500v2,
 	},
 	{ 0, 0 },
 };
