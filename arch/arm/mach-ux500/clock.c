@@ -246,7 +246,7 @@ EXPORT_SYMBOL(clk_set_rate);
 
 int clk_set_parent(struct clk *clk, struct clk *parent)
 {
-	int err = -EINVAL;
+	int err = 0;
 	unsigned long flags;
 	struct clk **p;
 
@@ -259,15 +259,20 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
 
 	__clk_lock(clk, NO_LOCK, &flags);
 
-	if (clk->enabled) {
-		err = -EINVAL;
-	} else {
-		if ((clk->ops != NULL) && (clk->ops->set_parent != NULL))
-			err = clk->ops->set_parent(clk, parent);
-		if (!err)
-			clk->parent = parent;
+	if ((clk->ops != NULL) && (clk->ops->set_parent != NULL)) {
+		err = clk->ops->set_parent(clk, parent);
+		if (err)
+			goto unlock_and_return;
+	} else if (clk->enabled) {
+		err = __clk_enable(parent, clk->mutex);
+		if (err)
+			goto unlock_and_return;
+		__clk_disable(clk->parent, clk->mutex);
 	}
 
+	clk->parent = parent;
+
+unlock_and_return:
 	__clk_unlock(clk, NO_LOCK, flags);
 
 	return err;

@@ -145,7 +145,8 @@ static int ab_ulpclk_enable(struct clk *clk)
 	if (err)
 		return err;
 	return ab8500_sysctrl_set(AB8500_SYSULPCLKCTRL1,
-		AB8500_SYSULPCLKCTRL1_ULPCLKREQ);
+		(AB8500_SYSULPCLKCTRL1_ULPCLKREQ |
+		 AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK));
 }
 
 static void ab_ulpclk_disable(struct clk *clk)
@@ -185,24 +186,9 @@ static void audioclk_disable(struct clk *clk)
 	}
 }
 
-static int audioclk_set_parent(struct clk *clk, struct clk *parent)
-{
-	if (parent->ops == &sysclk_ops) {
-		return ab8500_sysctrl_clear(AB8500_SYSULPCLKCTRL1,
-			AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK);
-	} else if (parent->ops == &ab_ulpclk_ops) {
-		return ab8500_sysctrl_write(AB8500_SYSULPCLKCTRL1,
-			AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK,
-			(1 << AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_SHIFT));
-	} else {
-		return -EINVAL;
-	}
-}
-
 static struct clkops audioclk_ops = {
 	.enable = audioclk_enable,
 	.disable = audioclk_disable,
-	.set_parent = audioclk_set_parent,
 };
 
 /* Primary camera clock operations */
