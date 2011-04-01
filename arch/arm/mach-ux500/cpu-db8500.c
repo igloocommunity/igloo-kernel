@@ -17,6 +17,7 @@
 #include <linux/gpio.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
+#include <linux/regulator/machine.h>
 
 #include <asm/mach/map.h>
 #include <asm/pmu.h>
@@ -27,6 +28,7 @@
 
 #include "devices-db8500.h"
 #include "ste-dma40-db8500.h"
+#include "regulator-db8500.h"
 
 /* minimum static i/o mapping required to boot U8500 platforms */
 static struct map_desc u8500_uart_io_desc[] __initdata = {
@@ -131,9 +133,195 @@ static struct platform_device db8500_pmu_device = {
 	.dev.platform_data	= &db8500_pmu_platdata,
 };
 
+/*
+ * Power domain switches (ePODs) modeled as regulators for the DB8500 SoC
+ */
+
+static struct regulator_consumer_supply db8500_vape_consumers[] = {
+	REGULATOR_SUPPLY("v-ape", NULL),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.0"),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.1"),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.2"),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.3"),
+	/* "v-mmc" changed to "vcore" in the mainline kernel */
+	REGULATOR_SUPPLY("vcore", "sdi0"),
+	REGULATOR_SUPPLY("vcore", "sdi1"),
+	REGULATOR_SUPPLY("vcore", "sdi2"),
+	REGULATOR_SUPPLY("vcore", "sdi3"),
+	REGULATOR_SUPPLY("vcore", "sdi4"),
+	REGULATOR_SUPPLY("v-dma", "dma40.0"),
+	REGULATOR_SUPPLY("v-ape", "ab8500-usb.0"),
+	/* "v-uart" changed to "vcore" in the mainline kernel */
+	REGULATOR_SUPPLY("vcore", "uart0"),
+	REGULATOR_SUPPLY("vcore", "uart1"),
+	REGULATOR_SUPPLY("vcore", "uart2"),
+	REGULATOR_SUPPLY("v-ape", "nmk-ske-keypad.0"),
+};
+
+static struct regulator_consumer_supply db8500_vsmps2_consumers[] = {
+	/* CG2900 and CW1200 power to off-chip peripherals */
+	REGULATOR_SUPPLY("gbf_1v8", "cg2900-uart.0"),
+	REGULATOR_SUPPLY("wlan_1v8", "cw1200.0"),
+	REGULATOR_SUPPLY("musb_1v8", "ab8500-usb.0"),
+	/* AV8100 regulator */
+	REGULATOR_SUPPLY("hdmi_1v8", "0-0070"),
+};
+
+static struct regulator_consumer_supply db8500_b2r2_mcde_consumers[] = {
+	REGULATOR_SUPPLY("vsupply", "b2r2.0"),
+	REGULATOR_SUPPLY("vsupply", "mcde.0"),
+};
+
+static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
+	[DB8500_REGULATOR_VAPE] = {
+		.constraints = {
+			.name = "db8500-vape",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+		.consumer_supplies = db8500_vape_consumers,
+		.num_consumer_supplies = ARRAY_SIZE(db8500_vape_consumers),
+	},
+	[DB8500_REGULATOR_VARM] = {
+		.constraints = {
+			.name = "db8500-varm",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_VMODEM] = {
+		.constraints = {
+			.name = "db8500-vmodem",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_VPLL] = {
+		.constraints = {
+			.name = "db8500-vpll",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_VSMPS1] = {
+		.constraints = {
+			.name = "db8500-vsmps1",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_VSMPS2] = {
+		.constraints = {
+			.name = "db8500-vsmps2",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+		.consumer_supplies = db8500_vsmps2_consumers,
+		.num_consumer_supplies = ARRAY_SIZE(db8500_vsmps2_consumers),
+	},
+	[DB8500_REGULATOR_VSMPS3] = {
+		.constraints = {
+			.name = "db8500-vsmps3",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_VRF1] = {
+		.constraints = {
+			.name = "db8500-vrf1",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_SWITCH_SVAMMDSP] = {
+		.supply_regulator = "db8500-vape",
+		.constraints = {
+			.name = "db8500-sva-mmdsp",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_SWITCH_SVAMMDSPRET] = {
+		.constraints = {
+			/* "ret" means "retention" */
+			.name = "db8500-sva-mmdsp-ret",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_SWITCH_SVAPIPE] = {
+		.supply_regulator = "db8500-vape",
+		.constraints = {
+			.name = "db8500-sva-pipe",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_SWITCH_SIAMMDSP] = {
+		.supply_regulator = "db8500-vape",
+		.constraints = {
+			.name = "db8500-sia-mmdsp",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_SWITCH_SIAMMDSPRET] = {
+		.constraints = {
+			.name = "db8500-sia-mmdsp-ret",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_SWITCH_SIAPIPE] = {
+		.supply_regulator = "db8500-vape",
+		.constraints = {
+			.name = "db8500-sia-pipe",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_SWITCH_SGA] = {
+		.supply_regulator = "db8500-vape",
+		.constraints = {
+			.name = "db8500-sga",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_SWITCH_B2R2_MCDE] = {
+		.supply_regulator = "db8500-vape",
+		.constraints = {
+			.name = "db8500-b2r2-mcde",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+		.consumer_supplies = db8500_b2r2_mcde_consumers,
+		.num_consumer_supplies = ARRAY_SIZE(db8500_b2r2_mcde_consumers),
+	},
+	[DB8500_REGULATOR_SWITCH_ESRAM12] = {
+		.supply_regulator = "db8500-vape",
+		.constraints = {
+			.name = "db8500-esram12",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_SWITCH_ESRAM12RET] = {
+		.constraints = {
+			.name = "db8500-esram12-ret",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_SWITCH_ESRAM34] = {
+		.supply_regulator = "db8500-vape",
+		.constraints = {
+			.name = "db8500-esram34",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+	[DB8500_REGULATOR_SWITCH_ESRAM34RET] = {
+		.constraints = {
+			.name = "db8500-esram34-ret",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+	},
+};
+
+static struct platform_device db8500_regulator_device = {
+	.name = "db8500-regulators",
+	.id   = 0,
+	.dev  = {
+		.platform_data = &db8500_regulators,
+	},
+};
+
 static struct platform_device *platform_devs[] __initdata = {
 	&u8500_dma40_device,
 	&db8500_pmu_device,
+	&db8500_regulator_device,
 };
 
 static resource_size_t __initdata db8500_gpio_base[] = {
