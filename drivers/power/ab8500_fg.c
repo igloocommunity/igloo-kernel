@@ -590,8 +590,7 @@ static void ab8500_fg_acc_cur_work(struct work_struct *work)
 
 	mutex_unlock(&di->cc_lock);
 
-	queue_work(di->fg_wq,
-		&di->fg_work);
+	queue_work(di->fg_wq, &di->fg_work);
 
 	return;
 exit:

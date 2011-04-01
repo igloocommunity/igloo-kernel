@@ -30,6 +30,9 @@
 /* End-of-charge criteria counter */
 #define EOC_COND_CNT			10
 
+/* Recharge criteria counter */
+#define RCH_COND_CNT			3
+
 #define to_ab8500_chargalg_device_info(x) container_of((x), \
 	struct ab8500_chargalg, chargalg_psy);
 
@@ -80,6 +83,8 @@ enum ab8500_chargalg_states {
 	STATE_HW_TEMP_PROTECT,
 	STATE_NORMAL_INIT,
 	STATE_NORMAL,
+	STATE_WAIT_FOR_RECHARGE_INIT,
+	STATE_WAIT_FOR_RECHARGE,
 	STATE_MAINTENANCE_A_INIT,
 	STATE_MAINTENANCE_A,
 	STATE_MAINTENANCE_B_INIT,
@@ -109,6 +114,8 @@ static const char *states[] = {
 	"HW_TEMP_PROTECT",
 	"NORMAL_INIT",
 	"NORMAL",
+	"WAIT_FOR_RECHARGE_INIT",
+	"WAIT_FOR_RECHARGE",
 	"MAINTENANCE_A_INIT",
 	"MAINTENANCE_A",
 	"MAINTENANCE_B_INIT",
@@ -186,6 +193,7 @@ enum maxim_ret {
  * @dev:		pointer to the structure device
  * @charge_status:	battery operating status
  * @eoc_cnt:		counter used to determine end-of_charge
+ * @rch_cnt:		counter used to determine start of recharge
  * @maintenance_chg:	indicate if maintenance charge is active
  * @t_hyst_norm		temperature hysteresis when the temperature has	been
  *			over or under normal limits
@@ -214,6 +222,7 @@ struct ab8500_chargalg {
 	struct device *dev;
 	int charge_status;
 	int eoc_cnt;
+	int rch_cnt;
 	bool maintenance_chg;
 	int t_hyst_norm;
 	int t_hyst_lowhigh;
@@ -563,6 +572,26 @@ static void ab8500_chargalg_stop_charging(struct ab8500_chargalg *di)
 	ab8500_chargalg_stop_safety_timer(di);
 	ab8500_chargalg_stop_maintenance_timer(di);
 	di->charge_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
+	di->maintenance_chg = false;
+	cancel_delayed_work(&di->chargalg_wd_work);
+	power_supply_changed(&di->chargalg_psy);
+}
+
+/**
+ * ab8500_chargalg_hold_charging() - Pauses charging
+ * @di:		pointer to the ab8500_chargalg structure
+ *
+ * This function is called in the case where maintenance charging has been
+ * disabled and instead a battery voltage mode is entered to check when the
+ * battery voltage has reached a certain recharge voltage
+ */
+static void ab8500_chargalg_hold_charging(struct ab8500_chargalg *di)
+{
+	ab8500_chargalg_ac_en(di, false, 0, 0);
+	ab8500_chargalg_usb_en(di, false, 0, 0);
+	ab8500_chargalg_stop_safety_timer(di);
+	ab8500_chargalg_stop_maintenance_timer(di);
+	di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
 	di->maintenance_chg = false;
 	cancel_delayed_work(&di->chargalg_wd_work);
 	power_supply_changed(&di->chargalg_psy);
@@ -1384,11 +1413,31 @@ static void ab8500_chargalg_algorithm(struct ab8500_chargalg *di)
 
 	case STATE_NORMAL:
 		handle_maxim_chg_curr(di);
-
 		if (di->charge_status == POWER_SUPPLY_STATUS_FULL &&
-				di->maintenance_chg)
-			ab8500_chargalg_state_to(di, STATE_MAINTENANCE_A_INIT);
+			di->maintenance_chg) {
+			if (di->bat->no_maintenance)
+				ab8500_chargalg_state_to(di,
+					STATE_WAIT_FOR_RECHARGE_INIT);
+			else
+				ab8500_chargalg_state_to(di,
+					STATE_MAINTENANCE_A_INIT);
+		}
+		break;
 
+	/* This state will be used when the maintenance state is disabled */
+	case STATE_WAIT_FOR_RECHARGE_INIT:
+		ab8500_chargalg_hold_charging(di);
+		ab8500_chargalg_state_to(di, STATE_WAIT_FOR_RECHARGE);
+		di->rch_cnt = RCH_COND_CNT;
+		/* Intentional fallthrough */
+
+	case STATE_WAIT_FOR_RECHARGE:
+		if (di->batt_data.volt <=
+			di->bat->bat_type[di->bat->batt_id].recharge_vol) {
+			if (di->rch_cnt-- == 0)
+				ab8500_chargalg_state_to(di, STATE_NORMAL_INIT);
+		} else
+			di->rch_cnt = RCH_COND_CNT;
 		break;
 
 	case STATE_MAINTENANCE_A_INIT:
