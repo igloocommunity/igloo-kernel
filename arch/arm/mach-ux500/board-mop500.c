@@ -316,6 +316,10 @@ static struct lp5521_platform_data __initdata lp5521_sec_data = {
 
 static struct i2c_board_info __initdata mop500_i2c0_devices[] = {
 	{
+		I2C_BOARD_INFO("tps61052", 0x33),
+		.platform_data  = &mop500_tps61052_data,
+	},
+	{
 		I2C_BOARD_INFO("tc3589x", 0x42),
 		.irq		= NOMADIK_GPIO_TO_IRQ(217),
 		.platform_data  = &mop500_tc35892_data,
