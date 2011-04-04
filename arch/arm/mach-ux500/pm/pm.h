@@ -1,0 +1,110 @@
+/*
+ * Copyright (C) ST-Ericsson SA 2010
+ * Author: Rickard Andersson <rickard.andersson@stericsson.com> for
+ *         ST-Ericsson.
+ * License terms: GNU General Public License (GPL) version 2
+ *
+ */
+
+#ifndef PM_COMMON_H
+#define PM_COMMON_H
+
+#ifdef CONFIG_PM
+/**
+ * ux500_pm_arm_on_ext_clk()
+ *
+ * @leave_arm_pll_on: True, if leave the ARM PLL on.
+ *
+ * returns divps_rate, used as input for ux500_pm_arm_on_arm_pll
+ * or -EINVAL if already running on external clock.
+ */
+int ux500_pm_arm_on_ext_clk(bool leave_arm_pll_on);
+
+/**
+ * ux500_pm_arm_on_arm_pll()
+ *
+ * @divps_rate: Rate provided by ux500_pm_arm_on_ext_clk
+ *
+ * Restores the previous arm pll settings.
+ */
+void ux500_pm_arm_on_arm_pll(int divps_rate);
+
+/**
+ * ux500_pm_gic_decouple()
+ *
+ * Decouple GIC from the interrupt bus.
+ */
+void ux500_pm_gic_decouple(void);
+
+/**
+ * ux500_pm_gic_recouple()
+ *
+ * Recouple GIC with the interrupt bus.
+ */
+void ux500_pm_gic_recouple(void);
+
+/**
+ * ux500_pm_gic_pending_interrupt()
+ *
+ * returns true, if there are pending interrupts.
+ */
+bool ux500_pm_gic_pending_interrupt(void);
+
+/**
+ * ux500_pm_prcmu_pending_interrupt()
+ *
+ * returns true, if there are pending interrupts.
+ */
+bool ux500_pm_prcmu_pending_interrupt(void);
+
+/**
+ * ux500_pm_prcmu_set_ioforce()
+ *
+ * @enable: Enable/disable
+ *
+ * Enable/disable the gpio-ring
+ */
+void ux500_pm_prcmu_set_ioforce(bool enable);
+
+/**
+ * ux500_pm_prcmu_copy_gic_settings()
+ *
+ * This function copies all the gic interrupt settings to the prcmu.
+ * This is needed for the system to catch interrupts in ApIdle
+ */
+void ux500_pm_prcmu_copy_gic_settings(void);
+
+/**
+ * ux500_pm_gpio_save_wake_up_status()
+ *
+ * This function is called when the prcmu has woken the ARM
+ * but before ioforce is disabled.
+ */
+void ux500_pm_gpio_save_wake_up_status(void);
+
+/**
+ * ux500_pm_gpio_read_wake_up_status()
+ *
+ * @bank_number: The gpio bank.
+ *
+ * Returns the WKS register settings for given bank number.
+ * The WKS register is cleared when ioforce is released therefore
+ * this function is needed.
+ */
+u32 ux500_pm_gpio_read_wake_up_status(unsigned int bank_number);
+
+/**
+ * ux500_pm_other_cpu_wfi()
+ *
+ * Returns true if the other CPU is in WFI.
+ */
+bool ux500_pm_other_cpu_wfi(void);
+
+#else
+u32 ux500_pm_gpio_read_wake_up_status(unsigned int bank_number)
+{
+	return 0;
+}
+#endif
+
+#endif
