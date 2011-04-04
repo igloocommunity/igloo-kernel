@@ -26,7 +26,6 @@
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
-#include <mach/id.h>
 
 /*
  * NOTE! Temporary until all users of set_hwacc() are using the regulator
@@ -40,6 +39,7 @@
 #include <mach/prcmu-fw-api.h>
 #include <mach/prcmu-fw-defs_v1.h>
 #include <mach/db8500-regs.h>
+#include <mach/id.h>
 
 /* Offset for the firmware version within the TCPM */
 #define PRCMU_FW_VERSION_OFFSET 0xA4
@@ -1888,44 +1888,44 @@ static void prcmu_mask_work(struct work_struct *work)
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
 }
 
-static void prcmu_irq_mask(unsigned int irq)
+static void prcmu_irq_mask(struct irq_data *d)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
 
-	mb0_transfer.req.dbb_irqs &= ~prcmu_irq_bit[irq - IRQ_PRCMU_BASE];
+	mb0_transfer.req.dbb_irqs &= ~prcmu_irq_bit[d->irq - IRQ_PRCMU_BASE];
 
 	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
 
-	if (irq != IRQ_PRCMU_CA_SLEEP)
+	if (d->irq != IRQ_PRCMU_CA_SLEEP)
 		schedule_work(&mb0_transfer.mask_work);
 }
 
-static void prcmu_irq_unmask(unsigned int irq)
+static void prcmu_irq_unmask(struct irq_data *d)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
 
-	mb0_transfer.req.dbb_irqs |= prcmu_irq_bit[irq - IRQ_PRCMU_BASE];
+	mb0_transfer.req.dbb_irqs |= prcmu_irq_bit[d->irq - IRQ_PRCMU_BASE];
 
 	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
 
-	if (irq != IRQ_PRCMU_CA_SLEEP)
+	if (d->irq != IRQ_PRCMU_CA_SLEEP)
 		schedule_work(&mb0_transfer.mask_work);
 }
 
-static void noop(unsigned int irq)
+static void noop(struct irq_data *d)
 {
 }
 
 static struct irq_chip prcmu_irq_chip = {
 	.name		= "prcmu",
-	.disable	= prcmu_irq_mask,
-	.ack		= noop,
-	.mask		= prcmu_irq_mask,
-	.unmask		= prcmu_irq_unmask,
+	.irq_disable	= prcmu_irq_mask,
+	.irq_ack	= noop,
+	.irq_mask	= prcmu_irq_mask,
+	.irq_unmask	= prcmu_irq_unmask,
 };
 
 void __init prcmu_early_init(void)
@@ -2008,7 +2008,8 @@ int __init prcmu_init(void)
 		goto no_irq_return;
 	}
 
-	prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
+	if (cpu_is_u8500v20_or_later())
+		prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
 
 no_irq_return:
 	return err;
