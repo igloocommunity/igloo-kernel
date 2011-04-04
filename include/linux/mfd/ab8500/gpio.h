@@ -18,4 +18,7 @@ struct ab8500_gpio_platform_data {
 	u8  config_reg[7];
 };
 
+int ab8500_config_pull_up_or_down(struct platform_device *dev,
+				unsigned gpio, bool enable);
 #endif /* _AB8500_GPIO_H */
+
