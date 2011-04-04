@@ -1,0 +1,740 @@
+/*
+ * Copyright (C) ST-Ericsson SA 2010-2011
+ * Author: Bengt Jonsson <bengt.g.jonsson@stericsson.com>,
+ *         Rickard Andersson <rickard.andersson@stericsson.com>,
+ *         Jonas Aaberg <jonas.aberg@stericsson.com>,
+ *         Sundar Iyer for ST-Ericsson.
+ * License terms: GNU General Public License (GPL) version 2
+ *
+ */
+
+#include <linux/init.h>
+#include <linux/io.h>
+#include <linux/smp.h>
+#include <linux/percpu.h>
+#include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/device.h>
+#include <linux/notifier.h>
+
+#include <mach/hardware.h>
+#include <mach/irqs.h>
+#include <mach/scu.h>
+
+#include "context.h"
+
+/*
+ * TODO:
+ * - Use the "UX500*"-macros instead where possible
+ */
+
+#define U8500_BACKUPRAM_SIZE SZ_64K
+
+#define U8500_PUBLIC_BOOT_ROM_BASE (U8500_BOOT_ROM_BASE + 0x17000)
+
+/* Special dedicated addresses in backup RAM */
+#define U8500_EXT_RAM_LOC_BACKUPRAM_ADDR		0x80151FDC
+#define U8500_CPU0_CP15_CR_BACKUPRAM_ADDR		0x80151F80
+#define U8500_CPU1_CP15_CR_BACKUPRAM_ADDR		0x80151FA0
+
+/* For v1.x */
+#define U8500_CPU0_BACKUPRAM_ADDR_BACKUPRAM_LOG_ADDR	0x80151FD8
+#define U8500_CPU1_BACKUPRAM_ADDR_BACKUPRAM_LOG_ADDR	0x80151FE0
+
+/* For v2.0 and later */
+#define U8500_CPU0_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR	0x80151FD8
+#define U8500_CPU1_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR	0x80151FE0
+
+#define GIC_DIST_ENABLE_NS 0x0
+
+/* 32 interrupts fits in 4 bytes */
+#define GIC_DIST_ENABLE_SET_COMMON_NUM ((DBX500_NR_INTERNAL_IRQS - \
+					 IRQ_SHPI_START) / 32)
+#define GIC_DIST_ENABLE_SET_CPU_NUM (IRQ_SHPI_START / 32)
+#define GIC_DIST_ENABLE_SET_SPI0 GIC_DIST_ENABLE_SET
+#define GIC_DIST_ENABLE_SET_SPI32 (GIC_DIST_ENABLE_SET + IRQ_SHPI_START / 8)
+
+#define GIC_DIST_PRI_COMMON_NUM ((DBX500_NR_INTERNAL_IRQS - IRQ_SHPI_START) / 4)
+#define GIC_DIST_PRI_CPU_NUM (IRQ_SHPI_START / 4)
+#define GIC_DIST_PRI_SPI0 GIC_DIST_PRI
+#define GIC_DIST_PRI_SPI32 (GIC_DIST_PRI + IRQ_SHPI_START)
+
+#define GIC_DIST_SPI_TARGET_COMMON_NUM ((DBX500_NR_INTERNAL_IRQS - \
+					 IRQ_SHPI_START) / 4)
+#define GIC_DIST_SPI_TARGET_CPU_NUM (IRQ_SHPI_START / 4)
+#define GIC_DIST_SPI_TARGET_SPI0 GIC_DIST_TARGET
+#define GIC_DIST_SPI_TARGET_SPI32 (GIC_DIST_TARGET + IRQ_SHPI_START)
+
+/* 16 interrupts per 4 bytes */
+#define GIC_DIST_CONFIG_COMMON_NUM ((DBX500_NR_INTERNAL_IRQS - IRQ_SHPI_START) \
+				    / 16)
+#define GIC_DIST_CONFIG_CPU_NUM (IRQ_SHPI_START / 16)
+#define GIC_DIST_CONFIG_SPI0 GIC_DIST_CONFIG
+#define GIC_DIST_CONFIG_SPI32 (GIC_DIST_CONFIG + IRQ_SHPI_START / 4)
+
+/* TODO! Move STM reg offsets to suitable place */
+#define STM_CR_OFFSET	0x00
+#define STM_MMC_OFFSET	0x08
+#define STM_TER_OFFSET	0x10
+
+#define TPIU_PORT_SIZE 0x4
+#define TPIU_TRIGGER_COUNTER 0x104
+#define TPIU_TRIGGER_MULTIPLIER 0x108
+#define TPIU_CURRENT_TEST_PATTERN 0x204
+#define TPIU_TEST_PATTERN_REPEAT 0x208
+#define TPIU_FORMATTER 0x304
+#define TPIU_FORMATTER_SYNC 0x308
+#define TPIU_LOCK_ACCESS_REGISTER 0xFB0
+
+#define TPIU_UNLOCK_CODE 0xc5acce55
+
+#define SCU_FILTER_STARTADDR	0x40
+#define SCU_FILTER_ENDADDR	0x44
+#define SCU_ACCESS_CTRL_SAC	0x50
+
+/*
+ * Periph clock cluster context
+ */
+#define PRCC_BCK_EN		0x00
+#define PRCC_KCK_EN		0x08
+#define PRCC_BCK_STATUS		0x10
+#define PRCC_KCK_STATUS		0x14
+
+/* The context of the Trace Port Interface Unit (TPIU) */
+static struct {
+	void __iomem *base;
+	u32 port_size;
+	u32 trigger_counter;
+	u32 trigger_multiplier;
+	u32 current_test_pattern;
+	u32 test_pattern_repeat;
+	u32 formatter;
+	u32 formatter_sync;
+} context_tpiu;
+
+static struct {
+	void __iomem *base;
+	u32 cr;
+	u32 mmc;
+	u32 ter;
+} context_stm_ape;
+
+struct context_gic_cpu {
+	void __iomem *base;
+	u32 ctrl;
+	u32 primask;
+	u32 binpoint;
+};
+static DEFINE_PER_CPU(struct context_gic_cpu, context_gic_cpu);
+
+static struct {
+	void __iomem *base;
+	u32 ns;
+	u32 enable_set[GIC_DIST_ENABLE_SET_COMMON_NUM]; /* IRQ 32 to 160 */
+	u32 priority_level[GIC_DIST_PRI_COMMON_NUM];
+	u32 spi_target[GIC_DIST_SPI_TARGET_COMMON_NUM];
+	u32 config[GIC_DIST_CONFIG_COMMON_NUM];
+} context_gic_dist_common;
+
+struct context_gic_dist_cpu {
+	void __iomem *base;
+	u32 enable_set[GIC_DIST_ENABLE_SET_CPU_NUM]; /* IRQ 0 to 31 */
+	u32 priority_level[GIC_DIST_PRI_CPU_NUM];
+	u32 spi_target[GIC_DIST_SPI_TARGET_CPU_NUM];
+	u32 config[GIC_DIST_CONFIG_CPU_NUM];
+};
+static DEFINE_PER_CPU(struct context_gic_dist_cpu, context_gic_dist_cpu);
+
+static struct {
+	void __iomem *base;
+	u32 ctrl;
+	u32 cpu_pwrstatus;
+	u32 inv_all_nonsecure;
+	u32 filter_start_addr;
+	u32 filter_end_addr;
+	u32 access_ctrl_sac;
+} context_scu;
+
+#define UX500_NR_PRCC_BANKS 5
+static struct {
+	void __iomem *base;
+	u32 bus_clk;
+	u32 kern_clk;
+} context_prcc[UX500_NR_PRCC_BANKS];
+
+static u32 backup_sram_storage[NR_CPUS] = {
+	IO_ADDRESS(U8500_CPU0_CP15_CR_BACKUPRAM_ADDR),
+	IO_ADDRESS(U8500_CPU1_CP15_CR_BACKUPRAM_ADDR),
+};
+
+/*
+ * Stacks and stack pointers
+ */
+static DEFINE_PER_CPU(u32, varm_registers_backup_stack[1024]);
+static DEFINE_PER_CPU(u32 *, varm_registers_pointer);
+
+static DEFINE_PER_CPU(u32, varm_cp15_backup_stack[1024]);
+static DEFINE_PER_CPU(u32 *, varm_cp15_pointer);
+
+
+static ATOMIC_NOTIFIER_HEAD(context_ape_notifier_list);
+static ATOMIC_NOTIFIER_HEAD(context_arm_notifier_list);
+
+/*
+ * Register a simple callback for handling vape context save/restore
+ */
+int context_ape_notifier_register(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_register(&context_ape_notifier_list, nb);
+}
+EXPORT_SYMBOL(context_ape_notifier_register);
+
+/*
+ * Remove a previously registered callback
+ */
+int context_ape_notifier_unregister(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_unregister(&context_ape_notifier_list,
+						    nb);
+}
+EXPORT_SYMBOL(context_ape_notifier_unregister);
+
+/*
+ * Register a simple callback for handling varm context save/restore
+ */
+int context_arm_notifier_register(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_register(&context_arm_notifier_list, nb);
+}
+EXPORT_SYMBOL(context_arm_notifier_register);
+
+/*
+ * Remove a previously registered callback
+ */
+int context_arm_notifier_unregister(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_unregister(&context_arm_notifier_list,
+						    nb);
+}
+EXPORT_SYMBOL(context_arm_notifier_unregister);
+
+static void save_prcc(void)
+{
+	int i;
+
+	for (i = 0; i < UX500_NR_PRCC_BANKS; i++) {
+		context_prcc[i].bus_clk =
+			readl(context_prcc[i].base + PRCC_BCK_STATUS);
+		context_prcc[i].kern_clk =
+			readl(context_prcc[i].base + PRCC_KCK_STATUS);
+	}
+}
+
+static void restore_prcc(void)
+{
+	int i;
+
+	for (i = 0; i < UX500_NR_PRCC_BANKS; i++) {
+		writel(context_prcc[i].bus_clk,
+		       context_prcc[i].base + PRCC_BCK_EN);
+		writel(context_prcc[i].kern_clk,
+		       context_prcc[i].base + PRCC_KCK_EN);
+	}
+}
+
+static void save_stm_ape(void)
+{
+	/*
+	 * TODO: Check with PRCMU developers how STM is handled by PRCMU
+	 * firmware. According to DB5500 design spec there is a "flush"
+	 * mechanism supposed to be used by the PRCMU before power down,
+	 * PRCMU fw might save/restore the following three registers
+	 * at the same time.
+	 */
+	context_stm_ape.cr  = readl(context_stm_ape.base +
+				    STM_CR_OFFSET);
+	context_stm_ape.mmc = readl(context_stm_ape.base +
+				    STM_MMC_OFFSET);
+	context_stm_ape.ter = readl(context_stm_ape.base +
+				    STM_TER_OFFSET);
+}
+
+static void restore_stm_ape(void)
+{
+	writel(context_stm_ape.ter,
+	       context_stm_ape.base + STM_TER_OFFSET);
+	writel(context_stm_ape.mmc,
+	       context_stm_ape.base + STM_MMC_OFFSET);
+	writel(context_stm_ape.cr,
+	       context_stm_ape.base + STM_CR_OFFSET);
+}
+
+/*
+ * Save the context of the Trace Port Interface Unit (TPIU).
+ * Saving/restoring is needed for the PTM tracing to work together
+ * with the sleep states ApSleep and ApDeepSleep.
+ */
+static void save_tpiu(void)
+{
+	context_tpiu.port_size		  = readl(context_tpiu.base +
+						  TPIU_PORT_SIZE);
+	context_tpiu.trigger_counter	  = readl(context_tpiu.base +
+						  TPIU_TRIGGER_COUNTER);
+	context_tpiu.trigger_multiplier   = readl(context_tpiu.base +
+						TPIU_TRIGGER_MULTIPLIER);
+	context_tpiu.current_test_pattern = readl(context_tpiu.base +
+						  TPIU_CURRENT_TEST_PATTERN);
+	context_tpiu.test_pattern_repeat  = readl(context_tpiu.base +
+						 TPIU_TEST_PATTERN_REPEAT);
+	context_tpiu.formatter		  = readl(context_tpiu.base +
+						  TPIU_FORMATTER);
+	context_tpiu.formatter_sync	  = readl(context_tpiu.base +
+						  TPIU_FORMATTER_SYNC);
+}
+
+/*
+ * Restore the context of the Trace Port Interface Unit (TPIU).
+ * Saving/restoring is needed for the PTM tracing to work together
+ * with the sleep states ApSleep and ApDeepSleep.
+ */
+static void restore_tpiu(void)
+{
+	writel(TPIU_UNLOCK_CODE,
+	       context_tpiu.base + TPIU_LOCK_ACCESS_REGISTER);
+
+	writel(context_tpiu.port_size,
+	       context_tpiu.base + TPIU_PORT_SIZE);
+	writel(context_tpiu.trigger_counter,
+	       context_tpiu.base + TPIU_TRIGGER_COUNTER);
+	writel(context_tpiu.trigger_multiplier,
+	       context_tpiu.base + TPIU_TRIGGER_MULTIPLIER);
+	writel(context_tpiu.current_test_pattern,
+	       context_tpiu.base + TPIU_CURRENT_TEST_PATTERN);
+	writel(context_tpiu.test_pattern_repeat,
+	       context_tpiu.base + TPIU_TEST_PATTERN_REPEAT);
+	writel(context_tpiu.formatter,
+	       context_tpiu.base + TPIU_FORMATTER);
+	writel(context_tpiu.formatter_sync,
+	       context_tpiu.base + TPIU_FORMATTER_SYNC);
+}
+
+/*
+ * Save GIC CPU IF registers
+ *
+ * This is per cpu so it needs to be called for each one.
+ */
+
+static void save_gic_if_cpu(struct context_gic_cpu *c_gic_cpu)
+{
+	c_gic_cpu->ctrl     = readl(c_gic_cpu->base + GIC_CPU_CTRL);
+	c_gic_cpu->primask  = readl(c_gic_cpu->base + GIC_CPU_PRIMASK);
+	c_gic_cpu->binpoint = readl(c_gic_cpu->base + GIC_CPU_BINPOINT);
+}
+
+/*
+ * Restore GIC CPU IF registers
+ *
+ * This is per cpu so it needs to be called for each one.
+ */
+static void restore_gic_if_cpu(struct context_gic_cpu *c_gic_cpu)
+{
+	writel(c_gic_cpu->ctrl,     c_gic_cpu->base + GIC_CPU_CTRL);
+	writel(c_gic_cpu->primask,  c_gic_cpu->base + GIC_CPU_PRIMASK);
+	writel(c_gic_cpu->binpoint, c_gic_cpu->base + GIC_CPU_BINPOINT);
+}
+
+/*
+ * Save GIC Distributor Common registers
+ *
+ * This context is common. Only one CPU needs to call.
+ *
+ * Save SPI (Shared Peripheral Interrupt) settings, IRQ 32-159.
+ */
+
+static void save_gic_dist_common(void)
+{
+	int i;
+
+	context_gic_dist_common.ns = readl(context_gic_dist_common.base +
+					   GIC_DIST_ENABLE_NS);
+
+	for (i = 0; i < GIC_DIST_ENABLE_SET_COMMON_NUM; i++)
+		context_gic_dist_common.enable_set[i] =
+			readl(context_gic_dist_common.base +
+			      GIC_DIST_ENABLE_SET_SPI32 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_PRI_COMMON_NUM; i++)
+		context_gic_dist_common.priority_level[i] =
+			readl(context_gic_dist_common.base +
+			      GIC_DIST_PRI_SPI32 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_SPI_TARGET_COMMON_NUM; i++)
+		context_gic_dist_common.spi_target[i] =
+			readl(context_gic_dist_common.base +
+			      GIC_DIST_SPI_TARGET_SPI32 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_CONFIG_COMMON_NUM; i++)
+		context_gic_dist_common.spi_target[i] =
+			readl(context_gic_dist_common.base +
+			      GIC_DIST_CONFIG_SPI32 +  i * 4);
+}
+
+/*
+ * Restore GIC Distributor Common registers
+ *
+ * This context is common. Only one CPU needs to call.
+ *
+ * Save SPI (Shared Peripheral Interrupt) settings, IRQ 32-159.
+ */
+static void restore_gic_dist_common(void)
+{
+
+	int i;
+
+	for (i = 0; i < GIC_DIST_CONFIG_COMMON_NUM; i++)
+		writel(context_gic_dist_common.spi_target[i],
+		       context_gic_dist_common.base +
+		       GIC_DIST_CONFIG_SPI32 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_SPI_TARGET_COMMON_NUM; i++)
+		writel(context_gic_dist_common.spi_target[i],
+		       context_gic_dist_common.base +
+		       GIC_DIST_SPI_TARGET_SPI32 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_PRI_COMMON_NUM; i++)
+		writel(context_gic_dist_common.priority_level[i],
+			context_gic_dist_common.base +
+		       GIC_DIST_PRI_SPI32 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_ENABLE_SET_COMMON_NUM; i++)
+		writel(context_gic_dist_common.enable_set[i],
+		       context_gic_dist_common.base +
+		       GIC_DIST_ENABLE_SET_SPI32 +  i * 4);
+
+	writel(context_gic_dist_common.ns,
+	       context_gic_dist_common.base + GIC_DIST_ENABLE_NS);
+}
+
+
+
+/*
+ * Save GIC Dist CPU registers
+ *
+ * This needs to be called by all cpu:s which will not call
+ * save_gic_dist_common(). Only the registers of the GIC which are
+ * banked will be saved.
+ */
+static void save_gic_dist_cpu(struct context_gic_dist_cpu *c_gic)
+{
+	int i;
+
+	for (i = 0; i < GIC_DIST_ENABLE_SET_CPU_NUM; i++)
+		c_gic->enable_set[i] =
+			readl(c_gic->base +
+			      GIC_DIST_ENABLE_SET_SPI0 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_PRI_CPU_NUM; i++)
+		c_gic->priority_level[i] =
+			readl(c_gic->base +
+			      GIC_DIST_PRI_SPI0 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_SPI_TARGET_CPU_NUM; i++)
+		c_gic->spi_target[i] =
+			readl(c_gic->base +
+			      GIC_DIST_SPI_TARGET_SPI0 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_CONFIG_CPU_NUM; i++)
+		c_gic->spi_target[i] =
+			readl(c_gic->base +
+			      GIC_DIST_CONFIG_SPI0 +  i * 4);
+}
+
+/*
+ * Restore GIC Dist CPU registers
+ *
+ * This needs to be called by all cpu:s which will not call
+ * restore_gic_dist_common(). Only the registers of the GIC which are
+ * banked will be saved.
+ */
+static void restore_gic_dist_cpu(struct context_gic_dist_cpu *c_gic)
+{
+
+	int i;
+
+	for (i = 0; i < GIC_DIST_CONFIG_CPU_NUM; i++)
+		writel(c_gic->spi_target[i],
+		       c_gic->base +
+		       GIC_DIST_CONFIG_SPI0 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_SPI_TARGET_CPU_NUM; i++)
+		writel(c_gic->spi_target[i],
+		       c_gic->base +
+		       GIC_DIST_SPI_TARGET_SPI0 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_PRI_CPU_NUM; i++)
+		writel(c_gic->priority_level[i],
+			c_gic->base +
+		       GIC_DIST_PRI_SPI0 +  i * 4);
+
+	for (i = 0; i < GIC_DIST_ENABLE_SET_CPU_NUM; i++)
+		writel(c_gic->enable_set[i],
+		       c_gic->base +
+		       GIC_DIST_ENABLE_SET_SPI0 +  i * 4);
+}
+static void save_scu(void)
+{
+	context_scu.ctrl =
+		readl(context_scu.base + SCU_CTRL);
+	context_scu.cpu_pwrstatus =
+		readl(context_scu.base + SCU_CPU_STATUS);
+	context_scu.inv_all_nonsecure =
+		readl(context_scu.base + SCU_INVALIDATE);
+	context_scu.filter_start_addr =
+		readl(context_scu.base + SCU_FILTER_STARTADDR);
+	context_scu.filter_end_addr	=
+		readl(context_scu.base + SCU_FILTER_ENDADDR);
+	context_scu.access_ctrl_sac	=
+		readl(context_scu.base + SCU_ACCESS_CTRL_SAC);
+}
+
+static void restore_scu(void)
+{
+	writel(context_scu.ctrl,
+	       context_scu.base + SCU_CTRL);
+	writel(context_scu.cpu_pwrstatus,
+	       context_scu.base + SCU_CPU_STATUS);
+	writel(context_scu.inv_all_nonsecure,
+	       context_scu.base + SCU_INVALIDATE);
+	writel(context_scu.filter_start_addr,
+	       context_scu.base + SCU_FILTER_STARTADDR);
+	writel(context_scu.filter_end_addr,
+	       context_scu.base + SCU_FILTER_ENDADDR);
+	writel(context_scu.access_ctrl_sac,
+	       context_scu.base + SCU_ACCESS_CTRL_SAC);
+}
+
+
+/*
+ * Save VAPE context
+ */
+void context_vape_save(void)
+{
+	atomic_notifier_call_chain(&context_ape_notifier_list,
+				   CONTEXT_APE_SAVE, NULL);
+
+	if (cpu_is_u5500())
+		u5500_context_save_icn();
+	if (cpu_is_u8500())
+		u8500_context_save_icn();
+
+	save_stm_ape();
+
+	save_tpiu();
+
+	save_prcc();
+
+}
+
+/*
+ * Restore VAPE context
+ */
+void context_vape_restore(void)
+{
+	restore_prcc();
+
+	restore_tpiu();
+
+	restore_stm_ape();
+
+	if (cpu_is_u5500())
+		u5500_context_restore_icn();
+	if (cpu_is_u8500())
+		u8500_context_restore_icn();
+
+	atomic_notifier_call_chain(&context_ape_notifier_list,
+				   CONTEXT_APE_RESTORE, NULL);
+}
+
+/*
+ * Save common
+ *
+ * This function must be called once for all cores before going to deep sleep.
+ */
+void context_varm_save_common(void)
+{
+	atomic_notifier_call_chain(&context_arm_notifier_list,
+				   CONTEXT_ARM_COMMON_SAVE, NULL);
+
+	/* Save common parts */
+	save_gic_dist_common();
+	save_scu();
+}
+
+/*
+ * Restore common
+ *
+ * This function must be called once for all cores when waking up from deep
+ * sleep.
+ */
+void context_varm_restore_common(void)
+{
+	/* Restore common parts */
+	restore_scu();
+	restore_gic_dist_common();
+
+	atomic_notifier_call_chain(&context_arm_notifier_list,
+				   CONTEXT_ARM_COMMON_RESTORE, NULL);
+}
+
+/*
+ * Save core
+ *
+ * This function must be called once for each cpu core before going to deep
+ * sleep.
+ */
+void context_varm_save_core(void)
+{
+	int cpu = smp_processor_id();
+
+	atomic_notifier_call_chain(&context_arm_notifier_list,
+				   CONTEXT_ARM_CORE_SAVE, NULL);
+
+	per_cpu(varm_cp15_pointer, cpu) = per_cpu(varm_cp15_backup_stack, cpu);
+
+	/* Save core */
+	save_gic_if_cpu(&per_cpu(context_gic_cpu, cpu));
+	save_gic_dist_cpu(&per_cpu(context_gic_dist_cpu, cpu));
+	context_save_cp15_registers(&per_cpu(varm_cp15_pointer, cpu));
+}
+
+/*
+ * Restore core
+ *
+ * This function must be called once for each cpu core when waking up from
+ * deep sleep.
+ */
+void context_varm_restore_core(void)
+{
+	int cpu = smp_processor_id();
+
+	/* Restore core */
+	context_restore_cp15_registers(&per_cpu(varm_cp15_pointer, cpu));
+	restore_gic_dist_cpu(&per_cpu(context_gic_dist_cpu, cpu));
+	restore_gic_if_cpu(&per_cpu(context_gic_cpu, cpu));
+
+	atomic_notifier_call_chain(&context_arm_notifier_list,
+				   CONTEXT_ARM_CORE_RESTORE, NULL);
+
+}
+
+/*
+ * Save CPU registers
+ *
+ * This function saves ARM registers.
+ */
+void context_save_cpu_registers(void)
+{
+	int cpu = smp_processor_id();
+
+	per_cpu(varm_registers_pointer, cpu) =
+		per_cpu(varm_registers_backup_stack, cpu);
+	context_save_arm_registers(&per_cpu(varm_registers_pointer, cpu));
+}
+
+/*
+ * Restore CPU registers
+ *
+ * This function restores ARM registers.
+ */
+void context_restore_cpu_registers(void)
+{
+	int cpu = smp_processor_id();
+
+	context_restore_arm_registers(&per_cpu(varm_registers_pointer, cpu));
+}
+
+/*
+ * This function stores CP15 registers related to cache and mmu
+ * in backup SRAM. It also stores stack pointer, CPSR
+ * and return address for the PC in backup SRAM and
+ * does wait for interrupt.
+ */
+void context_save_to_sram_and_wfi(bool cleanL2cache)
+{
+	int cpu = smp_processor_id();
+
+	context_save_to_sram_and_wfi_internal(backup_sram_storage[cpu],
+					      cleanL2cache);
+}
+
+static int __init context_init(void)
+{
+	int i;
+	void __iomem *ux500_backup_ptr;
+
+	/* allocate backup pointer for RAM data */
+	ux500_backup_ptr = (void *)__get_free_pages(GFP_KERNEL,
+				  get_order(U8500_BACKUPRAM_SIZE));
+
+	if (!ux500_backup_ptr) {
+		pr_warning("context: could not allocate backup memory\n");
+		return -ENOMEM;
+	}
+
+	/*
+	 * ROM code addresses to store backup contents,
+	 * pass the physical address of back up to ROM code
+	 */
+	writel(virt_to_phys(ux500_backup_ptr),
+	       IO_ADDRESS(U8500_EXT_RAM_LOC_BACKUPRAM_ADDR));
+
+	/* Give logical address to backup RAM. For both CPUs */
+	if (cpu_is_u8500v20_or_later()) {
+		writel(IO_ADDRESS(U8500_PUBLIC_BOOT_ROM_BASE),
+		       IO_ADDRESS(U8500_CPU0_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR));
+
+		writel(IO_ADDRESS(U8500_PUBLIC_BOOT_ROM_BASE),
+		       IO_ADDRESS(U8500_CPU1_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR));
+	} else {
+		writel(IO_ADDRESS(U8500_BACKUPRAM0_BASE),
+		       IO_ADDRESS(U8500_CPU0_BACKUPRAM_ADDR_BACKUPRAM_LOG_ADDR));
+
+		writel(IO_ADDRESS(U8500_BACKUPRAM0_BASE),
+		       IO_ADDRESS(U8500_CPU1_BACKUPRAM_ADDR_BACKUPRAM_LOG_ADDR));
+	}
+
+	/* FIXME: To UX500 */
+	context_tpiu.base = ioremap(U8500_TPIU_BASE, SZ_4K);
+	context_stm_ape.base = ioremap(U8500_STM_REG_BASE, SZ_4K);
+	context_scu.base = ioremap(U8500_SCU_BASE, SZ_4K);
+
+	for (i = 0; i < num_possible_cpus(); i++) {
+		per_cpu(context_gic_cpu, i).base = ioremap(U8500_GIC_CPU_BASE,
+							   SZ_4K);
+		per_cpu(context_gic_dist_cpu, i).base =
+			ioremap(U8500_GIC_DIST_BASE,
+				SZ_4K);
+	}
+
+	context_gic_dist_common.base = ioremap(U8500_GIC_DIST_BASE, SZ_4K);
+
+	/* PERIPH4 is always on, so no need saving prcc */
+	context_prcc[0].base = ioremap(U8500_CLKRST1_BASE, SZ_4K);
+	context_prcc[1].base = ioremap(U8500_CLKRST2_BASE, SZ_4K);
+	context_prcc[2].base = ioremap(U8500_CLKRST3_BASE, SZ_4K);
+	context_prcc[3].base = ioremap(U8500_CLKRST5_BASE, SZ_4K);
+	context_prcc[4].base = ioremap(U8500_CLKRST6_BASE, SZ_4K);
+
+	if (cpu_is_u8500()) {
+		u8500_context_init();
+	} else if (cpu_is_u5500()) {
+		u5500_context_init();
+	} else {
+		printk(KERN_ERR "context: unknown hardware!\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+subsys_initcall(context_init);
+
