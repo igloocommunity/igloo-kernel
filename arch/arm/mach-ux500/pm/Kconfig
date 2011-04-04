@@ -4,3 +4,71 @@ config U8500_CPUFREQ
 	default y
 	help
 	  Add support for CPU Frequency scaling for U8500.
+
+config U8500_CPUIDLE
+	tristate "CPUIdle support"
+	depends on UX500_SOC_DB8500 && CPU_IDLE && U8500_PRCMU
+	default y
+	select GENERIC_CLOCKEVENTS_BROADCAST
+	select UX500_CONTEXT
+	help
+	  Add support for CPUIdle for U8500.
+
+config U8500_CPUIDLE_DEEPEST_STATE
+	int "Deepest sleep state"
+	default 2
+	depends on U8500_CPUIDLE
+	help
+	  Set deepest sleep state. See the cstate struct in cpuidle.c.
+
+config U8500_CPUIDLE_DEBUG
+	bool "CPUIdle debug"
+	depends on U8500_CPUIDLE && DEBUG_FS
+	default y
+	help
+	  Add debugging support for CPUIdle for U8500.
+
+config UX500_SUSPEND
+	bool "Suspend to mem and standby support"
+	depends on UX500_SOC_DB8500 && PM
+	select UX500_CONTEXT
+	help
+	  Add support for suspend.
+
+config UX500_SUSPEND_STANDBY
+	bool "Suspend Standby goes to ApSleep"
+	depends on UX500_SUSPEND
+	help
+	  If yes, echo standby > /sys/power/state puts the system into ApSleep.
+
+config UX500_SUSPEND_MEM
+	bool "Suspend Mem goes to ApDeepSleep"
+	depends on UX500_SUSPEND
+	help
+	  If yes, echo mem > /sys/power/state puts the system into ApDeepSleep else
+	  it will do the same as echo standby > /sys/power/state.
+
+config UX500_SUSPEND_DBG
+	bool "Suspend debug"
+	depends on UX500_SUSPEND && DEBUG_FS
+	help
+	  Add debug support for suspend.
+
+config UX500_SUSPEND_DBG_WAKE_ON_UART
+	bool "Suspend wakes on console UART"
+	depends on UX500_SUSPEND_DBG
+	help
+	  Wake up on uart interrupts. Makes it possible for the console to wake up system.
+
+config UX500_CONSOLE_UART_GPIO_PIN
+	int "The pin number of the console UART GPIO pin"
+	default 29
+	depends on UX500_SUSPEND_DBG_WAKE_ON_UART || U8500_CPUIDLE_DEBUG
+	help
+	  GPIO pin number of the GPIO pin connected to the console UART RX line.
+
+config UX500_CONTEXT
+	bool "Context save/restore support for UX500"
+	depends on UX500_SOC_DB8500 || UX500_SOC_DB5500
+	help
+	  This is needed for ApSleep and deeper sleep states.
