@@ -29,6 +29,22 @@
 #include <mach/db8500-regs.h>
 #include <mach/db5500-regs.h>
 
+/*
+ * FIFO offsets for IPs
+ */
+#define MSP_TX_RX_REG_OFFSET	(0)
+#define SSP_TX_RX_REG_OFFSET	(0x8)
+#define SPI_TX_RX_REG_OFFSET	(0x8)
+#define SD_MMC_TX_RX_REG_OFFSET (0x80)
+#define CRYP1_RX_REG_OFFSET	(0x10)
+#define CRYP1_TX_REG_OFFSET	(0x8)
+
+/* MSP related board specific declaration************************/
+
+#define MSP_DATA_DELAY       MSP_DELAY_0
+#define MSP_TX_CLOCK_EDGE    MSP_FALLING_EDGE
+#define MSP_RX_CLOCK_EDGE    MSP_FALLING_EDGE
+
 #ifndef __ASSEMBLY__
 
 #include <mach/id.h>
