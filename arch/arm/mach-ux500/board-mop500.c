@@ -398,6 +398,7 @@ static struct platform_device ux500_backlight_device[] = {
 
 /* add any platform devices here - TODO */
 static struct platform_device *platform_devs[] __initdata = {
+	&ux500_hwmem_device,
 #ifdef CONFIG_CRYPTO_DEV_UX500_HASH
 	&ux500_hash1_device,
 #endif
