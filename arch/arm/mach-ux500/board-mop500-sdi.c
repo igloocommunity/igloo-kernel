@@ -274,6 +274,8 @@ void __init mop500_sdi_init(void)
 			sdi0_en = HREFV60_SDMMC_EN_GPIO;
 			sdi0_vsel = HREFV60_SDMMC_1V8_3V_GPIO;
 		} else if (machine_is_snowball()) {
+			mop500_sdi0_data.capabilities = (MMC_CAP_4_BIT_DATA |
+							 MMC_CAP_MMC_HIGHSPEED);
 			mop500_sdi0_data.gpio_cd = SNOWBALL_SDMMC_CD_GPIO;
 			mop500_sdi0_data.cd_invert = true;
 			sdi0_en = SNOWBALL_SDMMC_EN_GPIO;
