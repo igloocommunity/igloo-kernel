@@ -19,7 +19,7 @@
 #include "cpuidle_dbg.h"
 #include "context.h"
 #include "pm.h"
-#include "../regulator-u8500.h"
+#include "../regulator-db8500.h"
 #include "../timer-rtt.h"
 
 #define DEEP_SLEEP_WAKE_UP_LATENCY 8500
@@ -38,7 +38,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_ON,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
-		.flags = CPUIDLE_FLAG_SHALLOW | CPUIDLE_FLAG_TIME_VALID,
+		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_WFI,
 		.desc = "Wait for interrupt     ",
 	},
@@ -52,7 +52,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_ON,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
-		.flags = CPUIDLE_FLAG_SHALLOW | CPUIDLE_FLAG_TIME_VALID,
+		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_IDLE,
 		.desc = "ApIdle                 ",
 	},
@@ -66,7 +66,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
-		.flags = CPUIDLE_FLAG_SHALLOW | CPUIDLE_FLAG_TIME_VALID,
+		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_IDLE,
 		.desc = "ApIdle, ARM PLL off    ",
 	},
@@ -80,7 +80,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
-		.flags = CPUIDLE_FLAG_BALANCED | CPUIDLE_FLAG_TIME_VALID,
+		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_SLEEP,
 		.desc = "ApSleep                ",
 	},
@@ -97,7 +97,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_OFF,
 		.ESRAM = ESRAM_RET,
-		.flags = CPUIDLE_FLAG_BALANCED | CPUIDLE_FLAG_TIME_VALID,
+		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_SLEEP,
 		.desc = "ApSleep, UL PLL off    ",
 	},
@@ -113,7 +113,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
-		.flags = CPUIDLE_FLAG_DEEP | CPUIDLE_FLAG_TIME_VALID,
+		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_DEEP_IDLE,
 		.desc = "ApDeepIdle, UL PLL off ",
 	},
@@ -129,7 +129,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_OFF,
 		.ESRAM = ESRAM_RET,
-		.flags = CPUIDLE_FLAG_DEEP | CPUIDLE_FLAG_TIME_VALID,
+		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_DEEP_SLEEP,
 		.desc = "ApDeepsleep, UL PLL off",
 	},
@@ -159,10 +159,6 @@ struct cstate *ux500_ci_get_cstates(int *len)
 	return cstates;
 }
 
-static void do_nothing(void *unused)
-{
-}
-
 /*
  * cpuidle & hotplug - plug or unplug a cpu in idle sequence
  */
@@ -176,22 +172,6 @@ void ux500_cpuidle_unplug(int cpu)
 	atomic_inc(&idle_cpus_counter);
 	wmb();
 }
-
-/*
- * cpu_idle_wait - Used to ensure that all the CPUs discard old value of
- * pm_idle and update to new pm_idle value. Required while changing pm_idle
- * handler on SMP systems.
- *
- * Caller must have changed pm_idle to the new value before the call. Old
- * pm_idle value will not be used by any CPU after the return of this function.
- */
-void cpu_idle_wait(void)
-{
-	smp_mb();
-	/* kick all the CPUs so that they exit out of pm_idle */
-	smp_call_function(do_nothing, NULL, 1);
-}
-EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
 static void migrate_to_always_on_timer(struct cpu_state *state)
 {
