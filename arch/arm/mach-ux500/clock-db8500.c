@@ -1164,8 +1164,8 @@ static struct clk_lookup u8500_v1_v2_prcc_clocks[] = {
 	CLK_LOOKUP(p5_pclk0, "musb-ux500.0", "usb"),
 
 	/* PERIPH 6 */
-	CLK_LOOKUP(p6_pclk5, "hash1", NULL),
-	CLK_LOOKUP(p6_pclk4, "cryp1", NULL),
+	CLK_LOOKUP(p6_pclk4, "hash1", NULL),
+	CLK_LOOKUP(p6_pclk1, "cryp1", NULL),
 	CLK_LOOKUP(p6_rng_clk, "rng", NULL),
 };
 
@@ -1184,8 +1184,7 @@ static struct clk_lookup u8500_v2_prcc_clocks[] = {
 	CLK_LOOKUP(p1_pclk11, "ab8500-codec.0", "msp3-bus"),
 
 	/* PERIPH 6 */
-	CLK_LOOKUP(p6_pclk4, "hash1", NULL),
-	CLK_LOOKUP(p6_pclk4, "cryp1", NULL),
+	/* cryp1 and hash1 already included in u8500_v1_v2_prcc_clocks. */
 	CLK_LOOKUP(p6_pclk5, "cfgreg", NULL),
 	CLK_LOOKUP(p6_mtu0_clk, "mtu0", NULL),
 	CLK_LOOKUP(p6_mtu1_clk, "mtu1", NULL),
