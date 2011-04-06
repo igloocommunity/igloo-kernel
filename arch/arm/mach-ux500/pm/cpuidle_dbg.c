@@ -108,8 +108,8 @@ void ux500_ci_dbg_console_handle_ape_suspend(void)
 	if (!dbg_console_enable)
 		return;
 
-	set_irq_wake(GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 1);
-	set_irq_type(GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN),
+	set_irq_wake(NOMADIK_GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 1);
+	set_irq_type(NOMADIK_GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN),
 		     IRQ_TYPE_EDGE_BOTH);
 }
 
@@ -128,7 +128,7 @@ void ux500_ci_dbg_console_handle_ape_resume(void)
 		reset_timer = true;
 		spin_unlock_irqrestore(&dbg_lock, flags);
 	}
-	set_irq_wake(GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 0);
+	set_irq_wake(NOMADIK_GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 0);
 
 }
 
