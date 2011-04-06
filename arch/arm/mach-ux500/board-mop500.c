@@ -30,6 +30,7 @@
 #include <linux/gpio_keys.h>
 #include <linux/delay.h>
 #include <linux/mfd/ab8500/denc.h>
+#include <linux/spi/stm_msp.h>
 #include <linux/leds_pwm.h>
 #include <linux/pwm_backlight.h>
 
@@ -514,7 +515,14 @@ static struct platform_device ux500_backlight_device[] = {
 
 /* add any platform devices here - TODO */
 static struct platform_device *mop500_platform_devs[] __initdata = {
+	&u8500_shrm_device,
 	&ux500_hwmem_device,
+	&u8500_mcde_device,
+	&u8500_b2r2_device,
+	&u8500_thsens_device,
+#ifdef CONFIG_STE_TRACE_MODEM
+	&u8500_trace_modem,
+#endif
 #ifdef CONFIG_CRYPTO_DEV_UX500_HASH
 	&ux500_hash1_device,
 #endif
@@ -528,7 +536,29 @@ static struct platform_device *mop500_platform_devs[] __initdata = {
 	&ux500_backlight_device[0],
 	&ux500_backlight_device[1],
 #endif
+#ifdef CONFIG_DB8500_MLOADER
+	&mloader_fw_device,
+#endif
 };
+
+/*
+ * MSP-SPI
+ */
+
+#define NUM_MSP_CLIENTS 10
+
+static struct stm_msp_controller mop500_msp2_spi_data = {
+	.id		= 2,
+	.num_chipselect	= NUM_MSP_CLIENTS,
+	.base_addr	= U8500_MSP2_BASE,
+	.device_name	= "msp2",
+};
+
+/*
+ * SSP
+ */
+
+#define NUM_SSP_CLIENTS 10
 
 #ifdef CONFIG_STE_DMA40
 static struct stedma40_chan_cfg ssp0_dma_cfg_rx = {
@@ -557,18 +587,17 @@ static struct pl022_ssp_controller ssp0_platform_data = {
 	.dma_filter = stedma40_filter,
 	.dma_rx_param = &ssp0_dma_cfg_rx,
 	.dma_tx_param = &ssp0_dma_cfg_tx,
-#else
-	.enable_dma = 0,
 #endif
 	/* on this platform, gpio 31,142,144,214 &
 	 * 224 are connected as chip selects
 	 */
-	.num_chipselect = 5,
+	.num_chipselect = NUM_SSP_CLIENTS,
 };
 
 static void __init mop500_spi_init(void)
 {
 	db8500_add_ssp0(&ssp0_platform_data);
+	db8500_add_msp2_spi(&mop500_msp2_spi_data);
 }
 
 #ifdef CONFIG_STE_DMA40

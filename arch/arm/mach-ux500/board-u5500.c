@@ -8,10 +8,14 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/amba/bus.h>
+#include <linux/amba/pl022.h>
 #include <linux/gpio.h>
 #include <linux/irq.h>
 #include <linux/i2c.h>
+#include <linux/i2s/i2s.h>
+#include <linux/mfd/abx500.h>
 #include <linux/led-lm3530.h>
+#include <linux/input/synaptics_i2c_rmi4.h>
 #include <linux/input/matrix_keypad.h>
 
 #include <asm/mach/arch.h>
@@ -20,6 +24,8 @@
 #include <plat/i2c.h>
 
 #include <mach/hardware.h>
+#include <mach/ste-dma40-db5500.h>
+#include <mach/msp.h>
 #include <mach/devices.h>
 #include <mach/setup.h>
 #include <mach/db5500-keypad.h>
@@ -27,9 +33,24 @@
 #include "devices-db5500.h"
 
 /*
+ * Touchscreen
+ */
+static struct synaptics_rmi4_platform_data rmi4_i2c_platformdata = {
+	.irq_number	= NOMADIK_GPIO_TO_IRQ(179),
+	.irq_type	= (IRQF_TRIGGER_FALLING | IRQF_SHARED),
+#if CONFIG_DISPLAY_GENERIC_DSI_PRIMARY_ROTATION_ANGLE == 270
+	.x_flip		= true,
+	.y_flip		= false,
+#else
+	.x_flip		= false,
+	.y_flip		= true,
+#endif
+	.regulator_en	= false,
+};
+
+/*
  * leds LM3530
  */
-
 static struct lm3530_platform_data u5500_als_platform_data = {
 	.mode = LM3530_BL_MODE_MANUAL,
 	.als_input_mode = LM3530_INPUT_ALS1,
@@ -78,6 +99,10 @@ U5500_I2C_CONTROLLER(2,	0xe, 1, 1, 400000, I2C_FREQ_MODE_FAST);
 U5500_I2C_CONTROLLER(3,	0xe, 1, 1, 400000, I2C_FREQ_MODE_FAST);
 
 static struct i2c_board_info __initdata u5500_i2c1_devices[] = {
+	{
+		I2C_BOARD_INFO("synaptics_rmi4_i2c", 0x4B),
+		.platform_data = &rmi4_i2c_platformdata,
+	},
 };
 
 static struct i2c_board_info __initdata u5500_i2c2_devices[] = {
@@ -86,6 +111,45 @@ static struct i2c_board_info __initdata u5500_i2c2_devices[] = {
 		I2C_BOARD_INFO("lm3530-led", 0x36),
 		.platform_data = &u5500_als_platform_data,
 	},
+};
+
+static struct resource ab5500_resources[] = {
+	[0] = {
+		/*TODO Change this when prcmu driver arrives */
+		.start = IRQ_DB5500_AB5500,
+		.end = IRQ_DB5500_AB5500,
+		.flags = IORESOURCE_IRQ
+	}
+};
+
+static struct ab5500_platform_data ab5500_plf_data = {
+	.irq = {
+		.base = IRQ_AB5500_BASE,
+		.count = AB5500_NR_IRQS,
+	},
+	.dev_data = {
+	},
+	.dev_data_sz = {
+	},
+	.init_settings = NULL,
+	.init_settings_sz = 0,
+};
+
+static struct platform_device u5500_ab5500_device = {
+	.name = "ab5500-core",
+	.id = 0,
+	.dev = {
+		.platform_data = &ab5500_plf_data,
+	},
+	.num_resources = 1,
+	.resource = ab5500_resources,
+};
+
+static struct platform_device *u5500_platform_devices[] __initdata = {
+	&u5500_ab5500_device,
+	&u5500_mcde_device,
+	&ux500_hwmem_device,
+	&u5500_b2r2_device,
 };
 
 static void __init u5500_i2c_init(void)
@@ -125,6 +189,92 @@ static struct db5500_keypad_platform_data u5500_keypad_board = {
 	.debounce_ms	= 40, /* milliseconds */
 };
 
+/*
+ * MSP
+ */
+
+#define MSP_DMA(num, eventline)					\
+static struct stedma40_chan_cfg msp##num##_dma_rx = {		\
+	.high_priority = true,					\
+	.dir = STEDMA40_PERIPH_TO_MEM,				\
+	.src_dev_type = eventline##_RX,				\
+	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,		\
+	.src_info.psize = STEDMA40_PSIZE_LOG_4,			\
+	.dst_info.psize = STEDMA40_PSIZE_LOG_4,			\
+};								\
+								\
+static struct stedma40_chan_cfg msp##num##_dma_tx = {		\
+	.high_priority = true,					\
+	.dir = STEDMA40_MEM_TO_PERIPH,				\
+	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,		\
+	.dst_dev_type = eventline##_TX,				\
+	.src_info.psize = STEDMA40_PSIZE_LOG_4,			\
+	.dst_info.psize = STEDMA40_PSIZE_LOG_4,			\
+}
+
+MSP_DMA(0, DB5500_DMA_DEV9_MSP0);
+MSP_DMA(1, DB5500_DMA_DEV10_MSP1);
+MSP_DMA(2, DB5500_DMA_DEV11_MSP2);
+
+static struct msp_i2s_platform_data u5500_msp0_data = {
+	.id		= MSP_0_I2S_CONTROLLER,
+	.msp_i2s_dma_rx	= &msp0_dma_rx,
+	.msp_i2s_dma_tx	= &msp0_dma_tx,
+};
+
+static struct msp_i2s_platform_data u5500_msp1_data = {
+	.id		= MSP_1_I2S_CONTROLLER,
+	.msp_i2s_dma_rx	= &msp1_dma_rx,
+	.msp_i2s_dma_tx	= &msp1_dma_tx,
+};
+
+static struct msp_i2s_platform_data u5500_msp2_data = {
+	.id		= MSP_2_I2S_CONTROLLER,
+	.msp_i2s_dma_rx	= &msp2_dma_rx,
+	.msp_i2s_dma_tx	= &msp2_dma_tx,
+};
+
+static struct i2s_board_info stm_i2s_board_info[] __initdata = {
+	{
+		.modalias	= "i2s_device.0",
+		.id		= 0,
+		.chip_select	= 0,
+	},
+	{
+		.modalias	= "i2s_device.1",
+		.id		= 1,
+		.chip_select	= 1,
+	},
+	{
+		.modalias	= "i2s_device.2",
+		.id		= 2,
+		.chip_select	= 2,
+	},
+};
+
+/*
+ * SPI
+ */
+
+static struct pl022_ssp_controller u5500_spi1_data = {
+	.bus_id		= 1,
+	.num_chipselect	= 4,	/* 3 possible CS lines + 1 for tests */
+};
+
+static void __init u5500_spi_init(void)
+{
+	db5500_add_spi1(&u5500_spi1_data);
+}
+
+static void __init u5500_msp_init(void)
+{
+	db5500_add_msp0_i2s(&u5500_msp0_data);
+	db5500_add_msp1_i2s(&u5500_msp1_data);
+	db5500_add_msp2_i2s(&u5500_msp2_data);
+
+	i2s_register_board_info(ARRAY_AND_SIZE(stm_i2s_board_info));
+}
+
 static void __init u5500_uart_init(void)
 {
 	db5500_add_uart0(NULL);
@@ -136,11 +286,16 @@ static void __init u5500_init_machine(void)
 {
 	u5500_init_devices();
 	u5500_i2c_init();
+	u5500_msp_init();
+	u5500_spi_init();
 
 	u5500_sdi_init();
 	u5500_uart_init();
 
 	db5500_add_keypad(&u5500_keypad_board);
+
+	platform_add_devices(u5500_platform_devices,
+			     ARRAY_SIZE(u5500_platform_devices));
 }
 
 MACHINE_START(U5500, "ST-Ericsson U5500 Platform")

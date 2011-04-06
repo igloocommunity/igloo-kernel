@@ -17,18 +17,20 @@ dbx500_add_platform_device_4k1irq(const char *name, int id,
 				  resource_size_t base,
 				  int irq, void *pdata);
 
-struct spi_master_cntlr;
+struct stm_msp_controller;
 
 static inline struct amba_device *
 dbx500_add_msp_spi(const char *name, resource_size_t base, int irq,
-		   struct spi_master_cntlr *pdata)
+		   struct stm_msp_controller *pdata)
 {
 	return dbx500_add_amba_device(name, base, irq, pdata, 0);
 }
 
+struct pl022_ssp_controller;
+
 static inline struct amba_device *
 dbx500_add_spi(const char *name, resource_size_t base, int irq,
-	       struct spi_master_cntlr *pdata,
+	       struct pl022_ssp_controller *pdata,
 	       u32 periphid)
 {
 	return dbx500_add_amba_device(name, base, irq, pdata, periphid);
