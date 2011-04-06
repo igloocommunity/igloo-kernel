@@ -113,6 +113,11 @@ static struct ux500_regulator ux500_atomic_regulators[] = {
 		.enable  = power_state_active_enable,
 		.disable = power_state_active_disable,
 	},
+	{
+		.name = "hash1",
+		.enable  = power_state_active_enable,
+		.disable = power_state_active_disable,
+	},
 };
 
 struct ux500_regulator *__must_check ux500_regulator_get(struct device *dev)
