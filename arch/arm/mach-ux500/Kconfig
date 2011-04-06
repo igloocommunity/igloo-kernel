@@ -91,5 +91,6 @@ config DB8500_MLOADER
 	help
 	  Adds Modem firmware upload/download support to DB8500.
 
+source "arch/arm/mach-ux500/Kconfig-arch"
 source "arch/arm/mach-ux500/pm/Kconfig"
 endif
