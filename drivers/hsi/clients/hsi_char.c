@@ -237,12 +237,19 @@ out:
 	return ret;
 }
 
+static struct hsi_client_driver hsi_char_driver;
+static struct cdev hsi_char_cdev;
+static const struct file_operations hsi_char_fops;
+static struct class *hsi_char_class;
+
 static int __devinit hsi_char_probe(struct device *dev)
 {
 	struct hsi_char_client_data *cl_data = &hsi_char_cl_data;
 	struct hsi_char_channel *channel = cl_data->channels;
 	struct hsi_client *cl = to_hsi_client(dev);
+	char devname[] = "hsi_char";
 	int i;
+	int ret;
 
 	for (i = 0; i < HSI_CHAR_DEVS; i++, channel++) {
 		if (channel->state == HSI_CHST_AVAIL)
@@ -254,6 +261,26 @@ static int __devinit hsi_char_probe(struct device *dev)
 	atomic_set(&cl_data->breq, 1);
 	cl_data->attached = 0;
 	hsi_client_set_drvdata(cl, cl_data);
+
+	ret = alloc_chrdev_region(&hsi_char_dev, 0, HSI_CHAR_DEVS, devname);
+	if (ret < 0) {
+		hsi_unregister_client_driver(&hsi_char_driver);
+		return ret;
+	}
+
+	cdev_init(&hsi_char_cdev, &hsi_char_fops);
+	ret = cdev_add(&hsi_char_cdev, hsi_char_dev, HSI_CHAR_DEVS);
+	if (ret) {
+		unregister_chrdev_region(hsi_char_dev, HSI_CHAR_DEVS);
+		hsi_unregister_client_driver(&hsi_char_driver);
+		return ret;
+	}
+
+	hsi_char_class = class_create(THIS_MODULE, "hsi");
+	if (IS_ERR(hsi_char_class))
+		pr_err("ERROR: hsi class creation failed!\n");
+
+	device_create(hsi_char_class, NULL, hsi_char_cdev.dev, NULL, devname);
 
 	return 0;
 }
@@ -1019,7 +1046,6 @@ static struct cdev hsi_char_cdev;
 
 static int __init hsi_char_init(void)
 {
-	char devname[] = "hsi_char";
 	struct hsi_char_client_data *cl_data = &hsi_char_cl_data;
 	struct hsi_char_channel *channel = cl_data->channels;
 	unsigned long ch_mask = 0;
@@ -1059,20 +1085,6 @@ static int __init hsi_char_init(void)
 		return ret;
 	}
 
-	ret = alloc_chrdev_region(&hsi_char_dev, 0, HSI_CHAR_DEVS, devname);
-	if (ret < 0) {
-		hsi_unregister_client_driver(&hsi_char_driver);
-		return ret;
-	}
-
-	cdev_init(&hsi_char_cdev, &hsi_char_fops);
-	ret = cdev_add(&hsi_char_cdev, hsi_char_dev, HSI_CHAR_DEVS);
-	if (ret) {
-		unregister_chrdev_region(hsi_char_dev, HSI_CHAR_DEVS);
-		hsi_unregister_client_driver(&hsi_char_driver);
-		return ret;
-	}
-
 	pr_info("HSI/SSI char device loaded\n");
 
 	return 0;
@@ -1081,6 +1093,8 @@ module_init(hsi_char_init);
 
 static void __exit hsi_char_exit(void)
 {
+	device_destroy(hsi_char_class, hsi_char_cdev.dev);
+	class_destroy(hsi_char_class);
 	cdev_del(&hsi_char_cdev);
 	unregister_chrdev_region(hsi_char_dev, HSI_CHAR_DEVS);
 	hsi_unregister_client_driver(&hsi_char_driver);
