@@ -11,7 +11,7 @@
 
 #include <linux/suspend.h>
 #include <linux/gpio.h>
-
+#include <linux/delay.h>
 #include <linux/regulator/ab8500-debug.h>
 
 #include <mach/prcmu-fw-api.h>
@@ -73,6 +73,9 @@ static int suspend(bool do_deepsleep)
 	mop500_pins_suspend_force();
 
 	ux500_pm_gic_decouple();
+
+	/* TODO: decouple gic should look at status bit.*/
+	udelay(100);
 
 	divps_rate = ux500_pm_arm_on_ext_clk(false);
 
