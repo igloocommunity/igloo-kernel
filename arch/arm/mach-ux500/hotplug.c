@@ -15,6 +15,9 @@
 
 #include <asm/cacheflush.h>
 
+#include "pm/cpuidle.h"
+#include "pm/context.h"
+
 extern volatile int pen_release;
 
 static DECLARE_COMPLETION(cpu_killed);
@@ -22,18 +25,25 @@ static DECLARE_COMPLETION(cpu_killed);
 static inline void platform_do_lowpower(unsigned int cpu)
 {
 	flush_cache_all();
-
-	/* we put the platform to just WFI */
+	ux500_cpuidle_unplug(cpu);
 	for (;;) {
-		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
-				: : : "memory");
+
+		context_varm_save_core();
+		context_save_cpu_registers();
+
+		context_save_to_sram_and_wfi(false);
+
+		context_restore_cpu_registers();
+		context_varm_restore_core();
+
 		if (pen_release == cpu) {
 			/*
-			 * OK, proper wakeup, we're done
+			* OK, proper wakeup, we're done
 			 */
 			break;
 		}
 	}
+	ux500_cpuidle_plug(cpu);
 }
 
 int platform_cpu_kill(unsigned int cpu)
