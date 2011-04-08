@@ -10,12 +10,12 @@
 #include <linux/gpio.h>
 
 #include <plat/pincfg.h>
-#include <mach/db5500-regs.h>
 #include <plat/ste_dma40.h>
+#include <mach/db5500-regs.h>
+#include <mach/ste-dma40-db5500.h>
 
 #include "pins-db5500.h"
 #include "devices-db5500.h"
-#include "ste-dma40-db5500.h"
 
 static pin_cfg_t u5500_sdi_pins[] = {
 	/* SDI0 (POP eMMC) */

@@ -19,7 +19,7 @@
 
 #include "devices-db8500.h"
 #include "board-mop500.h"
-#include "ste-dma40-db8500.h"
+#include <mach/ste-dma40-db8500.h>
 #include "../../../drivers/mmc/host/mmci.h" /* to avoid MCI_ST* redefinition */
 
 /*
