@@ -221,7 +221,6 @@ void ux500_pm_gic_decouple(void)
 		cpu_relax();
 
 	/* TODO: Use the ack bit when possible */
-	udelay(100);
 }
 
 /* Recouple GIC with the interrupt bus */
