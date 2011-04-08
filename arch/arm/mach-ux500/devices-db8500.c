@@ -26,12 +26,10 @@
 #include <video/mcde.h>
 #include <mach/prcmu-fw-api.h>
 #include <mach/prcmu-regs.h>
-
+#include <mach/ste-dma40-db8500.h>
 #include <trace/stm.h>
 
 #include "pins-db8500.h"
-
-#include "ste-dma40-db8500.h"
 
 static struct resource dma40_resources[] = {
 	[0] = {
