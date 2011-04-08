@@ -25,9 +25,9 @@
 #include <mach/setup.h>
 #include <mach/devices.h>
 #include <mach/usb.h>
+#include <mach/ste-dma40-db8500.h>
 
 #include "devices-db8500.h"
-#include "ste-dma40-db8500.h"
 #include "regulator-db8500.h"
 
 /* minimum static i/o mapping required to boot U8500 platforms */
