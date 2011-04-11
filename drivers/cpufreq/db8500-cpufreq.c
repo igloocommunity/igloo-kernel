@@ -58,6 +58,10 @@ static enum arm_opp idx2opp[] = {
 
 #define WLAN_PROBE_DELAY 3000 /* 3 seconds */
 #define WLAN_LIMIT (3000/3) /* If we have more than 1000 irqs per second */
+#define USB_PROBE_DELAY 1000 /* 1 seconds */
+#define USB_LIMIT (200) /* If we have more than 200 irqs per second */
+static struct delayed_work work_usb_workaround;
+bool usb_mode_on;
 
 static struct delayed_work work_wlan_workaround;
 bool wlan_mode_on;
@@ -84,6 +88,40 @@ static void wlan_load(struct work_struct *work)
 				 msecs_to_jiffies(WLAN_PROBE_DELAY));
 }
 
+static void usb_load(struct work_struct *work)
+{
+	int cpu;
+	unsigned int num_irqs = 0;
+	static unsigned int old_num_irqs = UINT_MAX;
+
+	for_each_online_cpu(cpu)
+		num_irqs += kstat_irqs_cpu(IRQ_DB8500_USBOTG, cpu);
+
+	if ((num_irqs > old_num_irqs) &&
+	    (num_irqs - old_num_irqs) > USB_LIMIT)
+		usb_mode_on = true;
+	else
+		usb_mode_on = false;
+
+	old_num_irqs = num_irqs;
+
+	schedule_delayed_work_on(0,
+				 &work_usb_workaround,
+				 msecs_to_jiffies(USB_PROBE_DELAY));
+}
+
+void cpufreq_usb_connect_notify(bool connect)
+{
+	if (connect) {
+		schedule_delayed_work_on(0,
+				 &work_usb_workaround,
+				 msecs_to_jiffies(USB_PROBE_DELAY));
+	} else {
+		cancel_delayed_work_sync(&work_usb_workaround);
+		usb_mode_on = false;
+	}
+}
+
 static struct freq_attr *db8500_cpufreq_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
 	NULL,
@@ -105,10 +143,6 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
 	if (target_freq < policy->cpuinfo.min_freq)
 		target_freq = policy->cpuinfo.min_freq;
 	if (target_freq > policy->cpuinfo.max_freq)
-		target_freq = policy->cpuinfo.max_freq;
-
-	/* A work around for wlan performance issues */
-	if (wlan_mode_on)
 		target_freq = policy->cpuinfo.max_freq;
 
 	/* Lookup the next frequency */
@@ -168,6 +202,9 @@ static int __cpuinit db8500_cpufreq_init(struct cpufreq_policy *policy)
 	schedule_delayed_work_on(0,
 				 &work_wlan_workaround,
 				 msecs_to_jiffies(WLAN_PROBE_DELAY));
+
+	INIT_DELAYED_WORK_DEFERRABLE(&work_usb_workaround,
+				     usb_load);
 
 	pr_info("db8500-cpufreq : Available frequencies:\n");
 	while (freq_table[i].frequency != CPUFREQ_TABLE_END)
