@@ -15,7 +15,12 @@
 
 #include <asm/cacheflush.h>
 
+#ifdef CONFIG_U8500_CPUIDLE
 #include "pm/cpuidle.h"
+#else
+#define ux500_cpuidle_unplug(cpu)
+#define ux500_cpuidle_plug(cpu)
+#endif
 #include "pm/context.h"
 
 extern volatile int pen_release;
@@ -27,6 +32,10 @@ static inline void platform_do_lowpower(unsigned int cpu)
 	flush_cache_all();
 	ux500_cpuidle_unplug(cpu);
 	for (;;) {
+#ifndef CONFIG_U8500_CPUIDLE
+		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
+				: : : "memory");
+#endif
 
 		context_varm_save_core();
 		context_save_cpu_registers();
@@ -37,9 +46,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
 		context_varm_restore_core();
 
 		if (pen_release == cpu) {
-			/*
-			* OK, proper wakeup, we're done
-			 */
+			/* OK, proper wakeup, we're done */
 			break;
 		}
 	}
