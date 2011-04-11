@@ -48,14 +48,14 @@ static u32 suspend_count;
 #ifdef CONFIG_UX500_SUSPEND_DBG_WAKE_ON_UART
 void ux500_suspend_dbg_add_wake_on_uart(void)
 {
-	set_irq_wake(GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 1);
-	set_irq_type(GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN),
+	set_irq_wake(NOMADIK_GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 1);
+	set_irq_type(NOMADIK_GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN),
 		     IRQ_TYPE_EDGE_BOTH);
 }
 
 void ux500_suspend_dbg_remove_wake_on_uart(void)
 {
-	set_irq_wake(GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 0);
+	set_irq_wake(NOMADIK_GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 0);
 }
 #endif
 
