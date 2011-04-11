@@ -153,12 +153,14 @@ enum prcmu_clock {
  * @APE_NO_CHANGE: The APE operating point is unchanged
  * @APE_100_OPP: The new APE operating point is ape100opp
  * @APE_50_OPP: 50%
+ * @APE_50_PARTLY_25_OPP: 50%, except some clocks at 25%.
  */
 enum ape_opp {
 	APE_OPP_INIT = 0x00,
 	APE_NO_CHANGE = 0x01,
 	APE_100_OPP = 0x02,
-	APE_50_OPP = 0x03
+	APE_50_OPP = 0x03,
+	APE_50_PARTLY_25_OPP = 0xFF,
 };
 
 /**
@@ -492,6 +494,7 @@ static inline void prcmu_get_abb_event_buffer(void __iomem **buf)
 unsigned long prcmu_qos_get_cpufreq_opp_delay(void);
 void prcmu_qos_set_cpufreq_opp_delay(unsigned long);
 void prcmu_qos_force_opp(int, s32);
+void prcmu_qos_voice_call_override(bool enable);
 int prcmu_qos_requirement(int pm_qos_class);
 int prcmu_qos_add_requirement(int pm_qos_class, char *name, s32 value);
 int prcmu_qos_update_requirement(int pm_qos_class, char *name, s32 new_value);
@@ -511,6 +514,8 @@ static inline unsigned long prcmu_qos_get_cpufreq_opp_delay(void)
 static inline void prcmu_qos_set_cpufreq_opp_delay(unsigned long n) {}
 
 static inline void prcmu_qos_force_opp(int prcmu_qos_class, s32 i) {}
+
+static inline void prcmu_qos_voice_call_override(bool enable) {}
 
 static inline int prcmu_qos_requirement(int prcmu_qos_class)
 {

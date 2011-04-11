@@ -124,6 +124,7 @@ struct menu_device {
 };
 
 static int tune_multiplier = 1024;
+static int forced_state;
 
 #define LOAD_INT(x) ((x) >> FSHIFT)
 #define LOAD_FRAC(x) LOAD_INT(((x) & (FIXED_1-1)) * 100)
@@ -290,26 +291,34 @@ static int menu_select(struct cpuidle_device *dev)
 	if (data->expected_us > 5)
 		data->last_state_idx = CPUIDLE_DRIVER_STATE_START;
 
-	/*
-	 * Find the idle state with the lowest power while satisfying
-	 * our constraints.
-	 */
-	for (i = CPUIDLE_DRIVER_STATE_START; i < dev->state_count; i++) {
-		struct cpuidle_state *s = &dev->states[i];
+	WARN((forced_state >= dev->state_count), \
+		"Forced state value out of range.\n");
 
-		if (s->flags & CPUIDLE_FLAG_IGNORE)
-			continue;
-		if (s->target_residency > data->predicted_us)
-			continue;
-		if (s->exit_latency > latency_req)
-			continue;
-		if (s->exit_latency * multiplier > data->predicted_us)
-			continue;
+	if ((forced_state != 0) && (forced_state < dev->state_count)) {
+		data->exit_us = dev->states[forced_state].exit_latency;
+		data->last_state_idx = forced_state;
+	} else {
+		/*
+		 * Find the idle state with the lowest power while satisfying
+		 * our constraints.
+		 */
+		for (i = CPUIDLE_DRIVER_STATE_START; i < dev->state_count; i++) {
+			struct cpuidle_state *s = &dev->states[i];
 
-		if (s->power_usage < power_usage) {
-			power_usage = s->power_usage;
-			data->last_state_idx = i;
-			data->exit_us = s->exit_latency;
+			if (s->flags & CPUIDLE_FLAG_IGNORE)
+				continue;
+			if (s->target_residency > data->predicted_us)
+				continue;
+			if (s->exit_latency > latency_req)
+				continue;
+			if (s->exit_latency * multiplier > data->predicted_us)
+				continue;
+
+			if (s->power_usage < power_usage) {
+				power_usage = s->power_usage;
+				data->last_state_idx = i;
+				data->exit_us = s->exit_latency;
+			}
 		}
 	}
 
@@ -401,6 +410,15 @@ int cpuidle_set_multiplier(unsigned int value)
 	return 0;
 }
 EXPORT_SYMBOL(cpuidle_set_multiplier);
+
+/* Writing 0 will remove the forced state. */
+int cpuidle_force_state(unsigned int state)
+{
+	forced_state = state;
+
+	return 0;
+}
+EXPORT_SYMBOL(cpuidle_force_state);
 
 static ssize_t show_multiplier(struct sysdev_class *class,
 				      struct sysdev_class_attribute *attr,
