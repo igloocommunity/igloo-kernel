@@ -305,3 +305,11 @@ MACHINE_START(U5500, "ST-Ericsson U5500 Platform")
 	.timer		= &ux500_timer,
 	.init_machine	= u5500_init_machine,
 MACHINE_END
+
+MACHINE_START(B5500, "ST-Ericsson U5500 Big Board")
+	.boot_params	= 0x00000100,
+	.map_io		= u5500_map_io,
+	.init_irq	= ux500_init_irq,
+	.timer		= &ux500_timer,
+	.init_machine	= u5500_init_machine,
+MACHINE_END
