@@ -6,7 +6,8 @@ ifeq ($(CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL), y)
 	CFLAGS_board-mop500-bm.o += -DAB8500_BATTERY_THERM_ON_BATCTRL
 endif
 
-obj-y				:= clock.o cpu.o devices.o devices-common.o \
+obj-y				:= clock.o cpu.o devices.o dcache.o \
+				   devices-common.o \
 				   id.o pins.o timer-mtu.o timer-rtt.o usb.o
 obj-y				+= pm/
 obj-$(CONFIG_UX500_SOC_DB5500)	+= cpu-db5500.o dma-db5500.o prcmu-db5500.o \
