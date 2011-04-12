@@ -446,11 +446,4 @@ struct ab8500_chargalg_platform_data {
 	char **supplied_to;
 	size_t num_supplicants;
 };
-#ifdef CONFIG_AB8500_BM
-void ab8500_charger_usb_state_changed(u8 bm_usb_state, u16 mA);
-#else
-static void ab8500_charger_usb_state_changed(u8 bm_usb_state, u16 mA)
-{
-}
-#endif
 #endif /* _AB8500_BM_H */
