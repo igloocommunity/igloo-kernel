@@ -223,7 +223,6 @@ static int ab8500_usb_link_status_update(struct ab8500_usb *ab)
 {
 	u8 reg;
 	enum ab8500_usb_link_status lsts;
-	void *v = NULL;
 	enum usb_xceiv_events event;
 
 	abx500_get_register_interruptible(ab->dev,
@@ -256,7 +255,6 @@ static int ab8500_usb_link_status_update(struct ab8500_usb *ab)
 		if (ab->otg.gadget) {
 			ab8500_usb_peri_phy_en(ab);
 			ab->mode = USB_PERIPHERAL;
-			v = ab->otg.gadget;
 		}
 		event = USB_EVENT_VBUS;
 		break;
@@ -265,7 +263,6 @@ static int ab8500_usb_link_status_update(struct ab8500_usb *ab)
 		if (ab->otg.host) {
 			ab8500_usb_host_phy_en(ab);
 			ab->mode = USB_HOST;
-			v = ab->otg.host;
 		}
 		ab->otg.default_a = true;
 		event = USB_EVENT_ID;
@@ -283,7 +280,7 @@ static int ab8500_usb_link_status_update(struct ab8500_usb *ab)
 		break;
 	}
 
-	atomic_notifier_call_chain(&ab->otg.notifier, event, v);
+	atomic_notifier_call_chain(&ab->otg.notifier, event, &ab->vbus_draw);
 
 	return 0;
 }
@@ -356,15 +353,10 @@ static int ab8500_usb_set_power(struct otg_transceiver *otg, unsigned mA)
 
 	ab->vbus_draw = mA;
 
-	if (mA)
-		atomic_notifier_call_chain(&ab->otg.notifier,
-				USB_EVENT_ENUMERATED, ab->otg.gadget);
+	atomic_notifier_call_chain(&ab->otg.notifier,
+				USB_EVENT_VBUS, &ab->vbus_draw);
 	return 0;
 }
-
-/* TODO: Implement some way for charging or other drivers to read
- * ab->vbus_draw.
- */
 
 static int ab8500_usb_set_suspend(struct otg_transceiver *x, int suspend)
 {
