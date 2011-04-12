@@ -1037,6 +1037,8 @@ static struct clk_lookup u8500_v1_v2_prcc_clocks[] = {
 	/* PERIPH 1 */
 	CLK_LOOKUP(p1_msp1_clk, "msp1", NULL),
 	CLK_LOOKUP(p1_msp1_clk, "MSP_I2S.1", NULL),
+	CLK_LOOKUP(p1_msp1_kclk, "ab8500-codec.0", "msp1-kernel"),
+	CLK_LOOKUP(p1_pclk4, "ab8500-codec.0", "msp1-bus"),
 	CLK_LOOKUP(p1_pclk7, "spi3", NULL),
 	CLK_LOOKUP(p1_i2c4_clk, "nmk-i2c.4", NULL),
 
@@ -1076,6 +1078,8 @@ static struct clk_lookup u8500_v2_prcc_clocks[] = {
 	/* PERIPH 1 */
 	CLK_LOOKUP(p1_msp3_clk, "msp3", NULL),
 	CLK_LOOKUP(p1_msp3_clk, "MSP_I2S.3", NULL),
+	CLK_LOOKUP(p1_msp3_kclk, "ab8500-codec.0", "msp3-kernel"),
+	CLK_LOOKUP(p1_pclk11, "ab8500-codec.0", "msp3-bus"),
 
 	/* PERIPH 6 */
 	CLK_LOOKUP(p6_pclk4, "hash1", NULL),
@@ -1103,7 +1107,6 @@ static const char *u8500_boot_clk[] = {
 	"spi2",
 	"spi3",
 	"msp0",
-	"msp1",
 	"msp2",
 	"nmk-i2c.0",
 	"nmk-i2c.1",
