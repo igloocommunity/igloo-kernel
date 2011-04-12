@@ -77,7 +77,7 @@ static void __init u8500_timer_init(void)
 #endif
 }
 
-struct sys_timer u8500_timer = {
+struct sys_timer ux500_timer = {
 	.init		= u8500_timer_init,
 	.suspend	= u8500_timer_suspend,
 	.resume		= u8500_timer_reset,
