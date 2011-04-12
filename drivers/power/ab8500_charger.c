@@ -25,6 +25,7 @@
 #include <linux/mfd/ab8500/bm.h>
 #include <linux/mfd/ab8500/gpadc.h>
 #include <linux/mfd/ab8500/ux500_chargalg.h>
+#include <linux/usb/otg.h>
 
 /* Charger constants */
 #define NO_PW_CONN			0
@@ -135,7 +136,6 @@ struct ab8500_charger_usb_state {
 	bool usb_changed;
 	int usb_current;
 	enum ab8500_usb_state state;
-	spinlock_t usb_lock;
 };
 
 /**
@@ -198,14 +198,9 @@ struct ab8500_charger {
 	struct work_struct check_usbchgnotok_work;
 	struct work_struct check_main_thermal_prot_work;
 	struct work_struct check_usb_thermal_prot_work;
+	struct otg_transceiver *otg;
+	struct notifier_block nb;
 };
-
-/*
- * TODO: This variable is static in order to get information
- * about maximum current and USB state from the USB driver
- * This should be solved in a better way
- */
-static struct ab8500_charger *static_di;
 
 /* AC properties */
 static enum power_supply_property ab8500_charger_ac_props[] = {
@@ -1348,9 +1343,7 @@ static void ab8500_charger_usb_state_changed_work(struct work_struct *work)
 	if (!di->vbus_detected)
 		return;
 
-	spin_lock(&di->usb_state.usb_lock);
 	di->usb_state.usb_changed = false;
-	spin_unlock(&di->usb_state.usb_lock);
 
 	/*
 	 * wait for some time until you get updates from the usb stack
@@ -2026,25 +2019,39 @@ static struct ab8500_charger_interrupts ab8500_charger_irq[] = {
 	{"CH_WD_EXP", ab8500_charger_chwdexp_handler},
 };
 
-void ab8500_charger_usb_state_changed(u8 bm_usb_state, u16 mA)
+static int ab8500_charger_usb_notifier_call(struct notifier_block *nb,
+		unsigned long event, void *power)
 {
-	struct ab8500_charger *di = static_di;
+	struct ab8500_charger *di =
+		container_of(nb, struct ab8500_charger, nb);
+	enum ab8500_usb_state bm_usb_state;
+	unsigned mA = *((unsigned *)power);
+
+	/* TODO: State is fabricate  here. See if charger really needs USB
+	 * state or if mA is enough
+	 */
+	if ((di->usb_state.usb_current == 2) && (mA > 2))
+		bm_usb_state = AB8500_BM_USB_STATE_RESUME;
+	else if (mA == 0)
+		bm_usb_state = AB8500_BM_USB_STATE_RESET_HS;
+	else if (mA == 2)
+		bm_usb_state = AB8500_BM_USB_STATE_SUSPEND;
+	else if (mA >= 8) /* 8, 100, 500 */
+		bm_usb_state = AB8500_BM_USB_STATE_CONFIGURED;
+	else /* Should never occur */
+		bm_usb_state = AB8500_BM_USB_STATE_RESET_FS;
 
 	dev_dbg(di->dev, "%s usb_state: 0x%02x mA: %d\n",
 		__func__, bm_usb_state, mA);
 
-	spin_lock(&di->usb_state.usb_lock);
 	di->usb_state.usb_changed = true;
-	spin_unlock(&di->usb_state.usb_lock);
-
 	di->usb_state.state = bm_usb_state;
 	di->usb_state.usb_current = mA;
 
 	queue_work(di->charger_wq, &di->usb_state_changed_work);
 
-	return;
+	return NOTIFY_OK;
 }
-EXPORT_SYMBOL(ab8500_charger_usb_state_changed);
 
 #if defined(CONFIG_PM)
 static int ab8500_charger_resume(struct platform_device *pdev)
@@ -2124,6 +2131,9 @@ static int __devexit ab8500_charger_remove(struct platform_device *pdev)
 	if (ret < 0)
 		dev_err(di->dev, "%s mask and set failed\n", __func__);
 
+	otg_unregister_notifier(di->otg, &di->nb);
+	otg_put_transceiver(di->otg);
+
 	/* Delete the work queue */
 	destroy_workqueue(di->charger_wq);
 
@@ -2146,15 +2156,10 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 	if (!di)
 		return -ENOMEM;
 
-	static_di = di;
-
 	/* get parent data */
 	di->dev = &pdev->dev;
 	di->parent = dev_get_drvdata(pdev->dev.parent);
 	di->gpadc = ab8500_gpadc_get();
-
-	/* initialize lock */
-	spin_lock_init(&di->usb_state.usb_lock);
 
 	plat = dev_get_platdata(di->parent->dev);
 
@@ -2283,6 +2288,18 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 		goto free_ac;
 	}
 
+	di->otg = otg_get_transceiver();
+	if (!di->otg) {
+		dev_err(di->dev, "failed to get otg transceiver\n");
+		goto free_usb;
+	}
+	di->nb.notifier_call = ab8500_charger_usb_notifier_call;
+	ret = otg_register_notifier(di->otg, &di->nb);
+	if (ret) {
+		dev_err(di->dev, "failed to register otg notifier\n");
+		goto put_otg_transceiver;
+	}
+
 	/* Identify the connected charger types during startup */
 	charger_status = ab8500_charger_detect_chargers(di);
 	if (charger_status & AC_PW_CONN) {
@@ -2321,13 +2338,17 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 	return ret;
 
 free_irq:
-	power_supply_unregister(&di->usb_chg.psy);
+	otg_unregister_notifier(di->otg, &di->nb);
 
 	/* We also have to free all successfully registered irqs */
 	for (i = i - 1; i >= 0; i--) {
 		irq = platform_get_irq_byname(pdev, ab8500_charger_irq[i].name);
 		free_irq(irq, di);
 	}
+put_otg_transceiver:
+	otg_put_transceiver(di->otg);
+free_usb:
+	power_supply_unregister(&di->usb_chg.psy);
 free_ac:
 	power_supply_unregister(&di->ac_chg.psy);
 free_charger_wq:
