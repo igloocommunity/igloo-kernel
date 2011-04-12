@@ -23,7 +23,7 @@
 #include <linux/boottime.h>
 #include <linux/cnt32_to_63.h>
 #include <asm/mach/time.h>
-#include <mach/mtu.h>
+#include <plat/mtu.h>
 #include <mach/setup.h>
 
 #define TIMER_CTRL	0x80	/* No divisor */
