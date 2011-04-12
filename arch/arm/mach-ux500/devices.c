@@ -14,7 +14,6 @@
 #include <mach/crypto-ux500.h>
 #include <mach/hardware.h>
 #include <mach/setup.h>
-#include <linux/hwmem.h>
 
 #ifdef CONFIG_STE_TRACE_MODEM
 #include <linux/db8500-modem-trace.h>
@@ -59,35 +58,11 @@ static int __init early_trace_modem(char *p)
 early_param("mem_mtrace", early_trace_modem);
 #endif
 
-static struct hwmem_platform_data hwmem_pdata = {
-	.start = 0,
-	.size = 0,
-};
-
-static int __init early_hwmem(char *p)
-{
-	hwmem_pdata.size = memparse(p, &p);
-
-	if (*p != '@')
-		goto no_at;
-
-	hwmem_pdata.start = memparse(p + 1, &p);
-
-	return 0;
-
-no_at:
-	hwmem_pdata.size = 0;
-
-	return -EINVAL;
-}
-early_param("hwmem", early_hwmem);
-
+#ifdef CONFIG_HWMEM
 struct platform_device ux500_hwmem_device = {
 	.name = "hwmem",
-	.dev = {
-		.platform_data = &hwmem_pdata,
-	},
 };
+#endif
 
 static struct resource ux500_hash1_resources[] = {
 	[0] = {

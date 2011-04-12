@@ -35,3 +35,4 @@ obj-$(CONFIG_U8500_REGULATOR_DEBUG)	+= virt-regulator-u8500.o
 obj-$(CONFIG_UX500_PRCMU_DEBUG)		+= prcmu-debug.o
 obj-$(CONFIG_UX500_PRCMU_QOS_POWER)	+= prcmu-qos-power.o
 obj-$(CONFIG_UX500_DEBUG_HWREG) 	+= hwreg.o
+obj-$(CONFIG_HWMEM)			+= hwmem-int.o
