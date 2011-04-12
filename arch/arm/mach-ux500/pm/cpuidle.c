@@ -577,7 +577,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 	/* Compensate for ULPLL start up time */
 	if (cstates[target].UL_PLL == UL_PLL_OFF)
-		(void) u8500_rtc_adjust_next_wakeup(-UL_PLL_START_UP_LATENCY);
+		(void) rtc_rtt_adjust_next_wakeup(-UL_PLL_START_UP_LATENCY);
 
 	if (cstates[target].APE == APE_OFF) {
 
