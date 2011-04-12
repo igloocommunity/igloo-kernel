@@ -5,6 +5,7 @@ config UX500_SOC_COMMON
 	default y
 	select ARM_GIC
 	select HAS_MTU
+	select NOMADIK_GPIO
 	select ARM_ERRATA_753970
 
 menu "Ux500 SoC"
@@ -63,6 +64,26 @@ config KEYLAYOUT_LAYOUT2
 	help
 	  Supports keylayout numerics 0-9, left/right/up/down/back/
 	  enter keys and special character "."(dot)
+
+endchoice
+
+choice
+	prompt "Ux500 sched_clock timer"
+	default UX500_MTU_TIMER
+
+config U8500_PRCMU_TIMER
+	bool "PRCMU Timer sched_clock"
+	depends on UX500_SOC_DB8500 && U8500_CPUIDLE
+	help
+	  Add support for an always on sched_clock, required for
+	  proper cpuidle and suspend.
+
+config UX500_MTU_TIMER
+	bool "Multi Timer Unit sched_clock"
+	help
+	  Add sched_clock support for the Multi Timer Unit.
+	  Since mtu isn't always on cpuidle will not
+	  work with this clock.
 
 endchoice
 
