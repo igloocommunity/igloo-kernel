@@ -7,7 +7,7 @@
  * sched_clock implementation is based on:
  * plat-nomadik/timer.c Linus Walleij <linus.walleij@stericsson.com>
  *
- * DB8500-PRCMU Timer
+ * UX500 PRCMU Timer
  * The PRCMU has 5 timers which are available in a always-on
  * power domain. we use the Timer 4 for our always-on clock source.
  */
@@ -35,21 +35,21 @@ static __iomem void *prcmu_base;
 
 #define SCHED_CLOCK_MIN_WRAP (131072) /* 2^32 / 32768 */
 
-static cycle_t db8500_prcmu_read_timer_nop(struct clocksource *cs)
+static cycle_t prcmu_read_timer_nop(struct clocksource *cs)
 {
 	return 0;
 }
 
-static struct clocksource db8500_prcmu_clksrc = {
-	.name		= "db8500-prcmu-timer4",
+static struct clocksource prcmu_clksrc = {
+	.name		= "prcmu-timer4",
 	.rating		= 300,
-	.read		= db8500_prcmu_read_timer_nop,
+	.read		= prcmu_read_timer_nop,
 	.shift		= 10,
 	.mask		= CLOCKSOURCE_MASK(32),
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 };
 
-static cycle_t db8500_prcmu_read_timer(struct clocksource *cs)
+static cycle_t prcmu_read_timer(struct clocksource *cs)
 {
 	u32 count, count2;
 
@@ -65,13 +65,13 @@ static cycle_t db8500_prcmu_read_timer(struct clocksource *cs)
 	return ~count;
 }
 
-#ifdef CONFIG_U8500_PRCMU_TIMER
+#ifdef CONFIG_UX500_PRCMU_TIMER
 unsigned long long notrace sched_clock(void)
 {
-	return clocksource_cyc2ns(db8500_prcmu_clksrc.read(
-			&db8500_prcmu_clksrc),
-			db8500_prcmu_clksrc.mult,
-			db8500_prcmu_clksrc.shift);
+	return clocksource_cyc2ns(prcmu_clksrc.read(
+			&prcmu_clksrc),
+			prcmu_clksrc.mult,
+			prcmu_clksrc.shift);
 }
 #endif
 
@@ -79,10 +79,10 @@ unsigned long long notrace sched_clock(void)
 
 static unsigned long __init boottime_get_time(void)
 {
-	return div_s64(clocksource_cyc2ns(db8500_prcmu_clksrc.read(
-			&db8500_prcmu_clksrc),
-			db8500_prcmu_clksrc.mult,
-			db8500_prcmu_clksrc.shift), 1000);
+	return div_s64(clocksource_cyc2ns(prcmu_clksrc.read(
+			&prcmu_clksrc),
+			prcmu_clksrc.mult,
+			prcmu_clksrc.shift), 1000);
 }
 
 static struct boottime_timer __initdata boottime_timer = {
@@ -92,14 +92,14 @@ static struct boottime_timer __initdata boottime_timer = {
 };
 #endif
 
-void __init db8500_prcmu_timer_init(void)
+void __init prcmu_timer_init(void)
 {
 	if (ux500_is_svp())
 		return;
 
 	prcmu_base = __io_address(U8500_PRCMU_BASE);
 
-	clocksource_calc_mult_shift(&db8500_prcmu_clksrc,
+	clocksource_calc_mult_shift(&prcmu_clksrc,
 		RATE_32K, SCHED_CLOCK_MIN_WRAP);
 
 	/*
@@ -112,9 +112,9 @@ void __init db8500_prcmu_timer_init(void)
 		writel(TIMER_MODE_CONTINOUS, PRCMU_TIMER_4_MODE);
 		writel(TIMER_DOWNCOUNT_VAL, PRCMU_TIMER_4_REF);
 	}
-	db8500_prcmu_clksrc.read = db8500_prcmu_read_timer;
+	prcmu_clksrc.read = prcmu_read_timer;
 
-	clocksource_register(&db8500_prcmu_clksrc);
+	clocksource_register(&prcmu_clksrc);
 
 	if (!ux500_is_svp())
 		boottime_activate(&boottime_timer);

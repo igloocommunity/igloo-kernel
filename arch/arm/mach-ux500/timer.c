@@ -8,15 +8,15 @@
 #include <mach/setup.h>
 #include <mach/hardware.h>
 
+#include "timer-rtt.h"
 #include "pm/context.h"
 
-void u8500_rtc_init(unsigned int cpu);
-void db8500_prcmu_timer_init(void);
+void prcmu_timer_init(void);
 void mtu_timer_init(void);
 void mtu_timer_reset(void);
 
 #ifdef CONFIG_LOCAL_TIMERS
-extern void *twd_base;
+#include <asm/smp_twd.h>
 #endif
 
 #ifdef CONFIG_UX500_CONTEXT
@@ -33,16 +33,16 @@ static struct notifier_block mtu_context_notifier = {
 };
 #endif
 
-static void u8500_timer_reset(void)
+static void ux500_timer_reset(void)
 {
 	mtu_timer_reset();
 }
 
-static void u8500_timer_suspend(void)
+static void ux500_timer_suspend(void)
 {
 }
 
-static void __init u8500_timer_init(void)
+static void __init ux500_timer_init(void)
 {
 
 #ifdef CONFIG_LOCAL_TIMERS
@@ -69,8 +69,8 @@ static void __init u8500_timer_init(void)
  *
  */
 	mtu_timer_init();
-	u8500_rtc_init(0);
-	db8500_prcmu_timer_init();
+	rtc_rtt_timer_init(0);
+	prcmu_timer_init();
 
 #ifdef CONFIG_UX500_CONTEXT
 	WARN_ON(context_ape_notifier_register(&mtu_context_notifier));
@@ -78,7 +78,7 @@ static void __init u8500_timer_init(void)
 }
 
 struct sys_timer ux500_timer = {
-	.init		= u8500_timer_init,
-	.suspend	= u8500_timer_suspend,
-	.resume		= u8500_timer_reset,
+	.init		= ux500_timer_init,
+	.suspend	= ux500_timer_suspend,
+	.resume		= ux500_timer_reset,
 };

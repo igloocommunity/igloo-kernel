@@ -57,8 +57,8 @@ static unsigned long rtc_readl(unsigned long addr)
 	return readl(rtc_base + addr);
 }
 
-static void u8500_rtc_set_mode(enum clock_event_mode mode,
-			       struct clock_event_device *evt)
+static void rtc_set_mode(enum clock_event_mode mode,
+			 struct clock_event_device *evt)
 {
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
@@ -81,8 +81,8 @@ static void u8500_rtc_set_mode(enum clock_event_mode mode,
 	}
 }
 
-static int u8500_rtc_set_event(unsigned long delta,
-			       struct clock_event_device *dev)
+static int rtc_set_event(unsigned long delta,
+			 struct clock_event_device *dev)
 {
 
 	rtc_writel(RTC_TCR_RTTOS, RTC_TCR);
@@ -105,7 +105,7 @@ static int u8500_rtc_set_event(unsigned long delta,
 	return 0;
 }
 
-static irqreturn_t u8500_rtc_interrupt(int irq, void *dev)
+static irqreturn_t rtc_interrupt(int irq, void *dev)
 {
 	struct clock_event_device *clkevt = dev;
 
@@ -126,27 +126,27 @@ static irqreturn_t u8500_rtc_interrupt(int irq, void *dev)
 void smp_timer_broadcast(const struct cpumask *mask);
 #endif
 
-static struct clock_event_device u8500_rtc = {
+static struct clock_event_device rtc_dev = {
 	.name		= "rtc-rtt",
 	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
 	.shift		= 32,
 	.rating		= 300,
-	.set_next_event	= u8500_rtc_set_event,
-	.set_mode	= u8500_rtc_set_mode,
+	.set_next_event	= rtc_set_event,
+	.set_mode	= rtc_set_mode,
 #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
 	.broadcast      = smp_timer_broadcast,
 #endif
 	.cpumask	= cpu_all_mask,
 };
 
-static struct irqaction u8500_rtc_irq = {
+static struct irqaction rtc_irq = {
 	.name		= "RTC-RTT Timer Tick",
 	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_SHARED,
-	.handler	= u8500_rtc_interrupt,
-	.dev_id		= &u8500_rtc,
+	.handler	= rtc_interrupt,
+	.dev_id		= &rtc_dev,
 };
 
-void u8500_rtc_init(unsigned int cpu)
+void rtc_rtt_timer_init(unsigned int cpu)
 {
 	int irq;
 
@@ -163,21 +163,21 @@ void u8500_rtc_init(unsigned int cpu)
 		return;
 	}
 
-	u8500_rtc.irq = irq;
+	rtc_dev.irq = irq;
 
 	rtc_writel(0, RTC_TCR);
 	rtc_writel(RTC_ICR_TIC, RTC_ICR);
 	rtc_writel(RTC_IMSC_TIMSC, RTC_IMSC);
 
-	u8500_rtc.mult = div_sc(RATE_32K, NSEC_PER_SEC, u8500_rtc.shift);
-	u8500_rtc.max_delta_ns = clockevent_delta2ns(0xffffffff, &u8500_rtc);
-	u8500_rtc.min_delta_ns = clockevent_delta2ns(0xff, &u8500_rtc);
+	rtc_dev.mult = div_sc(RATE_32K, NSEC_PER_SEC, rtc_dev.shift);
+	rtc_dev.max_delta_ns = clockevent_delta2ns(0xffffffff, &rtc_dev);
+	rtc_dev.min_delta_ns = clockevent_delta2ns(0xff, &rtc_dev);
 
-	setup_irq(irq, &u8500_rtc_irq);
-	clockevents_register_device(&u8500_rtc);
+	setup_irq(irq, &rtc_irq);
+	clockevents_register_device(&rtc_dev);
 }
 
-int u8500_rtc_adjust_next_wakeup(int delta_in_us)
+int rtc_rtt_adjust_next_wakeup(int delta_in_us)
 {
 	int delta_ticks;
 	u64 temp;
@@ -210,5 +210,5 @@ int u8500_rtc_adjust_next_wakeup(int delta_in_us)
 	if (((u64)val + (u64)delta_ticks) > UINT_MAX)
 		return -EINVAL;
 
-	return u8500_rtc_set_event(val + delta_ticks, &u8500_rtc);
+	return rtc_set_event(val + delta_ticks, &rtc_dev);
 }

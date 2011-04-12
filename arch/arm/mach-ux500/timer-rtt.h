@@ -9,7 +9,12 @@
 #define TIMER_RTT_H
 
 /**
- * u8500_rtc_adjust_next_wakeup()
+ * rtc_rtt_timer_init()
+ */
+void rtc_rtt_timer_init(unsigned int cpu);
+
+/**
+ * rtc_rtt_adjust_next_wakeup()
  *
  * @delta_in_us: delta time to wake up. Can be negative, to wake up closer
  * in time.
@@ -20,6 +25,6 @@
  * ARM can start executing.
  * Returns -EINVAL if the wake up time can't be adjusted.
  */
-int u8500_rtc_adjust_next_wakeup(int delta_in_us);
+int rtc_rtt_adjust_next_wakeup(int delta_in_us);
 
 #endif
