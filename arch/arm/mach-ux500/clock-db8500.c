@@ -902,6 +902,9 @@ static struct clk_lookup u8500_common_clock_sources[] = {
 	CLK_LOOKUP(sysclk, "ab8500-codec.0", "sysclk"),
 	CLK_LOOKUP(ab_ulpclk, "ab8500-codec.0", "ulpclk"),
 	CLK_LOOKUP(audioclk, "ab8500-codec.0", "audioclk"),
+	CLK_LOOKUP(ab_ulpclk, "ab8500-pwm.1", NULL),
+	CLK_LOOKUP(ab_ulpclk, "ab8500-pwm.2", NULL),
+	CLK_LOOKUP(ab_ulpclk, "ab8500-pwm.3", NULL),
 };
 
 static struct clk_lookup u8500_v2_sysclks[] = {
