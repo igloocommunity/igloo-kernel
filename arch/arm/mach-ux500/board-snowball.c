@@ -22,7 +22,7 @@
 #include <linux/spi/spi.h>
 #include <linux/mfd/ab8500.h>
 #include <linux/input.h>
-
+#include <linux/smsc911x.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
@@ -39,6 +39,35 @@
 #include "board-mop500.h"
 #include "board-snowball.h"
 #include "board-mop500-regulators.h"
+
+static struct smsc911x_platform_config sbnet_cfg = {
+	.irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
+	.irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL,
+	.flags = SMSC911X_USE_16BIT | SMSC911X_FORCE_INTERNAL_PHY,
+	.shift = 1,
+};
+
+static struct resource sbnet_res[] = {
+	{
+		.name = "smsc911x-memory",
+		.start = (0x5000 << 16),
+		.end  =  (0x5000 << 16) + 0xffff,
+		.flags = IORESOURCE_MEM,
+	},{
+		.start = NOMADIK_GPIO_TO_IRQ(140),
+		.end = NOMADIK_GPIO_TO_IRQ(140),
+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
+	},
+};
+
+static struct platform_device sbnet_dev = {
+	.name           = "smsc911x",
+	.num_resources  = ARRAY_SIZE(sbnet_res),
+	.resource       = sbnet_res,
+	.dev            = {
+		.platform_data = &sbnet_cfg,
+	},
+};
 
 static struct ab8500_platform_data ab8500_platdata = {
 	.irq_base	= MOP500_AB8500_IRQ_BASE,
@@ -63,9 +92,6 @@ struct platform_device ab8500_device_snowball = {
 	.num_resources = 1,
 	.resource = ab8500_resources,
 };
-
-static struct i2c_board_info mop500_i2c0_devices[] = {};
-static struct i2c_board_info mop500_i2c2_devices[] = {};
 
 #define U8500_I2C_CONTROLLER(id, _slsu, _tft, _rft, clk, _sm) \
 static struct nmk_i2c_controller u8500_i2c##id##_data = { \
@@ -103,9 +129,6 @@ static void __init mop500_i2c_init(void)
 	db8500_add_i2c2(&u8500_i2c2_data);
 	db8500_add_i2c3(&u8500_i2c3_data);
 }
-
-/* add any platform devices here - TODO */
-static struct platform_device *platform_devs[] __initdata = {};
 
 static struct stedma40_chan_cfg ssp0_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
@@ -222,13 +245,16 @@ static void __init mop500_uart_init(void)
 	db8500_add_uart2(&uart2_plat);
 }
 
+static struct platform_device *snowball_devices[] __initdata = {
+        &sbnet_dev,
+        &ab8500_device_snowball,
+};
+
 static void __init mop500_init_machine(void)
 {
 	u8500_init_devices();
 
 	snowball_pins_init();
-
-	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
 
 	mop500_i2c_init();
 	mop500_sdi_init();
@@ -236,12 +262,7 @@ static void __init mop500_init_machine(void)
 	mop500_spi_init();
 	mop500_uart_init();
 
-	platform_device_register(&ab8500_device_snowball);
-
-	i2c_register_board_info(0, mop500_i2c0_devices,
-				ARRAY_SIZE(mop500_i2c0_devices));
-	i2c_register_board_info(2, mop500_i2c2_devices,
-				ARRAY_SIZE(mop500_i2c2_devices));
+	platform_add_devices(snowball_devices, ARRAY_SIZE(snowball_devices));
 }
 
 MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
