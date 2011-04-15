@@ -23,6 +23,8 @@
 #include <linux/mfd/ab8500.h>
 #include <linux/input.h>
 #include <linux/smsc911x.h>
+#include <linux/gpio_keys.h>
+#include <linux/leds.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
@@ -39,6 +41,87 @@
 #include "board-mop500.h"
 #include "board-snowball.h"
 #include "board-mop500-regulators.h"
+
+static struct gpio_led snowball_led_array[] = {
+	{    
+		.name = "user_led",
+		.default_trigger = "none",
+		.gpio = 142,
+	},
+};  
+    
+static struct gpio_led_platform_data snowball_led_data = {
+	.leds = snowball_led_array,
+	.num_leds = ARRAY_SIZE(snowball_led_array),
+};
+
+static struct platform_device snowball_led_dev = {
+	.name = "leds-gpio",
+	.dev = {
+		.platform_data = &snowball_led_data,
+	},
+};
+
+static struct gpio_keys_button snowball_key_array[] = {
+	{
+		.gpio           = 32,
+		.type           = EV_KEY,
+		.code           = KEY_1,
+		.desc           = "userpb",
+		.active_low     = 1,
+		.debounce_interval = 50,
+		.wakeup         = 1,
+	},
+	{
+		.gpio           = 151,
+		.type           = EV_KEY,
+		.code           = KEY_2,
+		.desc           = "extkb1",
+		.active_low     = 1,
+		.debounce_interval = 50,
+		.wakeup         = 1,
+	},
+	{
+		.gpio           = 152,
+		.type           = EV_KEY,
+		.code           = KEY_3,
+		.desc           = "extkb2",
+		.active_low     = 1,
+		.debounce_interval = 50,
+		.wakeup         = 1,
+	},
+	{
+		.gpio           = 161,
+		.type           = EV_KEY,
+		.code           = KEY_4,
+		.desc           = "extkb3",
+		.active_low     = 1,
+		.debounce_interval = 50,
+		.wakeup         = 1,
+	},
+	{
+		.gpio           = 162,
+		.type           = EV_KEY,
+		.code           = KEY_5,
+		.desc           = "extkb4",
+		.active_low     = 1,
+		.debounce_interval = 50,
+		.wakeup         = 1,
+	},
+};
+
+static struct gpio_keys_platform_data snowball_key_data = {
+	.buttons        = snowball_key_array,
+	.nbuttons       = ARRAY_SIZE(snowball_key_array),
+};
+
+static struct platform_device snowball_key_dev = {
+	.name           = "gpio-keys",
+	.id             = -1,
+	.dev            = {
+		.platform_data  = &snowball_key_data,
+	}
+};
 
 static struct smsc911x_platform_config sbnet_cfg = {
 	.irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
@@ -246,6 +329,8 @@ static void __init mop500_uart_init(void)
 }
 
 static struct platform_device *snowball_devices[] __initdata = {
+	&snowball_led_dev,
+	&snowball_key_dev,
         &sbnet_dev,
         &ab8500_device_snowball,
 };
