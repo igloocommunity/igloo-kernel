@@ -92,7 +92,7 @@ config ANDROID_LOW_MEMORY_KILLER
 
 config ANDROID_STE_TIMED_VIBRA
 	bool "ST-Ericsson Timed Output Vibrator"
-	depends on STE_AUDIO_IO_DEV
+	depends on SND_SOC_AB8500
 	depends on ANDROID_TIMED_OUTPUT
 	default y
 	help
