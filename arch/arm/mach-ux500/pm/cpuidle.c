@@ -61,7 +61,7 @@ static struct cstate cstates[] = {
 		.desc = "Wait for interrupt     ",
 	},
 	{
-		.enter_latency = 50,
+		.enter_latency = 40,
 		.exit_latency = 50,
 		.threshold = 150,
 		.power_usage = 5,
@@ -76,7 +76,7 @@ static struct cstate cstates[] = {
 		.desc = "ApIdle                 ",
 	},
 	{
-		.enter_latency = 55,
+		.enter_latency = 45,
 		.exit_latency = 50,
 		.threshold = 160,
 		.power_usage = 4,
@@ -91,13 +91,13 @@ static struct cstate cstates[] = {
 		.desc = "ApIdle, ARM PLL off    ",
 	},
 	{
-		.enter_latency = 140,
+		.enter_latency = 120,
 		.exit_latency = SLEEP_WAKE_UP_LATENCY,
 		/*
 		 * Note: Sleep time must be longer than 120 us or else
 		 * there might be issues with the RTC-RTT block.
 		 */
-		.threshold = SLEEP_WAKE_UP_LATENCY + 140 + 50,
+		.threshold = SLEEP_WAKE_UP_LATENCY + 120 + 50,
 		.power_usage = 3,
 		.APE = APE_OFF,
 		.ARM = ARM_RET,
@@ -338,7 +338,7 @@ static int determine_sleep_state(void)
 
 }
 
-static void enter_sleep_shallow(struct cpu_state *state)
+static void enter_sleep_shallow(struct cpu_state *state, ktime_t t1)
 {
 	int this_cpu = smp_processor_id();
 
@@ -350,11 +350,13 @@ static void enter_sleep_shallow(struct cpu_state *state)
 		context_save_cpu_registers();
 		/* fall through */
 	case ARM_RET:
+		ux500_ci_dbg_log(CI_WFI, t1);
 		context_save_to_sram_and_wfi(false);
 		if (cstates[state->gov_cstate].ARM == ARM_OFF)
 			context_restore_cpu_registers();
 		break;
 	case ARM_ON:
+		ux500_ci_dbg_log(CI_WFI, t1);
 		__asm__ __volatile__
 			("dsb\n\t" "wfi\n\t" : : : "memory");
 		break;
@@ -407,9 +409,8 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 	if (cstates[target].ARM == ARM_ON) {
 		/* Handle first cpu to enter sleep state */
-		ux500_ci_dbg_log(CI_WFI, t1);
 		always_on_timer_migrated = true;
-		enter_sleep_shallow(state);
+		enter_sleep_shallow(state, t1);
 		t3 = ktime_get();
 		slept_well = true;
 		goto exit;
@@ -421,9 +422,6 @@ static int enter_sleep(struct cpuidle_device *dev,
 	if (!ux500_pm_other_cpu_wfi())
 		/* Other CPU was not in WFI => abort */
 		goto exit;
-
-	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
-			     PRCMU_WAKEUP(ABB));
 
 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &this_cpu);
 
@@ -564,8 +562,6 @@ exit:
 					  time_zero);
 	}
 
-	prcmu_disable_wakeups();
-
 exit_fast:
 
 	if (target < 0)
@@ -654,6 +650,9 @@ static int __init cpuidle_driver_init(void)
 
 	/* Zero time used on a few places */
 	time_zero = ktime_set(0, 0);
+
+	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
+			     PRCMU_WAKEUP(ABB));
 
 	ux500_ci_dbg_init();
 
