@@ -138,7 +138,9 @@ static int suspend(bool do_deepsleep)
 	context_gpio_mux_safe_switch(false);
 	context_gpio_restore();
 
-	prcmu_disable_wakeups();
+	/* This is what cpuidle wants */
+	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
+			     PRCMU_WAKEUP(ABB));
 
 	nmk_gpio_wakeups_resume();
 	ux500_suspend_dbg_remove_wake_on_uart();
