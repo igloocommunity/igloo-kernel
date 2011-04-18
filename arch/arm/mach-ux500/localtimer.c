@@ -33,6 +33,6 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
         evt->broadcast = smp_timer_broadcast;
 #endif
 
-	twd_timer_setup(evt);
+	twd_timer_setup_scalable(evt, 2500 * 1000, 2);
 	return 0;
 }
