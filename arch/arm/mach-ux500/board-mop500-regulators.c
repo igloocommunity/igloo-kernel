@@ -39,7 +39,7 @@ struct regulator_init_data tps61052_regulator = {
 
 static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
 	/* External displays, connector on board 2v5 power supply */
-	REGULATOR_SUPPLY("vaux12v5", "mcde.0"),
+	REGULATOR_SUPPLY("vaux12v5", "mcde_disp_generic.0"),
 	/* SFH7741 proximity sensor */
 	REGULATOR_SUPPLY("vcc", "gpio-keys.0"),
 	/* BH1780GLS ambient light sensor */
