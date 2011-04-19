@@ -12,7 +12,7 @@ menu "Display selection"
 
 config DISPLAY_GENERIC_PRIMARY
 	bool "Generic primary display support"
-	depends on (MACH_U8500_MOP || MACH_B5500)
+	depends on (MACH_U8500 || MACH_U5500)
 	default y
 
 choice
@@ -31,7 +31,7 @@ config DISPLAY_GENERIC_DSI_PRIMARY
 config MCDE_DISPLAY_DPI_PRIMARY
 	bool "DPI display"
 	select MCDE_DISPLAY_DPI
-	depends on MACH_8500_MOP
+	depends on MACH_U8500
 	help
 	  Say yes here when using a DPI display
 
