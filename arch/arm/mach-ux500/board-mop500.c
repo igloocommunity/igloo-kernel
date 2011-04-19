@@ -19,6 +19,7 @@
 #include <linux/amba/pl022.h>
 #include <linux/amba/serial.h>
 #include <linux/spi/spi.h>
+#include <linux/hsi/hsi.h>
 #include <linux/mfd/ab8500.h>
 #include <linux/regulator/ab8500.h>
 #include <linux/mfd/tc3589x.h>
@@ -513,6 +514,62 @@ static struct platform_device ux500_backlight_device[] = {
 };
 #endif
 
+#ifdef CONFIG_HSI
+static struct hsi_board_info __initdata u8500_hsi_devices[] = {
+	{
+		.name = "hsi_char",
+		.hsi_id = 0,
+		.port = 0,
+		.tx_cfg = {
+			.mode = HSI_MODE_STREAM,
+			.channels = 2,
+			.speed = 100000,
+			{.arb_mode = HSI_ARB_RR},
+		},
+		.rx_cfg = {
+			.mode = HSI_MODE_STREAM,
+			.channels = 2,
+			.speed = 200000,
+			{.flow = HSI_FLOW_SYNC},
+		},
+	},
+	{
+		.name = "hsi_test",
+		.hsi_id = 0,
+		.port = 0,
+		.tx_cfg = {
+			.mode = HSI_MODE_FRAME,
+			.channels = 2,
+			.speed = 100000,
+			{.arb_mode = HSI_ARB_RR},
+		},
+		.rx_cfg = {
+			.mode = HSI_MODE_FRAME,
+			.channels = 2,
+			.speed = 200000,
+			{.flow = HSI_FLOW_SYNC},
+		},
+	},
+	{
+		.name = "cfhsi_v3_driver",
+		.hsi_id = 0,
+		.port = 0,
+		.tx_cfg = {
+			.mode = HSI_MODE_STREAM,
+			.channels = 2,
+			.speed = 20000,
+			{.arb_mode = HSI_ARB_RR},
+		},
+		.rx_cfg = {
+			.mode = HSI_MODE_STREAM,
+			.channels = 2,
+			.speed = 200000,
+			{.flow = HSI_FLOW_SYNC},
+		},
+	},
+};
+#endif
+
 /* add any platform devices here - TODO */
 static struct platform_device *mop500_platform_devs[] __initdata = {
 	&u8500_shrm_device,
@@ -538,6 +595,9 @@ static struct platform_device *mop500_platform_devs[] __initdata = {
 #endif
 #ifdef CONFIG_DB8500_MLOADER
 	&mloader_fw_device,
+#endif
+#ifdef CONFIG_HSI
+	&u8500_hsi_device,
 #endif
 };
 
@@ -765,6 +825,11 @@ static void __init mop500_init_machine(void)
 	u8500_init_devices();
 
 	mop500_pins_init();
+
+#ifdef CONFIG_HSI
+	hsi_register_board_info(u8500_hsi_devices,
+				ARRAY_SIZE(u8500_hsi_devices));
+#endif
 
 	if (machine_is_snowball())
 		platform_add_devices(snowball_platform_devs,
