@@ -549,6 +549,12 @@ static DEF_PER_CLK(p2_sdi3_clk, &p2_pclk7, &p2_sdi3_kclk);
 static DEF_PER2_KCLK(6, p2_sdi3_ed_kclk, &sdmmcclk);
 static DEF_PER_CLK(p2_sdi3_ed_clk, &p2_pclk8, &p2_sdi3_ed_kclk);
 
+/* HSIR */
+static DEF_PER2_KCLK(6, p2_ssirx_kclk, &hsirxclk);
+
+/* HSIT */
+static DEF_PER2_KCLK(7, p2_ssitx_kclk, &hsitxclk);
+
 /* SSP0 */
 static DEF_PER3_KCLK(1, p3_ssp0_kclk, &sspclk);
 static DEF_PER_CLK(p3_ssp0_clk, &p3_pclk1, &p3_ssp0_kclk);
@@ -932,6 +938,8 @@ static struct clk_lookup u8500_common_prcmu_clocks[] = {
 	CLK_LOOKUP(per7clk, "PERIPH7", NULL),
 	CLK_LOOKUP(lcdclk, "lcd", NULL),
 	CLK_LOOKUP(bmlclk, "bml", NULL),
+	CLK_LOOKUP(p2_ssitx_kclk, "ste_hsi.0", "hsit_hsitxclk"),
+	CLK_LOOKUP(p2_ssirx_kclk, "ste_hsi.0", "hsir_hsirxclk"),
 	CLK_LOOKUP(lcdclk, "mcde", "lcd"),
 	CLK_LOOKUP(hdmiclk, "hdmi", NULL),
 	CLK_LOOKUP(hdmiclk, "mcde", "hdmi"),
@@ -1051,6 +1059,8 @@ static struct clk_lookup u8500_v1_v2_prcc_clocks[] = {
 	CLK_LOOKUP(p2_sdi1_clk, "sdi1", NULL),
 	CLK_LOOKUP(p2_sdi3_clk, "sdi3", NULL),
 	CLK_LOOKUP(p2_pclk8, "spi0", NULL),
+	CLK_LOOKUP(p2_pclk9, "ste_hsi.0", "hsir_hclk"),
+	CLK_LOOKUP(p2_pclk10, "ste_hsi.0", "hsit_hclk"),
 	CLK_LOOKUP(p2_pclk11, "gpio.6", NULL),
 	CLK_LOOKUP(p2_pclk11, "gpio.7", NULL),
 	CLK_LOOKUP(p2_pclk11, "gpioblock1", NULL),
