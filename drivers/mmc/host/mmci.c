@@ -1408,7 +1408,8 @@ static int __devinit mmci_probe(struct amba_device *dev,
 			goto err_gpio_cd;
 
 		ret = request_any_context_irq(gpio_to_irq(plat->gpio_cd),
-					      mmci_cd_irq, 0,
+					      mmci_cd_irq,
+				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 					      DRIVER_NAME " (cd)", host);
 		if (ret >= 0)
 			host->gpio_cd_irq = gpio_to_irq(plat->gpio_cd);
