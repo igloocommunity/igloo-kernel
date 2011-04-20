@@ -162,7 +162,7 @@ static struct cpufreq_driver u8500_cpufreq_driver = {
 
 static int __init u8500_cpufreq_register(void)
 {
-	if (ux500_is_svp())
+	if (cpu_is_u8500v1() || ux500_is_svp())
 		return -ENODEV;
 
 	pr_info("cpufreq for u8500 started\n");

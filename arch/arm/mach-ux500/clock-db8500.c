@@ -1211,9 +1211,6 @@ int __init db8500_clk_init(void)
 	if (cpu_is_u8500ed()) {
 		pr_err("clock: U8500 ED is no longer supported.\n");
 		return -ENOSYS;
-	} else if (cpu_is_u8500v1()) {
-		pr_err("clock: U8500 V1 is no longer supported.\n");
-		return -ENOSYS;
 	} else if (cpu_is_u5500()) {
 		per6clk.rate = 26000000;
 		uartclk.rate = 36360000;
@@ -1246,7 +1243,7 @@ int __init db8500_clk_init(void)
 	if (cpu_is_u5500()) {
 		clks_register(u8500_ed_prcc_clocks,
 			ARRAY_SIZE(u8500_ed_prcc_clocks));
-	} else if (cpu_is_u8500v2()) {
+	} else if (cpu_is_u8500v1() || cpu_is_u8500v2()) {
 		clks_register(u8500_v2_sysclks,
 			ARRAY_SIZE(u8500_v2_sysclks));
 		clks_register(u8500_v1_v2_prcmu_clocks,
