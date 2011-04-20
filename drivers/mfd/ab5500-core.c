@@ -1090,6 +1090,25 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			},
 		},
 	},
+	[AB5500_DEVID_ONSWA] = {
+		.name = "ab5500-onswa",
+		.id = AB5500_DEVID_ONSWA,
+		.num_resources = 2,
+		.resources = (struct resource[]) {
+			{
+				.name	= "ONSWAn_rising",
+				.flags	= IORESOURCE_IRQ,
+				.start	= AB5500_IRQ(1, 3),
+				.end	= AB5500_IRQ(1, 3),
+			},
+			{
+				.name	= "ONSWAn_falling",
+				.flags	= IORESOURCE_IRQ,
+				.start	= AB5500_IRQ(1, 4),
+				.end	= AB5500_IRQ(1, 4),
+			},
+		},
+	},
 };
 
 /*
