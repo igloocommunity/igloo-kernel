@@ -12,7 +12,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/err.h>
-#include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
@@ -58,7 +57,6 @@
 struct ab5500_regulator {
 	struct regulator_desc desc;
 	const int *voltages;
-	int voltages_len;
 	bool pwrctrl;
 	int enable_time;
 	u8 bank;
@@ -124,10 +122,11 @@ ab5500_regulator_list_voltage(struct regulator_dev *rdev, unsigned selector)
 {
 	struct ab5500_regulators *ab5500 = rdev_get_drvdata(rdev);
 	struct ab5500_regulator *r = ab5500->regulator[rdev_get_id(rdev)];
+	unsigned n_voltages = r->desc.n_voltages;
 	int selindex;
 	int i;
 
-	for (i = 0, selindex = 0; selindex < r->voltages_len; i++) {
+	for (i = 0, selindex = 0; selindex < n_voltages; i++) {
 		int voltage = r->voltages[i];
 
 		if (!voltage)
@@ -167,7 +166,7 @@ static int ab5500_regulator_get_voltage(struct regulator_dev *rdev)
 	}
 
 	regval &= AB5500_LDO_VOLT_MASK;
-	if (regval >= r->voltages_len || !r->voltages[regval])
+	if (regval >= r->desc.n_voltages || !r->voltages[regval])
 		return -EINVAL;
 
 	return r->voltages[regval];
@@ -176,6 +175,7 @@ static int ab5500_regulator_get_voltage(struct regulator_dev *rdev)
 static int ab5500_get_best_voltage_index(struct ab5500_regulator *r,
 					 int min_uV, int max_uV)
 {
+	unsigned n_voltages = r->desc.n_voltages;
 	int bestmatch = INT_MAX;
 	int bestindex = -EINVAL;
 	int selindex;
@@ -187,7 +187,7 @@ static int ab5500_get_best_voltage_index(struct ab5500_regulator *r,
 	 * in strict falling order so we need to check them
 	 * all for the best match.
 	 */
-	for (i = 0, selindex = 0; selindex < r->voltages_len; i++) {
+	for (i = 0, selindex = 0; selindex < n_voltages; i++) {
 		int voltage = r->voltages[i];
 
 		if (!voltage)
@@ -303,11 +303,11 @@ static struct ab5500_regulator ab5500_regulators[] = {
 			.ops	= &ab5500_regulator_variable_ops,
 			.type	= REGULATOR_VOLTAGE,
 			.owner	= THIS_MODULE,
+			.n_voltages = ARRAY_SIZE(ab5500_ldo_s_voltages),
 		},
 		.bank		= AB5500_BANK_STARTUP,
 		.reg		= AB5500_LDO_S_ST,
 		.voltages	= ab5500_ldo_s_voltages,
-		.voltages_len	= ARRAY_SIZE(ab5500_ldo_s_voltages),
 		.enable_time	= 400,
 		.pwrctrl	= true,
 	},
@@ -318,11 +318,11 @@ static struct ab5500_regulator ab5500_regulators[] = {
 			.ops	= &ab5500_regulator_fixed_ops,
 			.type	= REGULATOR_VOLTAGE,
 			.owner	= THIS_MODULE,
+			.n_voltages = ARRAY_SIZE(ab5500_ldo_d_voltages),
 		},
 		.bank		= AB5500_BANK_STARTUP,
 		.reg		= AB5500_LDO_D_ST,
 		.voltages	= ab5500_ldo_d_voltages,
-		.voltages_len	= ARRAY_SIZE(ab5500_ldo_d_voltages),
 		.enable_time	= 400,
 		.pwrctrl	= true,
 	},
@@ -333,11 +333,11 @@ static struct ab5500_regulator ab5500_regulators[] = {
 			.ops	= &ab5500_regulator_variable_ops,
 			.type	= REGULATOR_VOLTAGE,
 			.owner	= THIS_MODULE,
+			.n_voltages = ARRAY_SIZE(ab5500_ldo_lg_voltages) - 2,
 		},
 		.bank		= AB5500_BANK_STARTUP,
 		.reg		= AB5500_LDO_L_ST,
 		.voltages	= ab5500_ldo_lg_voltages,
-		.voltages_len	= ARRAY_SIZE(ab5500_ldo_lg_voltages) - 2,
 		.enable_time	= 400,
 	},
 	[AB5500_LDO_G] = {
@@ -347,11 +347,11 @@ static struct ab5500_regulator ab5500_regulators[] = {
 			.ops	= &ab5500_regulator_variable_ops,
 			.type	= REGULATOR_VOLTAGE,
 			.owner	= THIS_MODULE,
+			.n_voltages = ARRAY_SIZE(ab5500_ldo_lg_voltages) - 2,
 		},
 		.bank		= AB5500_BANK_STARTUP,
 		.reg		= AB5500_LDO_G_ST,
 		.voltages	= ab5500_ldo_lg_voltages,
-		.voltages_len	= ARRAY_SIZE(ab5500_ldo_lg_voltages) - 2,
 		.enable_time	= 400,
 	},
 	[AB5500_LDO_K] = {
@@ -361,11 +361,11 @@ static struct ab5500_regulator ab5500_regulators[] = {
 			.ops	= &ab5500_regulator_variable_ops,
 			.type	= REGULATOR_VOLTAGE,
 			.owner	= THIS_MODULE,
+			.n_voltages = ARRAY_SIZE(ab5500_ldo_kh_voltages),
 		},
 		.bank		= AB5500_BANK_STARTUP,
 		.reg		= AB5500_LDO_K_ST,
 		.voltages	= ab5500_ldo_kh_voltages,
-		.voltages_len	= ARRAY_SIZE(ab5500_ldo_kh_voltages),
 		.enable_time	= 400,
 	},
 	[AB5500_LDO_H] = {
@@ -375,11 +375,11 @@ static struct ab5500_regulator ab5500_regulators[] = {
 			.ops	= &ab5500_regulator_variable_ops,
 			.type	= REGULATOR_VOLTAGE,
 			.owner	= THIS_MODULE,
+			.n_voltages = ARRAY_SIZE(ab5500_ldo_kh_voltages),
 		},
 		.bank		= AB5500_BANK_STARTUP,
 		.reg		= AB5500_LDO_H_ST,
 		.voltages	= ab5500_ldo_kh_voltages,
-		.voltages_len	= ARRAY_SIZE(ab5500_ldo_kh_voltages),
 		.enable_time	= 400,
 	},
 	[AB5500_LDO_VDIGMIC] = {
@@ -389,11 +389,11 @@ static struct ab5500_regulator ab5500_regulators[] = {
 			.ops	= &ab5500_regulator_fixed_ops,
 			.type	= REGULATOR_VOLTAGE,
 			.owner	= THIS_MODULE,
+			.n_voltages = ARRAY_SIZE(ab5500_ldo_vdigmic_voltages),
 		},
 		.bank		= AB5500_BANK_STARTUP,
 		.reg		= AB5500_LDO_VDIGMIC_ST,
 		.voltages	= ab5500_ldo_vdigmic_voltages,
-		.voltages_len	= ARRAY_SIZE(ab5500_ldo_vdigmic_voltages),
 		.enable_time	= 450,
 	},
 	[AB5500_LDO_SIM] = {
@@ -403,11 +403,11 @@ static struct ab5500_regulator ab5500_regulators[] = {
 			.ops	= &ab5500_regulator_variable_ops,
 			.type	= REGULATOR_VOLTAGE,
 			.owner	= THIS_MODULE,
+			.n_voltages = ARRAY_SIZE(ab5500_ldo_sim_voltages),
 		},
 		.bank		= AB5500_BANK_SIM_USBSIM,
 		.reg		= AB5500_SIM_SUP,
 		.voltages	= ab5500_ldo_sim_voltages,
-		.voltages_len	= ARRAY_SIZE(ab5500_ldo_sim_voltages),
 		.enable_time	= 1000,
 	},
 };
