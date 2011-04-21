@@ -127,7 +127,7 @@ config U5500_MODEM_IRQ
 
 config TEE_UX500
 	bool "Trusted Execution Environment (TEE) ux500 hardware support"
-	depends on (TEE_SUPPORT && MACH_U8500_MOP)
+	depends on (TEE_SUPPORT && MACH_U8500)
 	default y
 	help
 	  Adds TEE hardware support for ux500 platforms.
