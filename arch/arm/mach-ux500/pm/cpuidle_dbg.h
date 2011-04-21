@@ -37,7 +37,7 @@ static inline void ux500_ci_dbg_remove(void) { }
 
 static inline void ux500_ci_dbg_log(enum ci_pwrst pstate,
 				    ktime_t enter_time) { }
-static void ux500_ci_dbg_wake_leave(enum ci_pwrst pstate, ktime_t t) { }
+static inline void ux500_ci_dbg_wake_leave(enum ci_pwrst pstate, ktime_t t) { }
 
 static inline bool ux500_ci_dbg_force_ape_on(void)
 {
