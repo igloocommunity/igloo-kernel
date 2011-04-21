@@ -204,38 +204,69 @@ static void dbg_cpuidle_work_function(struct work_struct *work)
 	force_APE_on = false;
 }
 
+static void store_latency(u32 *count,
+			  ktime_t d,
+			  ktime_t *sum,
+			  ktime_t *min,
+			  ktime_t *max,
+			  bool lock)
+{
+	unsigned long flags;
+
+	if (lock)
+		spin_lock_irqsave(&dbg_lock, flags);
+
+	(*count)++;
+	(*sum) = ktime_add((*sum), d);
+
+	if (ktime_to_us(d) > ktime_to_us(*max))
+		(*max) = d;
+
+	if (ktime_to_us(d) < ktime_to_us((*min)))
+		(*min) = d;
+
+	if (lock)
+		spin_unlock_irqrestore(&dbg_lock, flags);
+}
+
+void ux500_ci_dbg_wake_leave(enum ci_pwrst pstate, ktime_t t)
+{
+	struct state_history *sh;
+
+	if (pstate < CI_IDLE || !measure_latency)
+		return;
+
+	sh = per_cpu(state_history, smp_processor_id());
+
+	store_latency(&sh->states[pstate].exit_latency_count,
+		      ktime_sub(ktime_get(), t),
+		      &sh->states[pstate].exit_latency_sum,
+		      &sh->states[pstate].exit_latency_min,
+		      &sh->states[pstate].exit_latency_max,
+		      true);
+}
+
 static void state_record_time(struct state_history *sh, enum ci_pwrst pstate,
 			      ktime_t now, ktime_t start, bool latency)
 {
 	ktime_t dtime;
-	struct state_history_state *shs;
-
-	sh->state = pstate;
-
-	shs = &sh->states[sh->state];
 
 	dtime = ktime_sub(now, sh->start);
-	shs->time = ktime_add(shs->time, dtime);
+	sh->states[sh->state].time = ktime_add(sh->states[sh->state].time,
+					       dtime);
 
 	sh->start = now;
+	sh->state = pstate;
 
-	if (latency && pstate != CI_RUNNING && measure_latency) {
-		ktime_t this = ktime_sub(now, start);
-		shs->enter_latency_count++;
-		shs->enter_latency_sum =
-			ktime_add(shs->enter_latency_sum,
-				  this);
+	if (latency && pstate != CI_RUNNING && measure_latency)
+		store_latency(&sh->states[sh->state].enter_latency_count,
+			      ktime_sub(now, start),
+			      &sh->states[sh->state].enter_latency_sum,
+			      &sh->states[sh->state].enter_latency_min,
+			      &sh->states[sh->state].enter_latency_max,
+			      false);
 
-		if (ktime_to_us(this) >
-		    ktime_to_us(shs->enter_latency_max))
-			shs->enter_latency_max = this;
-
-		if (ktime_to_us(this) <
-		    ktime_to_us(shs->enter_latency_min))
-			shs->enter_latency_min = this;
-	}
-
-	shs->counter++;
+	sh->states[sh->state].counter++;
 }
 
 void ux500_ci_dbg_log(enum ci_pwrst pstate, ktime_t enter_time)
@@ -300,52 +331,6 @@ void ux500_ci_dbg_log(enum ci_pwrst pstate, ktime_t enter_time)
 done:
 	spin_unlock_irqrestore(&dbg_lock, flags);
 }
-extern void __iomem *rtc_base;
-#define RTC_TDR		0x20
-
-#define TICKS_PER_NS (1000000000/32768)
-
-static void wake_up_latency(u32 *count,
-			    ktime_t d,
-			    ktime_t *sum,
-			    ktime_t *min,
-			    ktime_t *max)
-{
-	unsigned long flags;
-
-
-	spin_lock_irqsave(&dbg_lock, flags);
-
-	(*count)++;
-	(*sum) = ktime_add((*sum), d);
-
-	if (ktime_to_us(d) > ktime_to_us(*max))
-		(*max) = d;
-
-	if (ktime_to_us(d) < ktime_to_us((*min)))
-		(*min) = d;
-
-	spin_unlock_irqrestore(&dbg_lock, flags);
-}
-
-void ux500_ci_dbg_wake_leave(enum ci_pwrst pstate, ktime_t t)
-{
-	struct state_history *sh;
-	ktime_t d;
-
-	if (pstate < CI_IDLE || !measure_latency)
-		return;
-
-	d = ktime_sub(ktime_get(), t);
-
-	sh = per_cpu(state_history, smp_processor_id());
-
-	wake_up_latency(&sh->states[pstate].exit_latency_count,
-			d,
-			&sh->states[pstate].exit_latency_sum,
-			&sh->states[pstate].exit_latency_min,
-			&sh->states[pstate].exit_latency_max);
-}
 
 static void state_history_reset(void)
 {
@@ -373,7 +358,6 @@ static void state_history_reset(void)
 								   10000000);
 			sh->states[i].exit_latency_max = ktime_set(0, 0);
 			sh->states[i].exit_latency_sum = ktime_set(0, 0);
-
 		}
 
 		for (i = 0; i <= cstates_len; i++)
