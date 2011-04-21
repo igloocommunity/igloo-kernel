@@ -13,6 +13,11 @@
 #include <linux/regulator/ab8500.h>
 #include "board-mop500-regulators.h"
 
+#ifdef CONFIG_U8500_REGULATOR_DEBUG
+#define REGULATOR_SUPPLY_DEBUG	 REGULATOR_SUPPLY
+#else
+#define REGULATOR_SUPPLY_DEBUG(_name, _dev_name)
+#endif
 /*
  * TPS61052 regulator
  */
@@ -55,6 +60,7 @@ static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
 	REGULATOR_SUPPLY("vdd", "3-004b"),
 	/* L3G4200D Gyroscope device */
 	REGULATOR_SUPPLY("vdd", "l3g4200d"),
+	REGULATOR_SUPPLY_DEBUG("aux1", "reg-virt-consumer.0")
 };
 
 static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
@@ -62,18 +68,13 @@ static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
 	REGULATOR_SUPPLY("vmmc", "sdi4"),
 	/* AB8500 audio codec */
 	REGULATOR_SUPPLY("vcc-N2158", "ab8500-codec.0"),
+	REGULATOR_SUPPLY_DEBUG("aux2", "reg-virt-consumer.1")
 };
 
 static struct regulator_consumer_supply ab8500_vaux3_consumers[] = {
 	/* External MMC slot power */
 	REGULATOR_SUPPLY("vmmc", "sdi0"),
-};
-
-static struct regulator_consumer_supply ab8500_vtvout_consumers[] = {
-	/* TV-out DENC supply */
-	REGULATOR_SUPPLY("vtvout", "ab8500-denc.0"),
-	/* Internal general-purpose ADC */
-	REGULATOR_SUPPLY("vddadc", "ab8500-gpadc.0"),
+	REGULATOR_SUPPLY_DEBUG("aux3", "reg-virt-consumer.2")
 };
 
 static struct regulator_consumer_supply ab8500_vintcore_consumers[] = {
@@ -81,6 +82,39 @@ static struct regulator_consumer_supply ab8500_vintcore_consumers[] = {
 	REGULATOR_SUPPLY("v-intcore", NULL),
 	/* USB Transciever */
 	REGULATOR_SUPPLY("vddulpivio18", "ab8500-usb.0"),
+	REGULATOR_SUPPLY_DEBUG("intcore", "reg-virt-consumer.3")
+};
+
+static struct regulator_consumer_supply ab8500_vtvout_consumers[] = {
+	/* TV-out DENC supply */
+	REGULATOR_SUPPLY("vtvout", "ab8500-denc.0"),
+	/* Internal general-purpose ADC */
+	REGULATOR_SUPPLY("vddadc", "ab8500-gpadc.0"),
+	REGULATOR_SUPPLY_DEBUG("tvout", "reg-virt-consumer.4")
+};
+
+static struct regulator_consumer_supply ab8500_vaudio_consumers[] = {
+	/* vaudio regulator, supply for ab8500-vaudio */
+	REGULATOR_SUPPLY("v-audio", NULL),
+	REGULATOR_SUPPLY_DEBUG("audio", "reg-virt-consumer.6")
+};
+
+static struct regulator_consumer_supply ab8500_vamic1_consumers[] = {
+	/* vamic1 regulator */
+	REGULATOR_SUPPLY("v-amic1", NULL),
+	REGULATOR_SUPPLY_DEBUG("anamic1", "reg-virt-consumer.7")
+};
+
+static struct regulator_consumer_supply ab8500_vamic2_consumers[] = {
+	/* vamic2 regulator */
+	REGULATOR_SUPPLY("v-amic2", NULL),
+	REGULATOR_SUPPLY_DEBUG("anamic2", "reg-virt-consumer.8")
+};
+
+static struct regulator_consumer_supply ab8500_vdmic_consumers[] = {
+	/* supply for v-dmic, VDMIC LDO */
+	REGULATOR_SUPPLY("v-dmic", NULL),
+	REGULATOR_SUPPLY_DEBUG("dmic", "reg-virt-consumer.9")
 };
 
 static struct regulator_consumer_supply ab8500_vana_consumers[] = {
@@ -90,26 +124,7 @@ static struct regulator_consumer_supply ab8500_vana_consumers[] = {
 	REGULATOR_SUPPLY("v-ana", "mcde"),
 	/* camera supply */
 	REGULATOR_SUPPLY("v-ana", "mmio_camera"),
-};
-
-static struct regulator_consumer_supply ab8500_vaudio_consumers[] = {
-	/* vaudio regulator, supply for ab8500-vaudio */
-	REGULATOR_SUPPLY("v-audio", NULL),
-};
-
-static struct regulator_consumer_supply ab8500_vamic1_consumers[] = {
-	/* vamic1 regulator */
-	REGULATOR_SUPPLY("v-amic1", NULL),
-};
-
-static struct regulator_consumer_supply ab8500_vamic2_consumers[] = {
-	/* vamic2 regulator */
-	REGULATOR_SUPPLY("v-amic2", NULL),
-};
-
-static struct regulator_consumer_supply ab8500_vdmic_consumers[] = {
-	/* supply for v-dmic, VDMIC LDO */
-	REGULATOR_SUPPLY("v-dmic", NULL),
+	REGULATOR_SUPPLY_DEBUG("ana", "reg-virt-consumer.10")
 };
 
 /* ab8500 regulator register initialization */
