@@ -94,6 +94,12 @@ config UX500_DEBUG_UART
 	  Choose the UART on which kernel low-level debug messages should be
 	  output.
 
+config U8500_REGULATOR_DEBUG
+	bool "Regulator debug support"
+	depends on REGULATOR_VIRTUAL_CONSUMER
+	help
+	  Add support for U8500 regulator debug
+
 config U5500_MODEM_IRQ
 	bool "Modem IRQ support"
 	depends on UX500_SOC_DB5500
@@ -126,7 +132,6 @@ config DB8500_MLOADER
 	bool "Modem firmware upload/download support"
 	depends on UX500_SOC_DB8500
 	select DBX500_MLOADER
-	default n
 	help
 	  Adds Modem firmware upload/download support to DB8500.
 
