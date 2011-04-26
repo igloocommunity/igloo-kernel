@@ -7,6 +7,7 @@
 
 #include <linux/kernel.h>
 #include <linux/gpio.h>
+#include <linux/gpio/nomadik.h>
 #include <linux/amba/bus.h>
 #include <linux/amba/mmci.h>
 #include <linux/mmc/host.h>

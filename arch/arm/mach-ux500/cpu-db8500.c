@@ -14,7 +14,7 @@
 #include <linux/amba/bus.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
-#include <linux/gpio.h>
+#include <linux/gpio/nomadik.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/regulator/machine.h>
@@ -393,6 +393,9 @@ static void __init db8500_add_gpios(void)
 	struct nmk_gpio_platform_data pdata = {
 		/* No custom data yet */
 	};
+
+	if (cpu_is_u8500v2())
+		pdata.supports_sleepmode = true;
 
 	if (cpu_is_u8500v2())
 		pdata.supports_sleepmode = true;
