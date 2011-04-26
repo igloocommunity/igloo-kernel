@@ -23,9 +23,9 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/slab.h>
+#include <linux/gpio/nomadik.h>
 
 #include <asm/mach/irq.h>
-
 #include <plat/pincfg.h>
 #include <mach/hardware.h>
 #include <mach/gpio.h>
