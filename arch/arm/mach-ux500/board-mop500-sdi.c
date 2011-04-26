@@ -99,39 +99,7 @@ static struct mmci_platform_data mop500_sdi0_data = {
 #endif
 };
 
-static void sdi0_configure(void)
-{
-	int ret;
-
-	ret = gpio_request(sdi0_en, "level shifter enable");
-	if (!ret)
-		ret = gpio_request(sdi0_vsel,
-				   "level shifter 1v8-3v select");
-
-	if (ret) {
-		pr_warning("unable to config sdi0 gpios for level shifter.\n");
-		return;
-	}
-
-	/* Select the default 2.9V and enable level shifter */
-	gpio_direction_output(sdi0_vsel, 0);
-	gpio_direction_output(sdi0_en, 1);
-
-	/* Add the device, force v2 to subrevision 1 */
-	if (cpu_is_u8500v2())
-		db8500_add_sdi0(&mop500_sdi0_data, 0x10480180);
-	else
-		db8500_add_sdi0(&mop500_sdi0_data, 0);
-}
-
-void mop500_sdi_tc35892_init(void)
-{
-	mop500_sdi0_data.gpio_cd = GPIO_SDMMC_CD;
-	sdi0_en = GPIO_SDMMC_EN;
-	sdi0_vsel = GPIO_SDMMC_1V8_3V_SEL;
-	sdi0_configure();
-}
-
+#if defined(CONFIG_CW1200) || defined(CONFIG_CW1200_MODULE)
 /*
  * SDI1 (SDIO WLAN)
  */
@@ -175,6 +143,51 @@ static struct mmci_platform_data mop500_sdi1_data = {
 #endif
 #endif
 };
+#endif /* CONFIG_CW1200 */
+
+/* GPIO pins used by the sdi0 level shifter */
+static int sdi0_en = -1;
+static int sdi0_vsel = -1;
+
+static void sdi0_sdi1_configure(void)
+{
+	int ret;
+	u32 periphid = 0;
+
+	/* v2 has a new version of this block that need to be forced */
+	if (cpu_is_u8500v2())
+		periphid = 0x10480180;
+
+	ret = gpio_request(sdi0_en, "level shifter enable");
+	if (!ret)
+		ret = gpio_request(sdi0_vsel,
+				   "level shifter 1v8-3v select");
+
+	if (ret) {
+		pr_warning("unable to config sdi0 gpios for level shifter.\n");
+		return;
+	}
+
+	/* Select the default 2.9V and enable level shifter */
+	gpio_direction_output(sdi0_vsel, 0);
+	gpio_direction_output(sdi0_en, 1);
+
+	db8500_add_sdi0(&mop500_sdi0_data, periphid);
+
+#if defined(CONFIG_CW1200) || defined(CONFIG_CW1200_MODULE)
+	/* SDIO WLAN must be the last SDI device initialized
+	 * to wait CW1200 detection without blocking others SDI init */
+	db8500_add_sdi1(&mop500_sdi1_data, periphid);
+#endif
+}
+
+void mop500_sdi_tc35892_init(void)
+{
+	mop500_sdi0_data.gpio_cd = GPIO_SDMMC_CD;
+	sdi0_en = GPIO_SDMMC_EN;
+	sdi0_vsel = GPIO_SDMMC_1V8_3V_SEL;
+	sdi0_sdi1_configure();
+}
 
 /*
  * SDI 2 (POP eMMC, not on DB8500ed)
@@ -281,11 +294,11 @@ void __init mop500_sdi_init(void)
 			sdi0_en = SNOWBALL_SDMMC_EN_GPIO;
 			sdi0_vsel = SNOWBALL_SDMMC_1V8_3V_GPIO;
 		}
-		sdi0_configure();
+		sdi0_sdi1_configure();
 	}
 
 	/*
-	 * On boards with the TC35892 GPIO expander, sdi0 will finally
+	 * On boards with the TC35892 GPIO expander, sdi0 & sdi1 will finally
 	 * be added when the TC35892 initializes and calls
 	 * mop500_sdi_tc35892_init() above.
 	 */
