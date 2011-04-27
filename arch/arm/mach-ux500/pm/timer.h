@@ -12,8 +12,18 @@
 
 #include <linux/ktime.h>
 
+#ifdef CONFIG_U8500_CPUIDLE_DEBUG
 ktime_t u8500_rtc_exit_latency_get(void);
 void ux500_rtcrtt_measure_latency(bool enable);
+#else
+static inline ktime_t u8500_rtc_exit_latency_get(void)
+{
+	return ktime_set(0, 0);
+}
+static inline void ux500_rtcrtt_measure_latency(bool enable) { }
+
+#endif
+
 void ux500_rtcrtt_off(void);
 void ux500_rtcrtt_next(u32 time_us);
 
