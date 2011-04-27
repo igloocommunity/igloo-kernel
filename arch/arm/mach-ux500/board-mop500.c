@@ -660,7 +660,7 @@ static void __init mop500_spi_init(void)
 	db8500_add_msp2_spi(&mop500_msp2_spi_data);
 }
 
-#ifdef CONFIG_STE_DMA40
+#ifdef CONFIG_STE_DMA40_REMOVE
 static struct stedma40_chan_cfg uart0_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
 	.dir = STEDMA40_PERIPH_TO_MEM,
@@ -765,7 +765,7 @@ static void ux500_uart0_exit(void)
 }
 
 static struct amba_pl011_data uart0_plat = {
-#ifdef CONFIG_STE_DMA40
+#ifdef CONFIG_STE_DMA40_REMOVE
 	.dma_filter = stedma40_filter,
 	.dma_rx_param = &uart0_dma_cfg_rx,
 	.dma_tx_param = &uart0_dma_cfg_tx,
@@ -776,7 +776,7 @@ static struct amba_pl011_data uart0_plat = {
 };
 
 static struct amba_pl011_data uart1_plat = {
-#ifdef CONFIG_STE_DMA40
+#ifdef CONFIG_STE_DMA40_REMOVE
 	.dma_filter = stedma40_filter,
 	.dma_rx_param = &uart1_dma_cfg_rx,
 	.dma_tx_param = &uart1_dma_cfg_tx,
@@ -784,7 +784,7 @@ static struct amba_pl011_data uart1_plat = {
 };
 
 static struct amba_pl011_data uart2_plat = {
-#ifdef CONFIG_STE_DMA40
+#ifdef CONFIG_STE_DMA40_REMOVE
 	.dma_filter = stedma40_filter,
 	.dma_rx_param = &uart2_dma_cfg_rx,
 	.dma_tx_param = &uart2_dma_cfg_tx,
