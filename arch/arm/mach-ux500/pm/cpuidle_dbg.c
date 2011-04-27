@@ -26,6 +26,7 @@
 
 #include "cpuidle.h"
 #include "pm.h"
+#include "timer.h"
 
 #define DBG_BUF_SIZE 5000
 #define APE_ON_TIMER_INTERVAL 5 /* Seconds */
@@ -36,24 +37,28 @@
 #define UART011_MIS_RXIS (1 << 4) /* receive interrupt status */
 #define UART011_MIS 0x40 /* Masked interrupt status register */
 
+enum latency_type {
+	LATENCY_ENTER = 0,
+	LATENCY_EXIT,
+	LATENCY_WAKE,
+	NUM_LATENCY,
+};
+
 struct state_history_state {
 	u32 counter;
 	ktime_t time;
 
-	u32 enter_latency_count;
-	ktime_t enter_latency_sum;
-	ktime_t enter_latency_min;
-	ktime_t enter_latency_max;
-
-	u32 exit_latency_count;
-	ktime_t exit_latency_sum;
-	ktime_t exit_latency_min;
-	ktime_t exit_latency_max;
+	u32 latency_count[NUM_LATENCY];
+	ktime_t latency_sum[NUM_LATENCY];
+	ktime_t latency_min[NUM_LATENCY];
+	ktime_t latency_max[NUM_LATENCY];
 };
 
 struct state_history {
 	ktime_t start;
 	u32 state;
+	u32 exit_counter;
+	ktime_t measure_begin;
 	struct state_history_state *states;
 };
 static DEFINE_PER_CPU(struct state_history, *state_history);
@@ -68,6 +73,7 @@ static bool force_APE_on;
 static bool reset_timer;
 static int deepest_allowed_state = CONFIG_U8500_CPUIDLE_DEEPEST_STATE;
 static u32 measure_latency;
+static bool wake_latency;
 
 static struct cstate *cstates;
 static int cstates_len;
@@ -204,11 +210,10 @@ static void dbg_cpuidle_work_function(struct work_struct *work)
 	force_APE_on = false;
 }
 
-static void store_latency(u32 *count,
+static void store_latency(struct state_history *sh,
+			  int ctarget,
+			  enum latency_type type,
 			  ktime_t d,
-			  ktime_t *sum,
-			  ktime_t *min,
-			  ktime_t *max,
 			  bool lock)
 {
 	unsigned long flags;
@@ -216,37 +221,61 @@ static void store_latency(u32 *count,
 	if (lock)
 		spin_lock_irqsave(&dbg_lock, flags);
 
-	(*count)++;
-	(*sum) = ktime_add((*sum), d);
+	sh->states[ctarget].latency_count[type]++;
 
-	if (ktime_to_us(d) > ktime_to_us(*max))
-		(*max) = d;
+	sh->states[ctarget].latency_sum[type] =
+		ktime_add(sh->states[ctarget].latency_sum[type], d);
 
-	if (ktime_to_us(d) < ktime_to_us((*min)))
-		(*min) = d;
+	if (ktime_to_us(d) > ktime_to_us(sh->states[ctarget].latency_max[type]))
+		sh->states[ctarget].latency_max[type] = d;
+
+	if (ktime_to_us(d) < ktime_to_us(sh->states[ctarget].latency_min[type]))
+		sh->states[ctarget].latency_min[type] = d;
 
 	if (lock)
 		spin_unlock_irqrestore(&dbg_lock, flags);
 }
 
-void ux500_ci_dbg_wake_leave(enum ci_pwrst pstate, ktime_t t)
+void ux500_ci_dbg_exit_latency(int ctarget, ktime_t t)
 {
 	struct state_history *sh;
 
-	if (pstate < CI_IDLE || !measure_latency)
-		return;
-
 	sh = per_cpu(state_history, smp_processor_id());
 
-	store_latency(&sh->states[pstate].exit_latency_count,
+	sh->exit_counter++;
+
+	if (cstates[ctarget].state < CI_IDLE || !measure_latency)
+		return;
+
+	store_latency(sh,
+		      ctarget,
+		      LATENCY_EXIT,
 		      ktime_sub(ktime_get(), t),
-		      &sh->states[pstate].exit_latency_sum,
-		      &sh->states[pstate].exit_latency_min,
-		      &sh->states[pstate].exit_latency_max,
 		      true);
 }
 
-static void state_record_time(struct state_history *sh, enum ci_pwrst pstate,
+void ux500_ci_dbg_wake_latency(int ctarget)
+{
+	struct state_history *sh;
+	ktime_t l;
+	ktime_t zero_time;
+
+	if (!measure_latency || cstates[ctarget].state < CI_SLEEP)
+		return;
+
+	zero_time = ktime_set(0, 0);
+	sh = per_cpu(state_history, smp_processor_id());
+
+	l = u8500_rtc_exit_latency_get();
+	if (!ktime_equal(zero_time, l))
+		store_latency(sh,
+			      ctarget,
+			      LATENCY_WAKE,
+			      l,
+			      true);
+}
+
+static void state_record_time(struct state_history *sh, int ctarget,
 			      ktime_t now, ktime_t start, bool latency)
 {
 	ktime_t dtime;
@@ -256,20 +285,19 @@ static void state_record_time(struct state_history *sh, enum ci_pwrst pstate,
 					       dtime);
 
 	sh->start = now;
-	sh->state = pstate;
+	sh->state = ctarget;
 
-	if (latency && pstate != CI_RUNNING && measure_latency)
-		store_latency(&sh->states[sh->state].enter_latency_count,
+	if (latency && cstates[ctarget].state != CI_RUNNING && measure_latency)
+		store_latency(sh,
+			      ctarget,
+			      LATENCY_ENTER,
 			      ktime_sub(now, start),
-			      &sh->states[sh->state].enter_latency_sum,
-			      &sh->states[sh->state].enter_latency_min,
-			      &sh->states[sh->state].enter_latency_max,
 			      false);
 
 	sh->states[sh->state].counter++;
 }
 
-void ux500_ci_dbg_log(enum ci_pwrst pstate, ktime_t enter_time)
+void ux500_ci_dbg_log(int ctarget, ktime_t enter_time)
 {
 	int i;
 	ktime_t now;
@@ -291,10 +319,10 @@ void ux500_ci_dbg_log(enum ci_pwrst pstate, ktime_t enter_time)
 	 * Check if current state is just a repeat of
 	 *  the state we're already in, then just quit.
 	 */
-	if (pstate == sh->state)
+	if (ctarget == sh->state)
 		goto done;
 
-	state_record_time(sh, pstate, now, enter_time, true);
+	state_record_time(sh, ctarget, now, enter_time, true);
 
 	/*
 	 * Update other cpus, (this_cpu = A, other cpus = B) if:
@@ -317,7 +345,8 @@ void ux500_ci_dbg_log(enum ci_pwrst pstate, ktime_t enter_time)
 		if (sh_other->state == sh->state)
 			continue;
 
-		if (pstate == CI_RUNNING && sh_other->state != CI_WFI) {
+		if (cstates[ctarget].state == CI_RUNNING &&
+		    cstates[sh_other->state].state != CI_WFI) {
 			state_record_time(sh_other, CI_WFI, now,
 					  enter_time, false);
 			continue;
@@ -326,7 +355,7 @@ void ux500_ci_dbg_log(enum ci_pwrst pstate, ktime_t enter_time)
 		 * This cpu is something else than running or wfi, both must be
 		 * in the same state.
 		 */
-		state_record_time(sh_other, pstate, now, enter_time, true);
+		state_record_time(sh_other, ctarget, now, enter_time, true);
 	}
 done:
 	spin_unlock_irqrestore(&dbg_lock, flags);
@@ -336,7 +365,7 @@ static void state_history_reset(void)
 {
 	unsigned long flags;
 	unsigned int cpu;
-	int i;
+	int i, j;
 	struct state_history *sh;
 
 	spin_lock_irqsave(&dbg_lock, flags);
@@ -345,24 +374,22 @@ static void state_history_reset(void)
 		sh = per_cpu(state_history, cpu);
 		for (i = 0; i <= cstates_len; i++) {
 			sh->states[i].counter = 0;
+
 			sh->states[i].time = ktime_set(0, 0);
 
-			sh->states[i].enter_latency_count = 0;
-			sh->states[i].enter_latency_min = ktime_set(0,
-								    10000000);
-			sh->states[i].enter_latency_max = ktime_set(0, 0);
-			sh->states[i].enter_latency_sum = ktime_set(0, 0);
-
-			sh->states[i].exit_latency_count = 0;
-			sh->states[i].exit_latency_min = ktime_set(0,
-								   10000000);
-			sh->states[i].exit_latency_max = ktime_set(0, 0);
-			sh->states[i].exit_latency_sum = ktime_set(0, 0);
+			for (j = 0; j < NUM_LATENCY; j++) {
+				sh->states[i].latency_count[j] = 0;
+				sh->states[i].latency_min[j] = ktime_set(0,
+									 10000000);
+				sh->states[i].latency_max[j] = ktime_set(0, 0);
+				sh->states[i].latency_sum[j] = ktime_set(0, 0);
+			}
 		}
 
-		for (i = 0; i <= cstates_len; i++)
-			sh->start = ktime_get();
+		sh->start = ktime_get();
+		sh->measure_begin = sh->start;
 		sh->state = cstates_len; /* CI_RUNNING */
+		sh->exit_counter = 0;
 	}
 	spin_unlock_irqrestore(&dbg_lock, flags);
 }
@@ -410,10 +437,99 @@ static ssize_t stats_write(struct file *file,
 			   const char __user *user_buf,
 			   size_t count, loff_t *ppos)
 {
-
 	pr_info("\nreset\n");
 	state_history_reset();
 	return count;
+}
+
+static int wake_latency_read(struct seq_file *s, void *p)
+{
+	seq_printf(s, "%s\n", wake_latency ? "on" : "off");
+
+	return 0;
+}
+
+static ssize_t wake_latency_write(struct file *file,
+				     const char __user *user_buf,
+				     size_t count, loff_t *ppos)
+{
+	wake_latency = !wake_latency;
+	ux500_rtcrtt_measure_latency(wake_latency);
+	return count;
+}
+
+static void stats_disp_one(struct seq_file *s, struct state_history *sh,
+			   s64 total_us, int i)
+{
+	int j;
+	s64 avg[NUM_LATENCY];
+	s64 t_us;
+	s64 perc;
+	ktime_t init_time, zero_time;
+
+	init_time = ktime_set(0, 10000000);
+	zero_time = ktime_set(0, 0);
+
+	memset(&avg, 0, sizeof(s64) * NUM_LATENCY);
+
+	if (measure_latency) {
+		for (j = 0; j < NUM_LATENCY; j++)
+			avg[j] = ktime_to_us(sh->states[i].latency_sum[j]);
+	}
+
+	t_us = ktime_to_us(sh->states[i].time);
+	perc = ktime_to_us(sh->states[i].time);
+	do_div(t_us, 1000); /* to ms */
+	do_div(total_us, 100);
+	if (total_us)
+		do_div(perc, total_us);
+
+	if (measure_latency) {
+		for (j = 0; j < NUM_LATENCY; j++) {
+			if (sh->states[i].latency_count[j])
+				do_div(avg[j], sh->states[i].latency_count[j]);
+		}
+	}
+
+	seq_printf(s, "\n%d - %s: # %u in %d ms %d%%",
+		   i, cstates[i].desc,
+		   sh->states[i].counter,
+		   (u32) t_us, (u32)perc);
+	if (i == CI_RUNNING || !measure_latency)
+		return;
+
+	for (j = 0; j < NUM_LATENCY; j++) {
+
+		if (!ktime_equal(sh->states[i].latency_min[j], init_time)) {
+			seq_printf(s, "\n\t\t\t\t");
+			switch (j) {
+			case LATENCY_ENTER:
+				seq_printf(s, "enter: ");
+				break;
+			case LATENCY_EXIT:
+				seq_printf(s, "exit: ");
+				break;
+			case LATENCY_WAKE:
+				seq_printf(s, "wake: ");
+				break;
+			default:
+				seq_printf(s, "unknown!: ");
+				break;
+			}
+
+			if (ktime_equal(sh->states[i].latency_min[j],
+					zero_time))
+				seq_printf(s, "min < 30");
+			else
+				seq_printf(s, "min %lld",
+					   ktime_to_us(sh->states[i].latency_min[j]));
+
+			seq_printf(s, " avg %lld max %lld us, count: %d",
+				   avg[j],
+				   ktime_to_us(sh->states[i].latency_max[j]),
+				   sh->states[i].latency_count[j]);
+		}
+	}
 }
 
 static int stats_print(struct seq_file *s, void *p)
@@ -422,14 +538,8 @@ static int stats_print(struct seq_file *s, void *p)
 	int i;
 	unsigned long flags;
 	struct state_history *sh;
-	ktime_t total;
-	s64 t_us;
-	s64 perc;
-	s64 total_us;
-	ktime_t init_time, zero_time;
-
-	init_time = ktime_set(0, 10000000);
-	zero_time = ktime_set(0, 0);
+	ktime_t total, wall;
+	s64 total_us, total_s;
 
 	for_each_possible_cpu(cpu) {
 		sh = per_cpu(state_history, cpu);
@@ -441,64 +551,25 @@ static int stats_print(struct seq_file *s, void *p)
 		for (i = 0; i < cstates_len; i++)
 			total = ktime_add(total, sh->states[i].time);
 
-		total_us = ktime_to_us(total);
-		do_div(total_us, 100);
+		wall = ktime_sub(ktime_get(), sh->measure_begin);
 
-		for (i = 0; i < cstates_len; i++) {
-			s64 avg_enter = 0;
-			s64 avg_exit = 0;
-			if (measure_latency) {
-				avg_enter = ktime_to_us(sh->states[i].enter_latency_sum);
-				avg_exit = ktime_to_us(sh->states[i].exit_latency_sum);
-			}
+		total_us = ktime_to_us(wall);
+		total_s = ktime_to_ms(wall);
 
-			t_us = ktime_to_us(sh->states[i].time);
-			perc = ktime_to_us(sh->states[i].time);
-			do_div(t_us, 1000); /* to ms */
-			if (total_us)
-				do_div(perc, total_us);
-			if (sh->states[i].enter_latency_count && measure_latency)
-				do_div(avg_enter, sh->states[i].enter_latency_count);
+		do_div(total_s, 1000);
 
-			if (sh->states[i].exit_latency_count && measure_latency)
-				do_div(avg_exit, sh->states[i].exit_latency_count);
+		if (total_s)
+			seq_printf(s, "wake ups per s: %u.%u\n",
+				   sh->exit_counter / (int) total_s,
+				   (10 * sh->exit_counter / (int) total_s) -
+				   10*(sh->exit_counter / (int) total_s));
 
-			seq_printf(s, "\n%d - %s: # %u in %d ms %d%%",
-				   i, cstates[i].desc,
-				   sh->states[i].counter,
-				   (u32) t_us, (u32)perc);
-			if (i == CI_RUNNING)
-				continue;
+		seq_printf(s, "delta accounted vs wall clock: %lld us\n",
+			   ktime_to_us(ktime_sub(wall, total)));
 
-			if (!ktime_equal(sh->states[i].enter_latency_min,
-					 init_time) && measure_latency) {
-				if (ktime_equal(sh->states[i].enter_latency_min,
-						zero_time))
-					seq_printf(s, " (enter: min < 30");
-				else
-					seq_printf(s, " (enter: min %lld",
-						   ktime_to_us(sh->states[i].enter_latency_min));
+		for (i = 0; i < cstates_len; i++)
+			stats_disp_one(s, sh, total_us, i);
 
-				seq_printf(s, " avg %lld max %lld us)",
-					   avg_enter,
-					   ktime_to_us(sh->states[i].enter_latency_max));
-			}
-
-			if (!ktime_equal(sh->states[i].exit_latency_min,
-					 init_time) && measure_latency) {
-
-				if (ktime_equal(sh->states[i].exit_latency_min,
-						zero_time))
-					seq_printf(s, " (exit: min < 30");
-				else
-					seq_printf(s, " (exit: min %lld",
-						   ktime_to_us(sh->states[i].exit_latency_min));
-
-				seq_printf(s, " avg %lld max %lld us)",
-					   avg_exit,
-					   ktime_to_us(sh->states[i].exit_latency_max));
-			}
-		}
 		spin_unlock_irqrestore(&dbg_lock, flags);
 	}
 	seq_printf(s, "\n");
@@ -537,11 +608,16 @@ static int stats_open_file(struct inode *inode, struct file *file)
 	return single_open(file, stats_print, inode->i_private);
 }
 
-
 static int ap_family_open(struct inode *inode,
 			  struct file *file)
 {
 	return single_open(file, ap_family_show, inode->i_private);
+}
+
+static int wake_latency_open(struct inode *inode,
+			  struct file *file)
+{
+	return single_open(file, wake_latency_read, inode->i_private);
 }
 
 static const struct file_operations deepest_state_fops = {
@@ -564,6 +640,15 @@ static const struct file_operations stats_fops = {
 
 static const struct file_operations ap_family_fops = {
 	.open = ap_family_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations wake_latency_fops = {
+	.open = wake_latency_open,
+	.write = wake_latency_write,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = single_release,
@@ -596,6 +681,13 @@ static void setup_debugfs(void)
 	if (IS_ERR_OR_NULL(debugfs_create_bool("measure_latency",
 					       S_IWUGO | S_IRUGO, cpuidle_dir,
 					       &measure_latency)))
+		goto fail;
+
+
+	if (IS_ERR_OR_NULL(debugfs_create_file("wake_latency",
+					       S_IWUGO | S_IRUGO, cpuidle_dir,
+					       NULL,
+					       &wake_latency_fops)))
 		goto fail;
 
 	if (IS_ERR_OR_NULL(debugfs_create_file("ap_idle", S_IRUGO,

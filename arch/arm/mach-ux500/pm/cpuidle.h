@@ -40,8 +40,8 @@ enum ESRAM {
 };
 
 enum ci_pwrst {
-	CI_RUNNING = 0,
-	CI_WFI = 1,
+	CI_RUNNING = 0, /* Must be the same number as entry in cstates */
+	CI_WFI = 1, /* Must be the same number as entry in cstates */
 	CI_IDLE,
 	CI_SLEEP,
 	CI_DEEP_IDLE,
