@@ -30,20 +30,20 @@ config U8500_CPUIDLE_DEBUG
 
 config UX500_SUSPEND
 	bool "Suspend to mem and standby support"
-	depends on UX500_SOC_DB8500 && PM
+	depends on (UX500_SOC_DB8500 || UX500_SOC_DB5500) && PM
 	select UX500_CONTEXT
 	help
 	  Add support for suspend.
 
 config UX500_SUSPEND_STANDBY
 	bool "Suspend Standby goes to ApSleep"
-	depends on UX500_SUSPEND
+	depends on UX500_SUSPEND && UX500_SOC_DB8500
 	help
 	  If yes, echo standby > /sys/power/state puts the system into ApSleep.
 
 config UX500_SUSPEND_MEM
 	bool "Suspend Mem goes to ApDeepSleep"
-	depends on UX500_SUSPEND
+	depends on UX500_SUSPEND && UX500_SOC_DB8500
 	help
 	  If yes, echo mem > /sys/power/state puts the system into ApDeepSleep else
 	  it will do the same as echo standby > /sys/power/state.
