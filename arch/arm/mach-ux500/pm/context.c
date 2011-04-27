@@ -824,8 +824,11 @@ void context_save_to_sram_and_wfi(bool cleanL2cache)
 {
 	int cpu = smp_processor_id();
 
-	context_save_to_sram_and_wfi_internal(backup_sram_storage[cpu],
-					      cleanL2cache);
+	if (cpu_is_u8500())
+		context_save_to_sram_and_wfi_internal(backup_sram_storage[cpu],
+						      cleanL2cache);
+	else if (cpu_is_u5500())
+		__asm__ __volatile__("wfi\n" : : : "memory");
 }
 
 static int __init context_init(void)
