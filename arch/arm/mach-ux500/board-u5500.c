@@ -209,7 +209,10 @@ static const unsigned int u5500_keymap[] = {
 	KEY(4, 3, KEY_BACK),
 	KEY(5, 2, KEY_SEND),
 	KEY(5, 3, KEY_HOME),
+#ifndef CONFIG_INPUT_AB8500_PONKEY
+	/* AB5500 ONSWa is also hooked up to this key */
 	KEY(8, 0, KEY_END),
+#endif
 	KEY(8, 1, KEY_VOLUMEUP),
 	KEY(8, 2, KEY_VOLUMEDOWN),
 };
