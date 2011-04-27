@@ -28,6 +28,8 @@
 
 #include <mach/hardware.h>
 
+#include "cpuidle_dbg.h"
+
 #define RTC_IMSC	0x10
 #define RTC_MIS		0x18
 #define RTC_ICR		0x1C
@@ -71,6 +73,8 @@
 
 static void __iomem *rtc_base;
 static bool measure_latency;
+
+#ifdef CONFIG_U8500_CPUIDLE_DEBUG
 
 /*
  * The plan here is to be able to measure the ApSleep/ApDeepSleep exit latency
@@ -147,6 +151,7 @@ void ux500_rtcrtt_measure_latency(bool enable)
 	}
 	measure_latency = enable;
 }
+#endif
 
 void ux500_rtcrtt_off(void)
 {

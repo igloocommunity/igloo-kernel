@@ -548,6 +548,8 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 	context_save_to_sram_and_wfi(cstates[target].ARM == ARM_OFF);
 
+	ux500_ci_dbg_wake_latency(target);
+
 	t3 = ktime_get();
 
 	/* The PRCMU restores ARM PLL and recouples the GIC */
@@ -593,7 +595,7 @@ exit_fast:
 
 	ux500_ci_dbg_console_check_uart();
 	if (slept_well)
-		ux500_ci_dbg_wake_leave(target, t3);
+		ux500_ci_dbg_exit_latency(target, t3);
 
 	ux500_ci_dbg_log(CI_RUNNING, t2);
 
