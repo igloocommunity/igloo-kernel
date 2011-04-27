@@ -43,6 +43,7 @@ static bool sleep_is_blocked(void)
 
 static int suspend(bool do_deepsleep)
 {
+	int ret = 0;
 	u32 divps_rate;
 
 	if (sleep_is_blocked()) {
@@ -82,15 +83,14 @@ static int suspend(bool do_deepsleep)
 	divps_rate = ux500_pm_arm_on_ext_clk(false);
 
 	if (ux500_pm_gic_pending_interrupt()) {
-		prcmu_disable_wakeups();
-		nmk_gpio_wakeups_resume();
-		ux500_suspend_dbg_remove_wake_on_uart();
+		pr_info("suspend/resume: pending interrupt\n");
 
 		ux500_pm_arm_on_arm_pll(divps_rate);
 		/* Recouple GIC with the interrupt bus */
 		ux500_pm_gic_recouple();
-		pr_info("suspend/resume: pending interrupt\n");
-		return -EBUSY;
+		ret = -EBUSY;
+
+		goto exit;
 	}
 	ux500_pm_prcmu_set_ioforce(true);
 
@@ -134,6 +134,7 @@ static int suspend(bool do_deepsleep)
 	/* APE was turned off, restore IO ring */
 	ux500_pm_prcmu_set_ioforce(false);
 
+exit:
 	/* Restore gpio settings */
 	context_gpio_mux_safe_switch(true);
 	context_gpio_restore_mux();
@@ -149,7 +150,7 @@ static int suspend(bool do_deepsleep)
 
 	nmk_gpio_clocks_disable();
 
-	return 0;
+	return ret;
 }
 
 static int ux500_suspend_enter(suspend_state_t state)
