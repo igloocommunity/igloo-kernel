@@ -2,6 +2,7 @@
 # Makefile for multifunction miscellaneous devices
 #
 
+obj-$(CONFIG_AB5500_CORE)	+= ab5500-core.o
 88pm860x-objs			:= 88pm860x-core.o 88pm860x-i2c.o
 obj-$(CONFIG_MFD_88PM860X)	+= 88pm860x.o
 obj-$(CONFIG_MFD_SM501)		+= sm501.o
@@ -77,6 +78,7 @@ obj-$(CONFIG_AB3550_CORE)	+= ab3550-core.o
 obj-$(CONFIG_AB8500_CORE)	+= ab8500-core.o ab8500-sysctrl.o
 obj-$(CONFIG_AB8500_I2C_CORE)	+= ab8500-i2c.o
 obj-$(CONFIG_AB8500_DEBUG)	+= ab8500-debugfs.o
+obj-$(CONFIG_AB8500_DENC)	+= ab8500-denc.o
 obj-$(CONFIG_AB8500_GPADC)	+= ab8500-gpadc.o
 obj-$(CONFIG_MFD_TIMBERDALE)    += timberdale.o
 obj-$(CONFIG_PMIC_ADP5520)	+= adp5520.o
