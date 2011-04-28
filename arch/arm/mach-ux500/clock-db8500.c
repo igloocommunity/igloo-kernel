@@ -22,6 +22,7 @@
 #include <linux/workqueue.h>
 #include <linux/regulator/consumer.h>
 
+#include <asm/mach-types.h>
 #include <plat/pincfg.h>
 
 #include <mach/hardware.h>
@@ -1195,10 +1196,17 @@ static void u8500_amba_clk_enable(void)
 					       + 0x04));
 	writel(~0x0, __io_address(U8500_PER2_BASE + 0xF000 + 0x0C));
 
-	/* GPIO,UART2 are enabled for booting */
-	writel(0xBF, __io_address(U8500_PER3_BASE + 0xF000 + 0x04));
-	writel(~0x0 & ~(1 << 6), __io_address(U8500_PER3_BASE + 0xF000
-					      + 0x0C));
+	if(machine_is_snowball()){
+		/* Leave FSMC alone, it is needed for ethernet controller */
+		writel(0xFE, __io_address(U8500_PER3_BASE + 0xF000 + 0x04));
+		writel(~0x0 & ~(1 << 1), __io_address(U8500_PER3_BASE + 0xF000
+							      + 0x0C));
+	} else {
+		/* GPIO,UART2 are enabled for booting */
+		writel(0xBF, __io_address(U8500_PER3_BASE + 0xF000 + 0x04));
+		writel(~0x0 & ~(1 << 6), __io_address(U8500_PER3_BASE + 0xF000
+							      + 0x0C));
+	}
 
 	for (i = 0; i < ARRAY_SIZE(u8500_boot_clk); i++) {
 		boot_clks[i] = clk_get_sys(u8500_boot_clk[i], NULL);
