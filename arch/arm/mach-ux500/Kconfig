@@ -83,5 +83,13 @@ config TEE_SVP
 	help
 	  Adds TEE support for SVP in ux500 platforms.
 
+config DB8500_MLOADER
+	bool "Modem firmware upload/download support"
+	depends on UX500_SOC_DB8500
+	select DBX500_MLOADER
+	default n
+	help
+	  Adds Modem firmware upload/download support to DB8500.
+
 source "arch/arm/mach-ux500/pm/Kconfig"
 endif
