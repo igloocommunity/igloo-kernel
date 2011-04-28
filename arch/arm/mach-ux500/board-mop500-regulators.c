@@ -86,6 +86,30 @@ static struct regulator_consumer_supply ab8500_vintcore_consumers[] = {
 static struct regulator_consumer_supply ab8500_vana_consumers[] = {
 	/* External displays, connector on board, 1v8 power supply */
 	REGULATOR_SUPPLY("vsmps2", "mcde.0"),
+	/* for analogue part of displays */
+	REGULATOR_SUPPLY("v-ana", "mcde"),
+	/* camera supply */
+	REGULATOR_SUPPLY("v-ana", "mmio_camera"),
+};
+
+static struct regulator_consumer_supply ab8500_vaudio_consumers[] = {
+	/* vaudio regulator, supply for ab8500-vaudio */
+	REGULATOR_SUPPLY("v-audio", NULL),
+};
+
+static struct regulator_consumer_supply ab8500_vamic1_consumers[] = {
+	/* vamic1 regulator */
+	REGULATOR_SUPPLY("v-amic1", NULL),
+};
+
+static struct regulator_consumer_supply ab8500_vamic2_consumers[] = {
+	/* vamic2 regulator */
+	REGULATOR_SUPPLY("v-amic2", NULL),
+};
+
+static struct regulator_consumer_supply ab8500_vdmic_consumers[] = {
+	/* supply for v-dmic, VDMIC LDO */
+	REGULATOR_SUPPLY("v-dmic", NULL),
 };
 
 /* ab8500 regulator register initialization */
@@ -325,6 +349,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 			.name = "V-AUD",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vaudio_consumers),
+		.consumer_supplies = ab8500_vaudio_consumers,
 	},
 	/* supply for v-anamic1 VAMic1-LDO */
 	[AB8500_LDO_ANAMIC1] = {
@@ -332,6 +358,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 			.name = "V-AMIC1",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vamic1_consumers),
+		.consumer_supplies = ab8500_vamic1_consumers,
 	},
 	/* supply for v-amic2, VAMIC2 LDO, reuse constants for AMIC1 */
 	[AB8500_LDO_ANAMIC2] = {
@@ -339,6 +367,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 			.name = "V-AMIC2",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vamic2_consumers),
+		.consumer_supplies = ab8500_vamic2_consumers,
 	},
 	/* supply for v-dmic, VDMIC LDO */
 	[AB8500_LDO_DMIC] = {
@@ -346,6 +376,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 			.name = "V-DMIC",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vdmic_consumers),
+		.consumer_supplies = ab8500_vdmic_consumers,
 	},
 	/* supply for v-intcore12, VINTCORE12 LDO */
 	[AB8500_LDO_INTCORE] = {
