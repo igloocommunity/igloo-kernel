@@ -18,6 +18,7 @@
 #include <../../../drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h>
 #include <linux/input/matrix_keypad.h>
 #include <linux/lsm303dlh.h>
+#include <linux/leds-ab5500.h>
 
 #include <video/av8100.h>
 
@@ -92,6 +93,32 @@ static struct lm3530_platform_data u5500_als_platform_data = {
 	.als1_resistor_sel = LM3530_ALS_IMPD_2_27kOhm,
 	.als2_resistor_sel = LM3530_ALS_IMPD_2_27kOhm,
 	.brt_val = 0x7F,	/* Max brightness */
+};
+
+
+/* leds-ab5500 */
+static struct ab5500_hvleds_platform_data ab5500_hvleds_data = {
+	.hw_blink = false,
+	.leds = {
+		[0] = {
+			.name = "ab5500-hvled:channel-0:",
+			.led_id = 0,
+			.status = AB5500_LED_ON,
+			.max_current = 10, /* wrong value may damage h/w */
+		},
+		[1] = {
+			.name = "ab5500-hvled:channel-1:",
+			.led_id = 1,
+			.status = AB5500_LED_ON,
+			.max_current = 10, /* wrong value may damage h/w */
+		},
+		[2] {
+			.name = "ab5500-hvled:channel-2:",
+			.led_id = 2,
+			.status = AB5500_LED_ON,
+			.max_current = 10, /* wrong value may damage h/w */
+		},
+	},
 };
 
 /*
@@ -290,6 +317,8 @@ static struct ab5500_platform_data ab5500_plf_data = {
 	},
 	.pm_power_off	= true,
 	.regulator	= &u5500_ab5500_regulator_data,
+	.dev_data[AB5500_DEVID_LEDS] = &ab5500_hvleds_data,
+	.dev_data_sz[AB5500_DEVID_LEDS] = sizeof(ab5500_hvleds_data),
 };
 
 static struct platform_device u5500_ab5500_device = {
