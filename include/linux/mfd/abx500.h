@@ -31,8 +31,15 @@
 #define AB3100_R2B	0xc8
 #define AB3550_P1A	0x10
 #define AB5500_1_0	0x20
-#define AB5500_2_0	0x21
-#define AB5500_2_1	0x22
+#define AB5500_1_1	0x21
+#define AB5500_2_0	0x24
+
+/* AB8500 CIDs*/
+#define AB8500_CUTEARLY	0x00
+#define AB8500_CUT1P0	0x10
+#define AB8500_CUT1P1	0x11
+#define AB8500_CUT2P0	0x20
+#define AB8500_CUT3P0	0x30
 
 /* AB8500 CIDs*/
 #define AB8500_CUTEARLY	0x00
@@ -198,6 +205,51 @@ struct ab3550_platform_data {
 	unsigned int init_settings_sz;
 };
 
+enum ab5500_devid {
+	AB5500_DEVID_ADC,
+	AB5500_DEVID_LEDS,
+	AB5500_DEVID_POWER,
+	AB5500_DEVID_REGULATORS,
+	AB5500_DEVID_SIM,
+	AB5500_DEVID_RTC,
+	AB5500_DEVID_CHARGER,
+	AB5500_DEVID_FUELGAUGE,
+	AB5500_DEVID_VIBRATOR,
+	AB5500_DEVID_CODEC,
+	AB5500_DEVID_USB,
+	AB5500_DEVID_OTP,
+	AB5500_DEVID_VIDEO,
+	AB5500_DEVID_DBIECI,
+	AB5500_NUM_DEVICES,
+};
+
+enum ab5500_banks {
+	AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP = 0,
+	AB5500_BANK_VDDDIG_IO_I2C_CLK_TST = 1,
+	AB5500_BANK_VDENC = 2,
+	AB5500_BANK_SIM_USBSIM  = 3,
+	AB5500_BANK_LED = 4,
+	AB5500_BANK_ADC  = 5,
+	AB5500_BANK_RTC  = 6,
+	AB5500_BANK_STARTUP  = 7,
+	AB5500_BANK_DBI_ECI  = 8,
+	AB5500_BANK_CHG  = 9,
+	AB5500_BANK_FG_BATTCOM_ACC = 10,
+	AB5500_BANK_USB = 11,
+	AB5500_BANK_IT = 12,
+	AB5500_BANK_VIBRA = 13,
+	AB5500_BANK_AUDIO_HEADSETUSB = 14,
+	AB5500_NUM_BANKS = 15,
+};
+
+struct ab5500_platform_data {
+	struct {unsigned int base; unsigned int count; } irq;
+	void *dev_data[AB5500_NUM_DEVICES];
+	size_t dev_data_sz[AB5500_NUM_DEVICES];
+	struct abx500_init_settings *init_settings;
+	unsigned int init_settings_sz;
+};
+
 int abx500_set_register_interruptible(struct device *dev, u8 bank, u8 reg,
 	u8 value);
 int abx500_get_register_interruptible(struct device *dev, u8 bank, u8 reg,
@@ -235,6 +287,6 @@ struct abx500_ops {
 	int (*startup_irq_enabled) (struct device *, unsigned int);
 };
 
-int abx500_register_ops(struct device *core_dev, struct abx500_ops *ops);
+int abx500_register_ops(struct device *dev, struct abx500_ops *ops);
 void abx500_remove_ops(struct device *dev);
 #endif

@@ -281,6 +281,14 @@ config REGULATOR_DB8500_PRCMU
 	  This driver supports the voltage domain regulators controlled by the
 	  DB8500 PRCMU
 
+config REGULATOR_AB8500_DEBUG
+	bool "AB8500 regulator debug"
+	depends on REGULATOR_AB8500
+	help
+	  Say Y here to add debug functionality for ST-Ericsson
+	  ab8500 regulators. This is a module that exposes a
+	  number of settings and debug output in debugfs.
+
 config REGULATOR_TPS6586X
 	tristate "TI TPS6586X Power regulators"
 	depends on MFD_TPS6586X
