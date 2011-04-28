@@ -133,7 +133,7 @@ static void ab8500_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
 	struct ab8500_gpio *ab8500_gpio = to_ab8500_gpio(chip);
 	int ret;
 	/* Write the data */
-	ret = ab8500_gpio_set_bits(chip, AB8500_GPIO_OUT1_REG, offset, 1);
+	ret = ab8500_gpio_set_bits(chip, AB8500_GPIO_OUT1_REG, offset, val);
 	if (ret < 0)
 		dev_err(ab8500_gpio->dev, "%s write failed\n", __func__);
 }
@@ -493,6 +493,33 @@ static int __devexit ab8500_gpio_remove(struct platform_device *pdev)
 
 	return 0;
 }
+
+/*
+ * ab8500_gpio_configpulldown() - configure pull down
+ * Either the function is used to enable pull down (enable true)
+ * or to leave it dangling (enable false) or the function it used
+ * to enable pull up (enable true) or to leave it dangling (enable false)
+ * @pdev  :Platform device registered
+ * @gpio  :gpio number
+ * @enable:pull down enabled (True) or disabled (False)
+ */
+int ab8500_config_pull_up_or_down(struct platform_device *pdev,
+				unsigned gpio, bool enable)
+{
+	struct ab8500_gpio *ab8500_gpio = platform_get_drvdata(pdev);
+	u8 offset =  gpio - ab8500_gpio->chip.base;
+	u8 pos = offset % 8;
+	u8 val = enable ? 0 : 1;
+	u8 reg = AB8500_GPIO_PUD1_REG + (offset / 8);
+	int ret;
+
+	ret = abx500_mask_and_set_register_interruptible(ab8500_gpio->dev,
+				AB8500_MISC, reg, 1 << pos, val << pos);
+	if (ret < 0)
+		dev_err(&pdev->dev, "%s write failed\n", __func__);
+	return ret;
+}
+EXPORT_SYMBOL(ab8500_config_pull_up_or_down);
 
 static struct platform_driver ab8500_gpio_driver = {
 	.driver = {
