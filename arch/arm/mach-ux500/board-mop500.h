@@ -38,6 +38,10 @@
 /* GPIOs on the AB8500 mixed-signals circuit */
 #define MOP500_AB8500_GPIO(x)		(MOP500_EGPIO_END + (x))
 
+/* GPIOs on AB8500 */
+#define MOP500_EGPIO_END		MOP500_EGPIO(24)
+#define MOP500_AB8500_GPIO(x)		(MOP500_EGPIO_END + (x))
+
 struct i2c_board_info;
 
 extern void mop500_sdi_init(void);
