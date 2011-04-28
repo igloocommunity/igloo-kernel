@@ -2,6 +2,10 @@
 # Makefile for the linux kernel, U8500 machine.
 #
 
+ifeq ($(CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL), y)
+	CFLAGS_board-mop500-bm.o += -DAB8500_BATTERY_THERM_ON_BATCTRL
+endif
+
 obj-y				:= clock.o cpu.o devices.o devices-common.o \
 				   id.o usb.o
 obj-y				+= pm/
@@ -13,7 +17,8 @@ obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
 				board-mop500-regulators.o \
 				board-mop500-uib.o board-mop500-stuib.o \
 				board-mop500-u8500uib.o \
-				board-mop500-pins.o
+				board-mop500-pins.o \
+				board-mop500-msp.o board-mop500-bm.o
 obj-$(CONFIG_MACH_U5500)	+= board-u5500.o board-u5500-sdi.o
 obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
 obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
