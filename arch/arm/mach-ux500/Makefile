@@ -23,3 +23,4 @@ obj-$(CONFIG_U5500_MBOX)	+= mbox-db5500.o
 obj-$(CONFIG_TEE_UX500)	+= tee_ux500.o
 obj-$(CONFIG_TEE_SVP)		+= tee_service_svp.o
 obj-$(CONFIG_TEE_SVP)		+= tee_ta_start_modem_svp.o
+obj-$(CONFIG_DB8500_MLOADER) 	+= mloader-db8500.o

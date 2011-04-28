@@ -461,6 +461,20 @@ config ARM_CHARLCD
 	  line and the Linux version on the second line, but that's
 	  still useful.
 
+config STE_TRACE_MODEM
+	tristate "DB8500 trace Modem"
+	depends on ARCH_U8500
+	default n
+	help
+	 Select this option to enable modem tracing by APE
+
+config DBX500_MLOADER
+	tristate "Modem firmware loader for db8500"
+	default n
+	depends on UX500_SOC_DB8500 || UX500_SOC_DB5500
+	help
+	  Provides a user interface to load modem firmware on dbx500 SOCs
+
 config BMP085
 	tristate "BMP085 digital pressure sensor"
 	depends on I2C && SYSFS
