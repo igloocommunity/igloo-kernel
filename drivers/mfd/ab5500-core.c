@@ -126,486 +126,408 @@ struct ab5500_i2c_banks {
  */
 
 #define NO_RANGE {.count = 0, .range = NULL,}
-static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
-	[AB5500_BANK_LED] = {
-		.bankid = AB5500_BANK_LED,
-		.nranges = 1,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x0C,
-				.perm = AB5500_PERM_RW,
-			},
-			},
-	},
-	[AB5500_BANK_ADC] = {
-		.bankid = AB5500_BANK_ADC,
-		.nranges = 6,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x1F,
-				.last = 0x22,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0x23,
-				.last = 0x24,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x26,
-				.last = 0x2D,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0x2F,
-				.last = 0x34,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x37,
-				.last = 0x57,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x58,
-				.last = 0x58,
-				.perm = AB5500_PERM_RO,
-			},
-		},
-	},
-	[AB5500_BANK_RTC] = {
-		.bankid = AB5500_BANK_RTC,
-		.nranges = 2,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x04,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x06,
-				.last = 0x0C,
-				.perm = AB5500_PERM_RW,
-			},
-		},
-	},
-	[AB5500_BANK_STARTUP] = {
-		.bankid = AB5500_BANK_STARTUP,
-		.nranges = 12,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x01,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x1F,
-				.last = 0x1F,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x2E,
-				.last = 0x2E,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0x2F,
-				.last = 0x30,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x50,
-				.last = 0x51,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x60,
-				.last = 0x61,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x66,
-				.last = 0x8A,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x8C,
-				.last = 0x96,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0xAA,
-				.last = 0xB4,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0xB7,
-				.last = 0xBF,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0xC1,
-				.last = 0xCA,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0xD3,
-				.last = 0xE0,
-				.perm = AB5500_PERM_RW,
-			},
-		},
-	},
-	[AB5500_BANK_DBI_ECI] = {
-		.bankid = AB5500_BANK_DBI_ECI,
-		.nranges = 3,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x07,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x10,
-				.last = 0x10,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x13,
-				.last = 0x13,
-				.perm = AB5500_PERM_RW,
-			},
-		},
-	},
-	[AB5500_BANK_CHG] = {
-		.bankid = AB5500_BANK_CHG,
-		.nranges = 2,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x11,
-				.last = 0x11,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0x12,
-				.last = 0x1B,
-				.perm = AB5500_PERM_RW,
-			},
-		},
-	},
-	[AB5500_BANK_FG_BATTCOM_ACC] = {
-		.bankid = AB5500_BANK_FG_BATTCOM_ACC,
-		.nranges = 2,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x0B,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0x0C,
-				.last = 0x10,
-				.perm = AB5500_PERM_RW,
-			},
-		},
-	},
-	[AB5500_BANK_USB] = {
-		.bankid = AB5500_BANK_USB,
-		.nranges = 12,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x01,
-				.last = 0x01,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x80,
-				.last = 0x83,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x87,
-				.last = 0x8A,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x8B,
-				.last = 0x8B,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0x91,
-				.last = 0x92,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0x93,
-				.last = 0x93,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x94,
-				.last = 0x94,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0xA8,
-				.last = 0xB0,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0xB2,
-				.last = 0xB2,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0xB4,
-				.last = 0xBC,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0xBF,
-				.last = 0xBF,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0xC1,
-				.last = 0xC5,
-				.perm = AB5500_PERM_RO,
-			},
-		},
-	},
-	[AB5500_BANK_IT] = {
-		.bankid = AB5500_BANK_IT,
-		.nranges = 4,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x02,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0x20,
-				.last = 0x36,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0x40,
-				.last = 0x56,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0x60,
-				.last = 0x76,
-				.perm = AB5500_PERM_RO,
-			},
-		},
-	},
-	[AB5500_BANK_VDDDIG_IO_I2C_CLK_TST] = {
-		.bankid = AB5500_BANK_VDDDIG_IO_I2C_CLK_TST,
-		.nranges = 7,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x02,
-				.last = 0x02,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x12,
-				.last = 0x12,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x30,
-				.last = 0x34,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x40,
-				.last = 0x44,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x50,
-				.last = 0x54,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x60,
-				.last = 0x64,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x70,
-				.last = 0x74,
-				.perm = AB5500_PERM_RW,
-			},
-		},
-	},
-	[AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP] = {
-		.bankid = AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP,
-		.nranges = 13,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x01,
-				.last = 0x01,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x02,
-				.last = 0x02,
-				.perm = AB5500_PERM_RO,
-			},
-			{
-				.first = 0x0D,
-				.last = 0x0F,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x1C,
-				.last = 0x1C,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x1E,
-				.last = 0x1E,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x20,
-				.last = 0x21,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x25,
-				.last = 0x25,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x28,
-				.last = 0x2A,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x30,
-				.last = 0x33,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x40,
-				.last = 0x43,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x50,
-				.last = 0x53,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x60,
-				.last = 0x63,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0x70,
-				.last = 0x73,
-				.perm = AB5500_PERM_RW,
-			},
-		},
-	},
-	[AB5500_BANK_VIBRA] = {
-		.bankid = AB5500_BANK_VIBRA,
-		.nranges = 2,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x10,
-				.last = 0x13,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0xFE,
-				.last = 0xFE,
-				.perm = AB5500_PERM_RW,
-			},
-		},
-	},
-	[AB5500_BANK_AUDIO_HEADSETUSB] = {
-		.bankid = AB5500_BANK_AUDIO_HEADSETUSB,
-		.nranges = 2,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x48,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0xEB,
-				.last = 0xFB,
-				.perm = AB5500_PERM_RW,
-			},
-		},
-	},
-	[AB5500_BANK_SIM_USBSIM] = {
-		.bankid = AB5500_BANK_SIM_USBSIM,
-		.nranges = 1,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x13,
-				.last = 0x19,
-				.perm = AB5500_PERM_RW,
-			},
-		},
-	},
-};
-
-
 static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 	[AB5500_DEVID_USB] =  {
 		.nbanks = 1,
-		.bank = &ab5500_reg_ranges[AB5500_BANK_USB],
+		.bank = (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_USB,
+				.nranges = 12,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x01,
+						.last = 0x01,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x80,
+						.last = 0x83,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x87,
+						.last = 0x8A,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x8B,
+						.last = 0x8B,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0x91,
+						.last = 0x92,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0x93,
+						.last = 0x93,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x94,
+						.last = 0x94,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0xA8,
+						.last = 0xB0,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0xB2,
+						.last = 0xB2,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0xB4,
+						.last = 0xBC,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0xBF,
+						.last = 0xBF,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0xC1,
+						.last = 0xC5,
+						.perm = AB5500_PERM_RO,
+					},
+				},
+			},
+		},
 	},
 	[AB5500_DEVID_ADC] =  {
 		.nbanks = 1,
-		.bank = &ab5500_reg_ranges[AB5500_BANK_ADC],
+		.bank = (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_ADC,
+				.nranges = 6,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x1F,
+						.last = 0x22,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0x23,
+						.last = 0x24,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x26,
+						.last = 0x2D,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0x2F,
+						.last = 0x34,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x37,
+						.last = 0x57,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x58,
+						.last = 0x58,
+						.perm = AB5500_PERM_RO,
+					},
+				},
+			},
+		},
 	},
 	[AB5500_DEVID_LEDS] =  {
 		.nbanks = 1,
-		.bank = &ab5500_reg_ranges[AB5500_BANK_LED],
+		.bank = (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_LED,
+				.nranges = 1,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x00,
+						.last = 0x0C,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+		},
 	},
 	[AB5500_DEVID_VIDEO] =   {
 		.nbanks = 1,
-		.bank = &ab5500_reg_ranges[AB5500_BANK_VDENC],
+		.bank = (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_VDENC,
+				.nranges = 12,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x00,
+						.last = 0x08,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x09,
+						.last = 0x09,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0x0A,
+						.last = 0x12,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x15,
+						.last = 0x19,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x1B,
+						.last = 0x21,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x27,
+						.last = 0x2C,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x41,
+						.last = 0x41,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x45,
+						.last = 0x5B,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x5D,
+						.last = 0x5D,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x69,
+						.last = 0x69,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x6C,
+						.last = 0x6D,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x80,
+						.last = 0x81,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+		},
 	},
 	[AB5500_DEVID_REGULATORS] =   {
 		.nbanks = 2,
-		.bank =  (struct ab5500_i2c_ranges * []) {
-			&ab5500_reg_ranges[AB5500_BANK_STARTUP],
-			&ab5500_reg_ranges[AB5500_BANK_SIM_USBSIM],
+		.bank =  (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_STARTUP,
+				.nranges = 12,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x00,
+						.last = 0x01,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x1F,
+						.last = 0x1F,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x2E,
+						.last = 0x2E,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0x2F,
+						.last = 0x30,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x50,
+						.last = 0x51,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x60,
+						.last = 0x61,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x66,
+						.last = 0x8A,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x8C,
+						.last = 0x96,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xAA,
+						.last = 0xB4,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xB7,
+						.last = 0xBF,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xC1,
+						.last = 0xCA,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xD3,
+						.last = 0xE0,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+			{
+				.bankid = AB5500_BANK_SIM_USBSIM,
+				.nranges = 1,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x13,
+						.last = 0x19,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
 		},
 	},
 	[AB5500_DEVID_SIM] =   {
 		.nbanks = 1,
-		.bank = &ab5500_reg_ranges[AB5500_BANK_SIM_USBSIM],
+		.bank = (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_SIM_USBSIM,
+				.nranges = 1,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x13,
+						.last = 0x19,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+		},
 	},
 	[AB5500_DEVID_RTC] =   {
 		.nbanks = 1,
-		.bank = &ab5500_reg_ranges[AB5500_BANK_RTC],
+		.bank = (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_RTC,
+				.nranges = 2,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x00,
+						.last = 0x04,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x06,
+						.last = 0x0C,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+		},
 	},
 	[AB5500_DEVID_CHARGER] =   {
 		.nbanks = 1,
-		.bank = &ab5500_reg_ranges[AB5500_BANK_CHG],
+		.bank = (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_CHG,
+				.nranges = 2,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x11,
+						.last = 0x11,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0x12,
+						.last = 0x1B,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+		},
 	},
 	[AB5500_DEVID_FUELGAUGE] =   {
 		.nbanks = 1,
-		.bank = &ab5500_reg_ranges[AB5500_BANK_FG_BATTCOM_ACC],
+		.bank = (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_FG_BATTCOM_ACC,
+				.nranges = 2,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x00,
+						.last = 0x0B,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0x0C,
+						.last = 0x10,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+		},
 	},
 	[AB5500_DEVID_VIBRATOR] =   {
 		.nbanks = 1,
-		.bank = &ab5500_reg_ranges[AB5500_BANK_VIBRA],
+		.bank = (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_VIBRA,
+				.nranges = 2,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x10,
+						.last = 0x13,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xFE,
+						.last = 0xFE,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+		},
 	},
 	[AB5500_DEVID_CODEC] =   {
 		.nbanks = 1,
-		.bank = &ab5500_reg_ranges[AB5500_BANK_AUDIO_HEADSETUSB],
+		.bank = (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_AUDIO_HEADSETUSB,
+				.nranges = 2,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x00,
+						.last = 0x48,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xEB,
+						.last = 0xFB,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+		},
 	},
 };
 
@@ -623,7 +545,7 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 		.id = AB5500_DEVID_POWER,
 	},
 	[AB5500_DEVID_REGULATORS] = {
-		.name = "ab5500-regulators",
+		.name = "ab5500-regulator",
 		.id = AB5500_DEVID_REGULATORS,
 	},
 	[AB5500_DEVID_SIM] = {
@@ -1422,6 +1344,503 @@ static irqreturn_t ab5500_irq(int irq, void *data)
 }
 
 #ifdef CONFIG_DEBUG_FS
+static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
+	[AB5500_BANK_LED] = {
+		.bankid = AB5500_BANK_LED,
+		.nranges = 1,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x0C,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_ADC] = {
+		.bankid = AB5500_BANK_ADC,
+		.nranges = 6,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x1F,
+				.last = 0x22,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x23,
+				.last = 0x24,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x26,
+				.last = 0x2D,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x2F,
+				.last = 0x34,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x37,
+				.last = 0x57,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x58,
+				.last = 0x58,
+				.perm = AB5500_PERM_RO,
+			},
+		},
+	},
+	[AB5500_BANK_RTC] = {
+		.bankid = AB5500_BANK_RTC,
+		.nranges = 2,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x04,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x06,
+				.last = 0x0C,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_STARTUP] = {
+		.bankid = AB5500_BANK_STARTUP,
+		.nranges = 12,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x01,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x1F,
+				.last = 0x1F,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x2E,
+				.last = 0x2E,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x2F,
+				.last = 0x30,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x50,
+				.last = 0x51,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x60,
+				.last = 0x61,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x66,
+				.last = 0x8A,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x8C,
+				.last = 0x96,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xAA,
+				.last = 0xB4,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xB7,
+				.last = 0xBF,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xC1,
+				.last = 0xCA,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xD3,
+				.last = 0xE0,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_DBI_ECI] = {
+		.bankid = AB5500_BANK_DBI_ECI,
+		.nranges = 3,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x07,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x10,
+				.last = 0x10,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x13,
+				.last = 0x13,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_CHG] = {
+		.bankid = AB5500_BANK_CHG,
+		.nranges = 2,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x11,
+				.last = 0x11,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x12,
+				.last = 0x1B,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_FG_BATTCOM_ACC] = {
+		.bankid = AB5500_BANK_FG_BATTCOM_ACC,
+		.nranges = 2,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x0B,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x0C,
+				.last = 0x10,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_USB] = {
+		.bankid = AB5500_BANK_USB,
+		.nranges = 12,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x01,
+				.last = 0x01,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x80,
+				.last = 0x83,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x87,
+				.last = 0x8A,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x8B,
+				.last = 0x8B,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x91,
+				.last = 0x92,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x93,
+				.last = 0x93,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x94,
+				.last = 0x94,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0xA8,
+				.last = 0xB0,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0xB2,
+				.last = 0xB2,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0xB4,
+				.last = 0xBC,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0xBF,
+				.last = 0xBF,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0xC1,
+				.last = 0xC5,
+				.perm = AB5500_PERM_RO,
+			},
+		},
+	},
+	[AB5500_BANK_IT] = {
+		.bankid = AB5500_BANK_IT,
+		.nranges = 4,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x02,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x20,
+				.last = 0x36,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x40,
+				.last = 0x56,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x60,
+				.last = 0x76,
+				.perm = AB5500_PERM_RO,
+			},
+		},
+	},
+	[AB5500_BANK_VDDDIG_IO_I2C_CLK_TST] = {
+		.bankid = AB5500_BANK_VDDDIG_IO_I2C_CLK_TST,
+		.nranges = 7,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x02,
+				.last = 0x02,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x12,
+				.last = 0x12,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x30,
+				.last = 0x34,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x40,
+				.last = 0x44,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x50,
+				.last = 0x54,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x60,
+				.last = 0x64,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x70,
+				.last = 0x74,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP] = {
+		.bankid = AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP,
+		.nranges = 13,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x01,
+				.last = 0x01,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x02,
+				.last = 0x02,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x0D,
+				.last = 0x0F,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x1C,
+				.last = 0x1C,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x1E,
+				.last = 0x1E,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x20,
+				.last = 0x21,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x25,
+				.last = 0x25,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x28,
+				.last = 0x2A,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x30,
+				.last = 0x33,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x40,
+				.last = 0x43,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x50,
+				.last = 0x53,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x60,
+				.last = 0x63,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x70,
+				.last = 0x73,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_VIBRA] = {
+		.bankid = AB5500_BANK_VIBRA,
+		.nranges = 2,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x10,
+				.last = 0x13,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xFE,
+				.last = 0xFE,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_AUDIO_HEADSETUSB] = {
+		.bankid = AB5500_BANK_AUDIO_HEADSETUSB,
+		.nranges = 2,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x48,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xEB,
+				.last = 0xFB,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_SIM_USBSIM] = {
+		.bankid = AB5500_BANK_SIM_USBSIM,
+		.nranges = 1,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x13,
+				.last = 0x19,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_VDENC] = {
+		.bankid = AB5500_BANK_VDENC,
+		.nranges = 12,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x08,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x09,
+				.last = 0x09,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x0A,
+				.last = 0x12,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x15,
+				.last = 0x19,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x1B,
+				.last = 0x21,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x27,
+				.last = 0x2C,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x41,
+				.last = 0x41,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x45,
+				.last = 0x5B,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x5D,
+				.last = 0x5D,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x69,
+				.last = 0x69,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x6C,
+				.last = 0x6D,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x80,
+				.last = 0x81,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+};
 static int ab5500_registers_print(struct seq_file *s, void *p)
 {
 	struct ab5500 *ab = s->private;
