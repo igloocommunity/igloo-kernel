@@ -264,7 +264,6 @@ static void ab8500_irq_sync_unlock(struct irq_data *data)
 		reg = AB8500_IT_MASK1_REG + ab8500_irq_regoffset[i];
 		set_register_interruptible(ab8500, AB8500_INTERRUPT, reg, new);
 	}
-
 	mutex_unlock(&ab8500->irq_lock);
 }
 
@@ -325,7 +324,6 @@ static irqreturn_t ab8500_irq(int irq, void *dev)
 			value &= ~(1 << bit);
 		} while (value);
 	}
-
 	return IRQ_HANDLED;
 }
 
@@ -417,19 +415,7 @@ static struct resource ab8500_poweronkey_db_resources[] = {
 	},
 };
 
-static struct resource ab8500_bm_resources[] = {
-	{
-		.name = "MAIN_EXT_CH_NOT_OK",
-		.start = AB8500_INT_MAIN_EXT_CH_NOT_OK,
-		.end = AB8500_INT_MAIN_EXT_CH_NOT_OK,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "BATT_OVV",
-		.start = AB8500_INT_BATT_OVV,
-		.end = AB8500_INT_BATT_OVV,
-		.flags = IORESOURCE_IRQ,
-	},
+static struct resource ab8500_charger_resources[] = {
 	{
 		.name = "MAIN_CH_UNPLUG_DET",
 		.start = AB8500_INT_MAIN_CH_UNPLUG_DET,
@@ -443,27 +429,27 @@ static struct resource ab8500_bm_resources[] = {
 		.flags = IORESOURCE_IRQ,
 	},
 	{
-		.name = "VBUS_DET_F",
-		.start = AB8500_INT_VBUS_DET_F,
-		.end = AB8500_INT_VBUS_DET_F,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
 		.name = "VBUS_DET_R",
 		.start = AB8500_INT_VBUS_DET_R,
 		.end = AB8500_INT_VBUS_DET_R,
 		.flags = IORESOURCE_IRQ,
 	},
 	{
-		.name = "BAT_CTRL_INDB",
-		.start = AB8500_INT_BAT_CTRL_INDB,
-		.end = AB8500_INT_BAT_CTRL_INDB,
+		.name = "VBUS_DET_F",
+		.start = AB8500_INT_VBUS_DET_F,
+		.end = AB8500_INT_VBUS_DET_F,
 		.flags = IORESOURCE_IRQ,
 	},
 	{
-		.name = "CH_WD_EXP",
-		.start = AB8500_INT_CH_WD_EXP,
-		.end = AB8500_INT_CH_WD_EXP,
+		.name = "USB_LINK_STATUS",
+		.start = AB8500_INT_USB_LINK_STATUS,
+		.end = AB8500_INT_USB_LINK_STATUS,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "USB_CHARGE_DET_DONE",
+		.start = AB8500_INT_USB_CHG_DET_DONE,
+		.end = AB8500_INT_USB_CHG_DET_DONE,
 		.flags = IORESOURCE_IRQ,
 	},
 	{
@@ -473,21 +459,60 @@ static struct resource ab8500_bm_resources[] = {
 		.flags = IORESOURCE_IRQ,
 	},
 	{
-		.name = "NCONV_ACCU",
-		.start = AB8500_INT_CCN_CONV_ACC,
-		.end = AB8500_INT_CCN_CONV_ACC,
+		.name = "USB_CH_TH_PROT_R",
+		.start = AB8500_INT_USB_CH_TH_PROT_R,
+		.end = AB8500_INT_USB_CH_TH_PROT_R,
 		.flags = IORESOURCE_IRQ,
 	},
 	{
-		.name = "LOW_BAT_F",
-		.start = AB8500_INT_LOW_BAT_F,
-		.end = AB8500_INT_LOW_BAT_F,
+		.name = "USB_CH_TH_PROT_F",
+		.start = AB8500_INT_USB_CH_TH_PROT_F,
+		.end = AB8500_INT_USB_CH_TH_PROT_F,
 		.flags = IORESOURCE_IRQ,
 	},
 	{
-		.name = "LOW_BAT_R",
-		.start = AB8500_INT_LOW_BAT_R,
-		.end = AB8500_INT_LOW_BAT_R,
+		.name = "MAIN_EXT_CH_NOT_OK",
+		.start = AB8500_INT_MAIN_EXT_CH_NOT_OK,
+		.end = AB8500_INT_MAIN_EXT_CH_NOT_OK,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "MAIN_CH_TH_PROT_R",
+		.start = AB8500_INT_MAIN_CH_TH_PROT_R,
+		.end = AB8500_INT_MAIN_CH_TH_PROT_R,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "MAIN_CH_TH_PROT_F",
+		.start = AB8500_INT_MAIN_CH_TH_PROT_F,
+		.end = AB8500_INT_MAIN_CH_TH_PROT_F,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "USB_CHARGER_NOT_OKR",
+		.start = AB8500_INT_USB_CHARGER_NOT_OK,
+		.end = AB8500_INT_USB_CHARGER_NOT_OK,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "USB_CHARGER_NOT_OKF",
+		.start = AB8500_INT_USB_CHARGER_NOT_OKF,
+		.end = AB8500_INT_USB_CHARGER_NOT_OKF,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "CH_WD_EXP",
+		.start = AB8500_INT_CH_WD_EXP,
+		.end = AB8500_INT_CH_WD_EXP,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+static struct resource ab8500_btemp_resources[] = {
+	{
+		.name = "BAT_CTRL_INDB",
+		.start = AB8500_INT_BAT_CTRL_INDB,
+		.end = AB8500_INT_BAT_CTRL_INDB,
 		.flags = IORESOURCE_IRQ,
 	},
 	{
@@ -503,36 +528,47 @@ static struct resource ab8500_bm_resources[] = {
 		.flags = IORESOURCE_IRQ,
 	},
 	{
-		.name = "USB_CHARGER_NOT_OKR",
-		.start = AB8500_INT_USB_CHARGER_NOT_OK,
-		.end = AB8500_INT_USB_CHARGER_NOT_OK,
+		.name = "BTEMP_LOW_MEDIUM",
+		.start = AB8500_INT_BTEMP_LOW_MEDIUM,
+		.end = AB8500_INT_BTEMP_LOW_MEDIUM,
 		.flags = IORESOURCE_IRQ,
 	},
 	{
-		.name = "USB_CHARGE_DET_DONE",
-		.start = AB8500_INT_USB_CHG_DET_DONE,
-		.end = AB8500_INT_USB_CHG_DET_DONE,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "USB_CH_TH_PROT_R",
-		.start = AB8500_INT_USB_CH_TH_PROT_R,
-		.end = AB8500_INT_USB_CH_TH_PROT_R,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "MAIN_CH_TH_PROT_R",
-		.start = AB8500_INT_MAIN_CH_TH_PROT_R,
-		.end = AB8500_INT_MAIN_CH_TH_PROT_R,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "USB_CHARGER_NOT_OKF",
-		.start = AB8500_INT_USB_CHARGER_NOT_OKF,
-		.end = AB8500_INT_USB_CHARGER_NOT_OKF,
+		.name = "BTEMP_MEDIUM_HIGH",
+		.start = AB8500_INT_BTEMP_MEDIUM_HIGH,
+		.end = AB8500_INT_BTEMP_MEDIUM_HIGH,
 		.flags = IORESOURCE_IRQ,
 	},
 };
+
+static struct resource ab8500_fg_resources[] = {
+	{
+		.name = "NCONV_ACCU",
+		.start = AB8500_INT_CCN_CONV_ACC,
+		.end = AB8500_INT_CCN_CONV_ACC,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "BATT_OVV",
+		.start = AB8500_INT_BATT_OVV,
+		.end = AB8500_INT_BATT_OVV,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "LOW_BAT_F",
+		.start = AB8500_INT_LOW_BAT_F,
+		.end = AB8500_INT_LOW_BAT_F,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "LOW_BAT_R",
+		.start = AB8500_INT_LOW_BAT_R,
+		.end = AB8500_INT_LOW_BAT_R,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+static struct resource ab8500_chargalg_resources[] = {};
 
 static struct resource ab8500_debug_resources[] = {
 	{
@@ -580,6 +616,18 @@ static struct resource ab8500_usb_resources[] = {
 		.end = AB8500_INT_USB_LINK_STATUS,
 		.flags = IORESOURCE_IRQ,
 	},
+	{
+		.name = "USB_ADP_PROBE_PLUG",
+		.start = AB8500_INT_ADP_PROBE_PLUG,
+		.end = AB8500_INT_ADP_PROBE_PLUG,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "USB_ADP_PROBE_UNPLUG",
+		.start = AB8500_INT_ADP_PROBE_UNPLUG,
+		.end = AB8500_INT_ADP_PROBE_UNPLUG,
+		.flags = IORESOURCE_IRQ,
+	},
 };
 
 static struct resource ab8500_temp_resources[] = {
@@ -589,6 +637,45 @@ static struct resource ab8500_temp_resources[] = {
 		.end   = AB8500_INT_TEMP_WARM,
 		.flags = IORESOURCE_IRQ,
 	},
+};
+
+static struct resource ab8500_codec_resources[] = {
+	{
+		.name = "ACC_DETECT_1DB_F",
+		.start = AB8500_INT_ACC_DETECT_1DB_F,
+		.end = AB8500_INT_ACC_DETECT_1DB_F,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "ACC_DETECT_1DB_R",
+		.start = AB8500_INT_ACC_DETECT_1DB_R,
+		.end = AB8500_INT_ACC_DETECT_1DB_R,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "ACC_DETECT_22DB_F",
+		.start = AB8500_INT_ACC_DETECT_22DB_F,
+		.end = AB8500_INT_ACC_DETECT_22DB_F,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "ACC_DETECT_22DB_R",
+		.start = AB8500_INT_ACC_DETECT_22DB_R,
+		.end = AB8500_INT_ACC_DETECT_22DB_R,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "ACC_DETECT_21DB_F",
+		.start = AB8500_INT_ACC_DETECT_21DB_F,
+		.end = AB8500_INT_ACC_DETECT_21DB_F,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "ACC_DETECT_21DB_R",
+		.start = AB8500_INT_ACC_DETECT_21DB_R,
+		.end = AB8500_INT_ACC_DETECT_21DB_R,
+		.flags = IORESOURCE_IRQ,
+	}
 };
 
 static struct mfd_cell ab8500_devs[] = {
@@ -606,6 +693,9 @@ static struct mfd_cell ab8500_devs[] = {
 		.name = "ab8500-regulator",
 	},
 	{
+		.name = "ab8500-regulator-debug",
+	},
+	{
 		.name = "ab8500-gpio",
 		.num_resources = ARRAY_SIZE(ab8500_gpio_resources),
 		.resources = ab8500_gpio_resources,
@@ -621,11 +711,30 @@ static struct mfd_cell ab8500_devs[] = {
 		.resources = ab8500_rtc_resources,
 	},
 	{
-		.name = "ab8500-bm",
-		.num_resources = ARRAY_SIZE(ab8500_bm_resources),
-		.resources = ab8500_bm_resources,
+		.name = "ab8500-charger",
+		.num_resources = ARRAY_SIZE(ab8500_charger_resources),
+		.resources = ab8500_charger_resources,
 	},
-	{ .name = "ab8500-codec", },
+	{
+		.name = "ab8500-btemp",
+		.num_resources = ARRAY_SIZE(ab8500_btemp_resources),
+		.resources = ab8500_btemp_resources,
+	},
+	{
+		.name = "ab8500-fg",
+		.num_resources = ARRAY_SIZE(ab8500_fg_resources),
+		.resources = ab8500_fg_resources,
+	},
+	{
+		.name = "ab8500-chargalg",
+		.num_resources = ARRAY_SIZE(ab8500_chargalg_resources),
+		.resources = ab8500_chargalg_resources,
+	},
+	{
+		.name = "ab8500-codec",
+		.num_resources = ARRAY_SIZE(ab8500_codec_resources),
+		.resources = ab8500_codec_resources,
+	},
 	{
 		.name = "ab8500-usb",
 		.num_resources = ARRAY_SIZE(ab8500_usb_resources),
