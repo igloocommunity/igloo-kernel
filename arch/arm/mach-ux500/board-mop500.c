@@ -27,12 +27,14 @@
 #include <linux/mfd/ab8500/gpio.h>
 #include <linux/leds-lp5521.h>
 #include <linux/input.h>
+#include <linux/smsc911x.h>
 #include <linux/gpio_keys.h>
 #include <linux/mfd/ab8500/denc.h>
 #include <linux/spi/stm_msp.h>
 #include <linux/leds_pwm.h>
 #include <linux/pwm_backlight.h>
 
+#include <linux/leds.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
@@ -64,6 +66,26 @@ static struct ab8500_audio_platform_data ab8500_audio_plat_data = {
 	.ste_gpio_altf_exit = msp13_i2s_exit,
 };
 
+static struct gpio_led snowball_led_array[] = {
+	{
+		.name = "user_led",
+		.default_trigger = "none",
+		.gpio = 142,
+	},
+};
+
+static struct gpio_led_platform_data snowball_led_data = {
+	.leds = snowball_led_array,
+	.num_leds = ARRAY_SIZE(snowball_led_array),
+};
+
+static struct platform_device snowball_led_dev = {
+	.name = "leds-gpio",
+	.dev = {
+		.platform_data = &snowball_led_data,
+	},
+};
+
 static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
 	.gpio_base		= MOP500_AB8500_GPIO(0),
 	.irq_base		= MOP500_AB8500_VIR_GPIO_IRQ_BASE,
@@ -84,6 +106,97 @@ static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
 	 */
 	.config_reg		= {0x00, 0x1E, 0x80, 0x01,
 					0x7A, 0x00, 0x00},
+};
+
+static struct gpio_keys_button snowball_key_array[] = {
+	{
+		.gpio           = 32,
+		.type           = EV_KEY,
+		.code           = KEY_1,
+		.desc           = "userpb",
+		.active_low     = 1,
+		.debounce_interval = 50,
+		.wakeup         = 1,
+	},
+	{
+		.gpio           = 151,
+		.type           = EV_KEY,
+		.code           = KEY_2,
+		.desc           = "extkb1",
+		.active_low     = 1,
+		.debounce_interval = 50,
+		.wakeup         = 1,
+	},
+	{
+		.gpio           = 152,
+		.type           = EV_KEY,
+		.code           = KEY_3,
+		.desc           = "extkb2",
+		.active_low     = 1,
+		.debounce_interval = 50,
+		.wakeup         = 1,
+	},
+	{
+		.gpio           = 161,
+		.type           = EV_KEY,
+		.code           = KEY_4,
+		.desc           = "extkb3",
+		.active_low     = 1,
+		.debounce_interval = 50,
+		.wakeup         = 1,
+	},
+	{
+		.gpio           = 162,
+		.type           = EV_KEY,
+		.code           = KEY_5,
+		.desc           = "extkb4",
+		.active_low     = 1,
+		.debounce_interval = 50,
+		.wakeup         = 1,
+	},
+};
+
+static struct gpio_keys_platform_data snowball_key_data = {
+	.buttons        = snowball_key_array,
+	.nbuttons       = ARRAY_SIZE(snowball_key_array),
+};
+
+static struct platform_device snowball_key_dev = {
+	.name           = "gpio-keys",
+	.id             = -1,
+	.dev            = {
+		.platform_data  = &snowball_key_data,
+	}
+};
+
+static struct smsc911x_platform_config snowball_sbnet_cfg = {
+	.irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
+	.irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL,
+	.flags = SMSC911X_USE_16BIT | SMSC911X_FORCE_INTERNAL_PHY,
+	.shift = 1,
+};
+
+static struct resource sbnet_res[] = {
+	{
+		.name = "smsc911x-memory",
+		.start = (0x5000 << 16),
+		.end  =  (0x5000 << 16) + 0xffff,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.start = NOMADIK_GPIO_TO_IRQ(140),
+		.end = NOMADIK_GPIO_TO_IRQ(140),
+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
+	},
+};
+
+static struct platform_device snowball_sbnet_dev = {
+	.name           = "smsc911x",
+	.num_resources  = ARRAY_SIZE(sbnet_res),
+	.resource       = sbnet_res,
+	.dev            = {
+		.platform_data = &snowball_sbnet_cfg,
+	},
 };
 
 static struct ab8500_platform_data ab8500_platdata = {
@@ -358,7 +471,7 @@ static struct led_pwm pwm_leds_data[] = {
 #endif
 };
 
-static struct led_pwm_platform_data u8500_leds_data = {
+static struct led_pwm_platform_data mop500_leds_data = {
 #ifdef CONFIG_DISPLAY_GENERIC_DSI_SECONDARY
 	.num_leds = 2,
 #else
@@ -367,16 +480,16 @@ static struct led_pwm_platform_data u8500_leds_data = {
 	.leds = pwm_leds_data,
 };
 
-static struct platform_device ux500_leds_device = {
+static struct platform_device mop500_leds_device = {
 	.name = "leds_pwm",
 	.dev = {
-		.platform_data = &u8500_leds_data,
+		.platform_data = &mop500_leds_data,
 	},
 };
 #endif
 
 #ifdef CONFIG_BACKLIGHT_PWM
-static struct platform_pwm_backlight_data u8500_backlight_data[] = {
+static struct platform_pwm_backlight_data mop500_backlight_data[] = {
 	[0] = {
 	.pwm_id = 1,
 	.max_brightness = 255,
@@ -393,19 +506,19 @@ static struct platform_pwm_backlight_data u8500_backlight_data[] = {
 	},
 };
 
-static struct platform_device ux500_backlight_device[] = {
+static struct platform_device mop500_backlight_device[] = {
 	[0] = {
 		.name = "pwm-backlight",
 		.id = 0,
 		.dev = {
-			.platform_data = &u8500_backlight_data[0],
+			.platform_data = &mop500_backlight_data[0],
 		},
 	},
 	[1] = {
 		.name = "pwm-backlight",
 		.id = 1,
 		.dev = {
-			.platform_data = &u8500_backlight_data[1],
+			.platform_data = &mop500_backlight_data[1],
 		},
 	},
 };
@@ -468,7 +581,7 @@ static struct hsi_board_info __initdata u8500_hsi_devices[] = {
 #endif
 
 /* add any platform devices here - TODO */
-static struct platform_device *platform_devs[] __initdata = {
+static struct platform_device *mop500_platform_devs[] __initdata = {
 	&u8500_shrm_device,
 	&ux500_hwmem_device,
 	&u8500_mcde_device,
@@ -483,11 +596,11 @@ static struct platform_device *platform_devs[] __initdata = {
 	&ux500_cryp1_device,
 	&mop500_gpio_keys_device,
 #ifdef CONFIG_LEDS_PWM
-	&ux500_leds_device,
+	&mop500_leds_device,
 #endif
 #ifdef CONFIG_BACKLIGHT_PWM
-	&ux500_backlight_device[0],
-	&ux500_backlight_device[1],
+	&mop500_backlight_device[0],
+	&mop500_backlight_device[1],
 #endif
 #ifdef CONFIG_DB8500_MLOADER
 	&mloader_fw_device,
@@ -495,6 +608,7 @@ static struct platform_device *platform_devs[] __initdata = {
 #ifdef CONFIG_HSI
 	&u8500_hsi_device,
 #endif
+	&ab8500_device,
 };
 
 /*
@@ -553,7 +667,8 @@ static struct pl022_ssp_controller ssp0_platform_data = {
 static void __init mop500_spi_init(void)
 {
 	db8500_add_ssp0(&ssp0_platform_data);
-	db8500_add_msp2_spi(&mop500_msp2_spi_data);
+	if (!machine_is_snowball())
+		db8500_add_msp2_spi(&mop500_msp2_spi_data);
 }
 
 #ifdef CONFIG_STE_DMA40_REMOVE
@@ -643,6 +758,16 @@ static void __init mop500_uart_init(void)
 	db8500_add_uart2(&uart2_plat);
 }
 
+static struct platform_device *snowball_platform_devs[] __initdata = {
+	&snowball_led_dev,
+	&snowball_key_dev,
+	&snowball_sbnet_dev,
+	&ab8500_device,
+	&ux500_hwmem_device,
+	&u8500_mcde_device,
+	&u8500_b2r2_device,
+};
+
 static void __init mop500_init_machine(void)
 {
 	int i2c0_devs;
@@ -652,13 +777,14 @@ static void __init mop500_init_machine(void)
 	 * all these GPIO pins to the internal GPIO controller
 	 * instead.
 	 */
-	if (machine_is_hrefv60()) {
-		mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
-		mop500_gpio_keys[1].gpio = HREFV60_HAL_SW_GPIO;
-	}
-	else {
-		mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
-		mop500_gpio_keys[1].gpio = GPIO_HAL_SENSOR;
+	if (!machine_is_snowball()) {
+		if (machine_is_hrefv60()) {
+			mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
+			mop500_gpio_keys[1].gpio = HREFV60_HAL_SW_GPIO;
+		} else {
+			mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
+			mop500_gpio_keys[1].gpio = GPIO_HAL_SENSOR;
+		}
 	}
 
 	u8500_init_devices();
@@ -670,15 +796,18 @@ static void __init mop500_init_machine(void)
 				ARRAY_SIZE(u8500_hsi_devices));
 #endif
 
-	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
+	if (machine_is_snowball())
+		platform_add_devices(snowball_platform_devs,
+					ARRAY_SIZE(snowball_platform_devs));
+	else
+		platform_add_devices(mop500_platform_devs,
+					ARRAY_SIZE(mop500_platform_devs));
 
 	mop500_i2c_init();
 	mop500_sdi_init();
 	mop500_msp_init();
 	mop500_spi_init();
 	mop500_uart_init();
-
-	platform_device_register(&ab8500_device);
 
 	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
 	if (machine_is_hrefv60())
@@ -706,6 +835,15 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
 	.boot_params	= 0x100,
 	.map_io		= u8500_map_io,
 	.init_irq	= ux500_init_irq,
+	.timer		= &ux500_timer,
+	.init_machine	= mop500_init_machine,
+MACHINE_END
+
+MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+	.boot_params	= 0x100,
+	.map_io		= u8500_map_io,
+	.init_irq	= ux500_init_irq,
+	/* we re-use nomadik timer here */
 	.timer		= &ux500_timer,
 	.init_machine	= mop500_init_machine,
 MACHINE_END
