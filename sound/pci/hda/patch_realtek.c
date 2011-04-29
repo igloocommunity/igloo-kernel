@@ -19491,6 +19491,10 @@ static const struct alc_fixup alc662_fixups[] = {
 		.type = ALC_FIXUP_SKU,
 		.v.sku = ALC_FIXUP_SKU_IGNORE,
 	},
+	[ALC662_FIXUP_SKU_IGNORE] = {
+		.type = ALC_FIXUP_SKU,
+		.v.sku = ALC_FIXUP_SKU_IGNORE,
+	},
 };
 
 static const struct snd_pci_quirk alc662_fixup_tbl[] = {
