@@ -28,7 +28,9 @@
 #include "../regulator-db8500.h"
 
 #define DEEP_SLEEP_WAKE_UP_LATENCY 8500
-#define SLEEP_WAKE_UP_LATENCY 800
+/* Exit latency from ApSleep is measured to be around 1.0 to 1.5 ms */
+#define MIN_SLEEP_WAKE_UP_LATENCY 1000
+#define MAX_SLEEP_WAKE_UP_LATENCY 1500
 #define UL_PLL_START_UP_LATENCY 8000 /* us */
 
 static struct cstate cstates[] = {
@@ -93,12 +95,12 @@ static struct cstate cstates[] = {
 	},
 	{
 		.enter_latency = 120,
-		.exit_latency = SLEEP_WAKE_UP_LATENCY,
+		.exit_latency = MAX_SLEEP_WAKE_UP_LATENCY,
 		/*
 		 * Note: Sleep time must be longer than 120 us or else
 		 * there might be issues with the RTC-RTT block.
 		 */
-		.threshold = SLEEP_WAKE_UP_LATENCY + 120 + 50,
+		.threshold = MAX_SLEEP_WAKE_UP_LATENCY + 120 + 200,
 		.power_usage = 3,
 		.APE = APE_OFF,
 		.ARM = ARM_RET,
@@ -112,10 +114,10 @@ static struct cstate cstates[] = {
 	},
 	{
 		.enter_latency = 150,
-		.exit_latency = (SLEEP_WAKE_UP_LATENCY +
+		.exit_latency = (MAX_SLEEP_WAKE_UP_LATENCY +
 				   UL_PLL_START_UP_LATENCY),
-		.threshold = (2 * (SLEEP_WAKE_UP_LATENCY +
-				   UL_PLL_START_UP_LATENCY + 50)),
+		.threshold = (2 * (MAX_SLEEP_WAKE_UP_LATENCY +
+				   UL_PLL_START_UP_LATENCY + 200)),
 		.power_usage = 2,
 		.APE = APE_OFF,
 		.ARM = ARM_RET,
@@ -172,7 +174,7 @@ static DEFINE_PER_CPU(struct cpu_state, *cpu_state);
 static DEFINE_SPINLOCK(cpuidle_lock);
 static bool restore_ape; /* protected by cpuidle_lock */
 static bool restore_arm; /* protected by cpuidle_lock */
-
+static ktime_t time_next;  /* protected by cpuidle_lock */
 extern struct clock_event_device u8500_mtu_clkevt;
 
 static atomic_t idle_cpus_counter = ATOMIC_INIT(0);
@@ -200,7 +202,8 @@ void ux500_cpuidle_unplug(int cpu)
 }
 
 static void restore_sequence(struct cpu_state *state,
-			     bool always_on_timer_migrated)
+			     bool always_on_timer_migrated,
+			     ktime_t now)
 {
 	unsigned long iflags;
 	int this_cpu = smp_processor_id();
@@ -220,9 +223,6 @@ static void restore_sequence(struct cpu_state *state,
 
 	smp_rmb();
 	if (restore_ape) {
-		/* Wake in 1 us */
-		ktime_t time_next = ktime_set(0, 1000);
-
 		restore_ape = false;
 		smp_wmb();
 
@@ -242,30 +242,16 @@ static void restore_sequence(struct cpu_state *state,
 		ux500_rtcrtt_off();
 
 		/*
-		 * TODO: We might have woken on other interrupt.
-		 * Reprogram MTU to wake at correct time.
+		 * If we're returning from ApSleep and the RTC timer
+		 * caused the wake up, program the MTU to trigger.
 		 */
+		if ((ktime_to_us(now) > ktime_to_us(time_next)))
+			time_next = ktime_add(now, ktime_set(0, 1000));
 
 		/* Make sure have an MTU interrupt waiting for us */
 		clockevents_program_event(&u8500_mtu_clkevt,
 					  time_next,
-					  time_zero);
-	}
-
-	/*
-	 * TODO: Figure out why the second CPU does not get scheduled
-	 * when it should be the first one out of ApSleep.
-	 * (First cpu gets all shared interrupts.)
-	 */
-
-	if (this_cpu == 0) {
-		int cpu;
-		for_each_online_cpu(cpu) {
-			/* TODO: Only kick the CPU that was supposed to wake */
-			if (cpu != this_cpu)
-				/* Send an unused IPI interrupt (2) */
-				gic_raise_softirq(cpumask_of(cpu), 2);
-		}
+					  now);
 	}
 
 	spin_unlock_irqrestore(&cpuidle_lock, iflags);
@@ -280,12 +266,12 @@ static void restore_sequence(struct cpu_state *state,
  * get_remaining_sleep_time() - returns remaining sleep time in
  * microseconds (us)
  */
-static int get_remaining_sleep_time(void)
+static int get_remaining_sleep_time(ktime_t *next, int *on_cpu)
 {
-	ktime_t now;
+	ktime_t now, t;
 	int cpu;
 	unsigned long iflags;
-	int t;
+	int delta;
 	int remaining_sleep_time = INT_MAX;
 
 	now = ktime_get();
@@ -294,11 +280,16 @@ static int get_remaining_sleep_time(void)
 
 	spin_lock_irqsave(&cpuidle_lock, iflags);
 	for_each_online_cpu(cpu) {
-		t = ktime_to_us(ktime_sub(per_cpu(cpu_state,
-						  cpu)->sched_wake_up,
-					  now));
-		if ((t < remaining_sleep_time) && (t > 0))
-			remaining_sleep_time = t;
+		t = per_cpu(cpu_state, cpu)->sched_wake_up;
+
+		delta = ktime_to_us(ktime_sub(t, now));
+		if ((delta < remaining_sleep_time) && (delta > 0)) {
+			remaining_sleep_time = delta;
+			if (next)
+				(*next) = t;
+			if (on_cpu)
+				(*on_cpu) = cpu;
+		}
 	}
 	spin_unlock_irqrestore(&cpuidle_lock, iflags);
 
@@ -332,7 +323,7 @@ static int determine_sleep_state(void)
 	power_state_req = power_state_active_is_enabled() ||
 		prcmu_is_ac_wake_requested();
 
-	sleep_time = get_remaining_sleep_time();
+	sleep_time = get_remaining_sleep_time(NULL, NULL);
 
 	/*
 	 * Never go deeper than the governor recommends even though it might be
@@ -482,11 +473,14 @@ static int enter_sleep(struct cpuidle_device *dev,
 	/* No PRCMU interrupt was pending => continue the sleeping stages */
 
 	if (cstates[target].APE == APE_OFF) {
+		ktime_t t;
+		int c;
+
 		/* We are going to sleep or deep sleep => prepare for it */
 
 		/* Program the only timer that is available when APE is off */
 
-		sleep_time = get_remaining_sleep_time();
+		sleep_time = get_remaining_sleep_time(&t, &c);
 
 		if (cstates[target].UL_PLL == UL_PLL_OFF)
 			/* Compensate for ULPLL start up time */
@@ -498,7 +492,16 @@ static int enter_sleep(struct cpuidle_device *dev,
 			 * there is enough time.
 			 */
 
+		/* Adjust for exit latency */
+		sleep_time -= MIN_SLEEP_WAKE_UP_LATENCY;
+
 		ux500_rtcrtt_next(sleep_time);
+
+		/*
+		 * Make sure the cpu that is scheduled first gets
+		 * the prcmu interrupt.
+		 */
+		irq_set_affinity(IRQ_DB8500_PRCMU1, cpumask_of(c));
 
 		context_vape_save();
 
@@ -507,6 +510,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 		spin_lock_irqsave(&cpuidle_lock, iflags);
 		restore_ape = true;
+		time_next = t;
 		spin_unlock_irqrestore(&cpuidle_lock, iflags);
 	}
 
@@ -562,7 +566,7 @@ exit:
 		/* Recouple GIC with the interrupt bus */
 		ux500_pm_gic_recouple();
 
-	restore_sequence(state, always_on_timer_migrated);
+	restore_sequence(state, always_on_timer_migrated, t3);
 
 exit_fast:
 
