@@ -21,8 +21,14 @@
 #include "pm.h"
 #include "suspend_dbg.h"
 
-extern void mop500_pins_suspend_force(void);
-extern void mop500_pins_suspend_force_mux(void);
+static void (*pins_suspend_force)(void);
+static void (*pins_suspend_force_mux)(void);
+
+void suspend_set_pins_force_fn(void (*force)(void), void (*force_mux)(void))
+{
+	pins_suspend_force = force;
+	pins_suspend_force_mux = force_mux;
+}
 
 static atomic_t block_sleep = ATOMIC_INIT(0);
 
@@ -43,6 +49,7 @@ static bool sleep_is_blocked(void)
 
 static int suspend(bool do_deepsleep)
 {
+	bool pins_force = pins_suspend_force_mux && pins_suspend_force;
 	int ret = 0;
 	u32 divps_rate;
 
@@ -59,19 +66,21 @@ static int suspend(bool do_deepsleep)
 
 	context_vape_save();
 
-	/*
-	 * Save GPIO settings before applying power save
-	 * settings
-	 */
-	context_gpio_save();
+	if (pins_force) {
+		/*
+		 * Save GPIO settings before applying power save
+		 * settings
+		 */
+		context_gpio_save();
 
-	/* Apply GPIO power save mux settings */
-	context_gpio_mux_safe_switch(true);
-	mop500_pins_suspend_force_mux();
-	context_gpio_mux_safe_switch(false);
+		/* Apply GPIO power save mux settings */
+		context_gpio_mux_safe_switch(true);
+		pins_suspend_force_mux();
+		context_gpio_mux_safe_switch(false);
 
-	/* Apply GPIO power save settings */
-	mop500_pins_suspend_force();
+		/* Apply GPIO power save settings */
+		pins_suspend_force();
+	}
 
 	ux500_pm_gic_decouple();
 
@@ -133,11 +142,13 @@ static int suspend(bool do_deepsleep)
 	ux500_pm_prcmu_set_ioforce(false);
 
 exit:
-	/* Restore gpio settings */
-	context_gpio_mux_safe_switch(true);
-	context_gpio_restore_mux();
-	context_gpio_mux_safe_switch(false);
-	context_gpio_restore();
+	if (pins_force) {
+		/* Restore gpio settings */
+		context_gpio_mux_safe_switch(true);
+		context_gpio_restore_mux();
+		context_gpio_mux_safe_switch(false);
+		context_gpio_restore();
+	}
 
 	/* This is what cpuidle wants */
 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |

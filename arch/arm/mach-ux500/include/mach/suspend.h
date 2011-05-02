@@ -8,5 +8,6 @@
 
 void suspend_block_sleep(void);
 void suspend_unblock_sleep(void);
+void suspend_set_pins_force_fn(void (*force)(void), void (*force_mux)(void));
 
 #endif /* __MACH_SUSPEND_H */
