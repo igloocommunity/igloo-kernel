@@ -670,13 +670,15 @@ void context_gpio_restore_mux(void)
 
 /*
  * Safe sequence used to switch IOs between GPIO and Alternate-C mode:
- *  - Save SLPM registers
- *  - Set SLPM=0 for the IOs you want to switch and others to 1
+ *  - Save SLPM registers (Not done.)
+ *  - Set SLPM=0 for the IOs you want to switch. (We assume that all
+ *    SLPM registers already are 0 except for the ones that wants to
+ *    have the mux connected in sleep (e.g modem STM)).
  *  - Configure the GPIO registers for the IOs that are being switched
  *  - Set IOFORCE=1
  *  - Modify the AFLSA/B registers for the IOs that are being switched
  *  - Set IOFORCE=0
- *  - Restore SLPM registers
+ *  - Restore SLPM registers (Not done.)
  *  - Any spurious wake up event during switch sequence to be ignored
  *    and cleared
  */
@@ -691,14 +693,12 @@ void context_gpio_mux_safe_switch(bool begin)
 	if (begin) {
 		for (i = 0; i < GPIO_NUM_BANKS; i++) {
 			/* Save registers */
-			slpc[i] = readl(gpio_bankaddr[i] + NMK_GPIO_SLPC);
 			rwimsc[i] = readl(gpio_bankaddr[i] + NMK_GPIO_RWIMSC);
 			fwimsc[i] = readl(gpio_bankaddr[i] + NMK_GPIO_FWIMSC);
 
 			/* Prevent spurious wakeups */
 			writel(0, gpio_bankaddr[i] + NMK_GPIO_RWIMSC);
 			writel(0, gpio_bankaddr[i] + NMK_GPIO_FWIMSC);
-			writel(0, gpio_bankaddr[i] + NMK_GPIO_SLPC);
 		}
 
 		ux500_pm_prcmu_set_ioforce(true);
@@ -707,7 +707,6 @@ void context_gpio_mux_safe_switch(bool begin)
 
 		/* Restore wake up settings */
 		for (i = 0; i < GPIO_NUM_BANKS; i++) {
-			writel(slpc[i], gpio_bankaddr[i] + NMK_GPIO_SLPC);
 			writel(rwimsc[i], gpio_bankaddr[i] + NMK_GPIO_RWIMSC);
 			writel(fwimsc[i], gpio_bankaddr[i] + NMK_GPIO_FWIMSC);
 		}
