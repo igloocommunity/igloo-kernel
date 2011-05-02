@@ -175,6 +175,7 @@ static DEFINE_SPINLOCK(cpuidle_lock);
 static bool restore_ape; /* protected by cpuidle_lock */
 static bool restore_arm; /* protected by cpuidle_lock */
 static ktime_t time_next;  /* protected by cpuidle_lock */
+
 extern struct clock_event_device u8500_mtu_clkevt;
 
 static atomic_t idle_cpus_counter = ATOMIC_INIT(0);
@@ -205,10 +206,9 @@ static void restore_sequence(struct cpu_state *state,
 			     bool always_on_timer_migrated,
 			     ktime_t now)
 {
-	unsigned long iflags;
 	int this_cpu = smp_processor_id();
 
-	spin_lock_irqsave(&cpuidle_lock, iflags);
+	spin_lock(&cpuidle_lock);
 
 	smp_rmb();
 	if (restore_arm) {
@@ -254,7 +254,7 @@ static void restore_sequence(struct cpu_state *state,
 					  now);
 	}
 
-	spin_unlock_irqrestore(&cpuidle_lock, iflags);
+	spin_unlock(&cpuidle_lock);
 
 	if (always_on_timer_migrated)
 		/* Use the ARM local timer for this cpu */
@@ -270,7 +270,6 @@ static int get_remaining_sleep_time(ktime_t *next, int *on_cpu)
 {
 	ktime_t now, t;
 	int cpu;
-	unsigned long iflags;
 	int delta;
 	int remaining_sleep_time = INT_MAX;
 
@@ -278,7 +277,7 @@ static int get_remaining_sleep_time(ktime_t *next, int *on_cpu)
 
 	/* Check next schedule to expire considering both cpus */
 
-	spin_lock_irqsave(&cpuidle_lock, iflags);
+	spin_lock(&cpuidle_lock);
 	for_each_online_cpu(cpu) {
 		t = per_cpu(cpu_state, cpu)->sched_wake_up;
 
@@ -291,7 +290,7 @@ static int get_remaining_sleep_time(ktime_t *next, int *on_cpu)
 				(*on_cpu) = cpu;
 		}
 	}
-	spin_unlock_irqrestore(&cpuidle_lock, iflags);
+	spin_unlock(&cpuidle_lock);
 
 	return remaining_sleep_time;
 }
@@ -392,7 +391,6 @@ static int enter_sleep(struct cpuidle_device *dev,
 	int ret;
 	int target;
 	struct cpu_state *state;
-	unsigned long iflags;
 	u32 divps_rate;
 	bool slept_well = false;
 	bool always_on_timer_migrated = false;
@@ -408,9 +406,9 @@ static int enter_sleep(struct cpuidle_device *dev,
 	state->gov_cstate = (int) cpuidle_get_statedata(ci_state);
 
 	/* Save scheduled wake up for this cpu */
-	spin_lock_irqsave(&cpuidle_lock, iflags);
+	spin_lock(&cpuidle_lock);
 	state->sched_wake_up = ktime_add(t1, tick_nohz_get_sleep_length());
-	spin_unlock_irqrestore(&cpuidle_lock, iflags);
+	spin_unlock(&cpuidle_lock);
 
 	atomic_inc(&idle_cpus_counter);
 
@@ -508,10 +506,10 @@ static int enter_sleep(struct cpuidle_device *dev,
 		ux500_ci_dbg_console_handle_ape_suspend();
 		ux500_pm_prcmu_set_ioforce(true);
 
-		spin_lock_irqsave(&cpuidle_lock, iflags);
+		spin_lock(&cpuidle_lock);
 		restore_ape = true;
 		time_next = t;
-		spin_unlock_irqrestore(&cpuidle_lock, iflags);
+		spin_unlock(&cpuidle_lock);
 	}
 
 	if (cstates[target].ARM == ARM_OFF) {
@@ -520,9 +518,9 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 		context_varm_save_core();
 
-		spin_lock_irqsave(&cpuidle_lock, iflags);
+		spin_lock(&cpuidle_lock);
 		restore_arm = true;
-		spin_unlock_irqrestore(&cpuidle_lock, iflags);
+		spin_unlock(&cpuidle_lock);
 		context_save_cpu_registers();
 	}
 
@@ -573,12 +571,12 @@ exit_fast:
 	if (target < 0)
 		target = CI_RUNNING;
 
-	spin_lock_irqsave(&cpuidle_lock, iflags);
+	spin_lock(&cpuidle_lock);
 	/* Remove wake up time i.e. set wake up far ahead */
 	state->sched_wake_up = ktime_add_us(state->sched_wake_up,
 					    1000000000); /* 16 minutes ahead */
 	smp_wmb();
-	spin_unlock_irqrestore(&cpuidle_lock, iflags);
+	spin_unlock(&cpuidle_lock);
 
 	atomic_dec(&idle_cpus_counter);
 
