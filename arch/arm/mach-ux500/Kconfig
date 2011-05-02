@@ -34,7 +34,7 @@ config MACH_HREFV60
 	help
 	  Include support for the HREFv60 new development platform.
 
-config MACH_U8500_SNOWBALL
+config MACH_SNOWBALL
 	bool "U8500 Snowball platform"
 	depends on UX500_SOC_DB8500
 	select MACH_U8500
