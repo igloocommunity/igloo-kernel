@@ -203,7 +203,6 @@ void ux500_cpuidle_unplug(int cpu)
 }
 
 static void restore_sequence(struct cpu_state *state,
-			     bool always_on_timer_migrated,
 			     ktime_t now)
 {
 	int this_cpu = smp_processor_id();
@@ -216,7 +215,6 @@ static void restore_sequence(struct cpu_state *state,
 		restore_arm = false;
 		smp_wmb();
 
-		context_varm_restore_core();
 		/* Restore gic settings */
 		context_varm_restore_common();
 	}
@@ -256,10 +254,9 @@ static void restore_sequence(struct cpu_state *state,
 
 	spin_unlock(&cpuidle_lock);
 
-	if (always_on_timer_migrated)
-		/* Use the ARM local timer for this cpu */
-		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,
-				   &this_cpu);
+	/* Use the ARM local timer for this cpu */
+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,
+			   &this_cpu);
 }
 
 /**
@@ -352,14 +349,10 @@ static int determine_sleep_state(void)
 	}
 
 	return max(CI_WFI, i);
-
 }
 
 static void enter_sleep_shallow(struct cpu_state *state, ktime_t t1)
 {
-	int this_cpu = smp_processor_id();
-
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &this_cpu);
 
 	switch (cstates[state->gov_cstate].ARM) {
 	case ARM_OFF:
@@ -369,8 +362,10 @@ static void enter_sleep_shallow(struct cpu_state *state, ktime_t t1)
 	case ARM_RET:
 		ux500_ci_dbg_log(CI_WFI, t1);
 		context_save_to_sram_and_wfi(false);
-		if (cstates[state->gov_cstate].ARM == ARM_OFF)
+		if (cstates[state->gov_cstate].ARM == ARM_OFF) {
 			context_restore_cpu_registers();
+			context_varm_restore_core();
+		}
 		break;
 	case ARM_ON:
 		ux500_ci_dbg_log(CI_WFI, t1);
@@ -385,7 +380,7 @@ static void enter_sleep_shallow(struct cpu_state *state, ktime_t t1)
 static int enter_sleep(struct cpuidle_device *dev,
 		       struct cpuidle_state *ci_state)
 {
-	ktime_t t1, t2, t3;
+	ktime_t time_enter, time_exit, time_wake;
 	u32 sleep_time;
 	s64 diff;
 	int ret;
@@ -393,12 +388,11 @@ static int enter_sleep(struct cpuidle_device *dev,
 	struct cpu_state *state;
 	u32 divps_rate;
 	bool slept_well = false;
-	bool always_on_timer_migrated = false;
 	int this_cpu = smp_processor_id();
 
 	local_irq_disable();
 
-	t1 = ktime_get(); /* Time now */
+	time_enter = ktime_get(); /* Time now */
 
 	state = per_cpu(cpu_state, smp_processor_id());
 
@@ -407,7 +401,8 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 	/* Save scheduled wake up for this cpu */
 	spin_lock(&cpuidle_lock);
-	state->sched_wake_up = ktime_add(t1, tick_nohz_get_sleep_length());
+	state->sched_wake_up = ktime_add(time_enter,
+					 tick_nohz_get_sleep_length());
 	spin_unlock(&cpuidle_lock);
 
 	atomic_inc(&idle_cpus_counter);
@@ -417,16 +412,16 @@ static int enter_sleep(struct cpuidle_device *dev,
 	 * shared resources like e.g. VAPE
 	 */
 	target = determine_sleep_state();
-	if (target < 0) {
+	if (target < 0)
 		/* "target" will be last_state in the cpuidle framework */
 		goto exit_fast;
-	}
+
+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &this_cpu);
 
 	if (cstates[target].ARM == ARM_ON) {
 		/* Handle first cpu to enter sleep state */
-		always_on_timer_migrated = true;
-		enter_sleep_shallow(state, t1);
-		t3 = ktime_get();
+		enter_sleep_shallow(state, time_enter);
+		time_wake = ktime_get();
 		slept_well = true;
 		goto exit;
 	}
@@ -438,19 +433,11 @@ static int enter_sleep(struct cpuidle_device *dev,
 		/* Other CPU was not in WFI => abort */
 		goto exit;
 
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &this_cpu);
-
-	always_on_timer_migrated = true;
-
 	/*
 	 * Check if we have a pending interrupt or if sleep
 	 * state has changed after GIC has been frozen
 	 */
 	if (ux500_pm_gic_pending_interrupt())
-		goto exit;
-
-	if (target != determine_sleep_state())
-		/* Sleep state has changed => abort */
 		goto exit;
 
 	/* Copy GIC interrupt settings to PRCMU interrupt settings */
@@ -539,7 +526,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 	if (cstates[target].ARM == ARM_OFF)
 		context_clean_l1_cache_all();
 
-	ux500_ci_dbg_log(target, t1);
+	ux500_ci_dbg_log(target, time_enter);
 
 	prcmu_set_power_state(cstates[target].pwrst,
 			      cstates[target].UL_PLL,
@@ -555,11 +542,13 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 	ux500_ci_dbg_wake_latency(target);
 
-	t3 = ktime_get();
+	time_wake = ktime_get();
 
 	/* The PRCMU restores ARM PLL and recouples the GIC */
-	if (cstates[target].ARM == ARM_OFF)
+	if (cstates[target].ARM == ARM_OFF) {
 		context_restore_cpu_registers();
+		context_varm_restore_core();
+	}
 
 	slept_well = true;
 exit:
@@ -567,7 +556,7 @@ exit:
 		/* Recouple GIC with the interrupt bus */
 		ux500_pm_gic_recouple();
 
-	restore_sequence(state, always_on_timer_migrated, t3);
+	restore_sequence(state, time_wake);
 
 exit_fast:
 
@@ -591,8 +580,8 @@ exit_fast:
 		/* Update last state pointer used by CPUIDLE subsystem */
 		dev->last_state = &(dev->states[target]);
 
-	t2 = ktime_get();
-	diff = ktime_to_us(ktime_sub(t2, t1));
+	time_exit = ktime_get();
+	diff = ktime_to_us(ktime_sub(time_exit, time_enter));
 	if (diff > INT_MAX)
 		diff = INT_MAX;
 
@@ -600,9 +589,9 @@ exit_fast:
 
 	ux500_ci_dbg_console_check_uart();
 	if (slept_well)
-		ux500_ci_dbg_exit_latency(target, t3);
+		ux500_ci_dbg_exit_latency(target, time_wake);
 
-	ux500_ci_dbg_log(CI_RUNNING, t2);
+	ux500_ci_dbg_log(CI_RUNNING, time_exit);
 
 	local_irq_enable();
 
