@@ -98,6 +98,7 @@ static struct lm3530_mode_map mode_map[] = {
  * @pdata: LM3530 platform data
  * @mode: mode of operation - manual, ALS, PWM
  * @regulator: regulator
+ * @brightness: current led brightness
  * @enable: regulator is enabled
  */
 struct lm3530_data {
@@ -106,6 +107,7 @@ struct lm3530_data {
 	struct lm3530_platform_data *pdata;
 	enum lm3530_mode mode;
 	struct regulator *regulator;
+	enum led_brightness brightness;
 	bool enable;
 };
 
@@ -177,7 +179,10 @@ static int lm3530_init_registers(struct lm3530_data *drvdata)
 	brt_ramp = (pltfm->brt_ramp_fall << LM3530_BRT_RAMP_FALL_SHIFT) |
 			(pltfm->brt_ramp_rise << LM3530_BRT_RAMP_RISE_SHIFT);
 
-	brightness = pltfm->brt_val;
+	if (drvdata->brightness)
+		brightness = drvdata->brightness;
+	else
+		brightness = drvdata->brightness = pltfm->brt_val;
 
 	reg_val[0] = gen_config;	/* LM3530_GEN_CONFIG */
 	reg_val[1] = als_config;	/* LM3530_ALS_CONFIG */
@@ -194,6 +199,16 @@ static int lm3530_init_registers(struct lm3530_data *drvdata)
 	reg_val[12] = LM3530_DEF_ZT_2;	/* LM3530_ALS_Z2T_REG */
 	reg_val[13] = LM3530_DEF_ZT_3;	/* LM3530_ALS_Z3T_REG */
 	reg_val[14] = LM3530_DEF_ZT_4;	/* LM3530_ALS_Z4T_REG */
+
+	if (!drvdata->enable) {
+		ret = regulator_enable(drvdata->regulator);
+		if (ret) {
+			dev_err(&drvdata->client->dev,
+				"Enable regulator failed\n");
+			return ret;
+		}
+		drvdata->enable = true;
+	}
 
 	for (i = 0; i < LM3530_REG_MAX; i++) {
 		ret = i2c_smbus_write_byte_data(client,
@@ -216,14 +231,7 @@ static void lm3530_brightness_set(struct led_classdev *led_cdev,
 	case LM3530_BL_MODE_MANUAL:
 
 		if (!drvdata->enable) {
-			err = regulator_enable(drvdata->regulator);
-			if (err) {
-				dev_err(&drvdata->client->dev,
-					"Unable to enable regulator\n");
-				break;
-			}
-			drvdata->enable = true;
-			lm3530_init_registers(drvdata);
+			err = lm3530_init_registers(drvdata);
 			if (err) {
 				dev_err(&drvdata->client->dev,
 					"Register Init failed: %d\n", err);
@@ -237,12 +245,14 @@ static void lm3530_brightness_set(struct led_classdev *led_cdev,
 		if (err)
 			dev_err(&drvdata->client->dev,
 				"Unable to set brightness: %d\n", err);
+		else
+			drvdata->brightness = brt_val / 2;
 
-		if (brt_val == 0 && drvdata->enable) {
+		if (brt_val == 0) {
 			err = regulator_disable(drvdata->regulator);
 			if (err)
 				dev_err(&drvdata->client->dev,
-					"Unable to disable regulator\n");
+					"Disable regulator failed\n");
 			drvdata->enable = false;
 		}
 		break;
@@ -326,6 +336,7 @@ static int __devinit lm3530_probe(struct i2c_client *client,
 	drvdata->mode = pdata->mode;
 	drvdata->client = client;
 	drvdata->pdata = pdata;
+	drvdata->brightness = LED_OFF;
 	drvdata->enable = false;
 	drvdata->led_dev.name = LM3530_LED_DEV;
 	drvdata->led_dev.brightness_set = lm3530_brightness_set;
@@ -340,15 +351,17 @@ static int __devinit lm3530_probe(struct i2c_client *client,
 		goto err_regulator_get;
 	}
 
-	err = lm3530_init_registers(drvdata);
-	if (err < 0) {
-		dev_err(&client->dev, "Register Init failed: %d\n", err);
-		err = -ENODEV;
-		goto err_reg_init;
+	if (drvdata->pdata->brt_val) {
+		err = lm3530_init_registers(drvdata);
+		if (err < 0) {
+			dev_err(&client->dev,
+				"Register Init failed: %d\n", err);
+			err = -ENODEV;
+			goto err_reg_init;
+		}
 	}
 
-	err = led_classdev_register((struct device *)
-				      &client->dev, &drvdata->led_dev);
+	err = led_classdev_register(&client->dev, &drvdata->led_dev);
 	if (err < 0) {
 		dev_err(&client->dev, "Register led class failed: %d\n", err);
 		err = -ENODEV;
@@ -365,11 +378,12 @@ static int __devinit lm3530_probe(struct i2c_client *client,
 	return 0;
 
 err_create_file:
-	regulator_put(drvdata->regulator);
-err_regulator_get:
 	led_classdev_unregister(&drvdata->led_dev);
 err_class_register:
 err_reg_init:
+	regulator_put(drvdata->regulator);
+err_regulator_get:
+	i2c_set_clientdata(client, NULL);
 	kfree(drvdata);
 err_out:
 	return err;
