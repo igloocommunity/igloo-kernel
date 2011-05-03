@@ -1,5 +1,5 @@
 /*
- * Copyright (C) ST-Ericsson SA 2010
+ * Copyright (C) ST-Ericsson SA 2010-2011
  *
  * License Terms: GNU General Public License v2
  * Author: Rickard Andersson <rickard.andersson@stericsson.com>,
@@ -7,7 +7,6 @@
  */
 
 #include <linux/slab.h>
-#include <linux/sched.h>
 #include <linux/io.h>
 #include <linux/clk.h>
 #include <linux/err.h>
@@ -47,6 +46,7 @@ enum latency_type {
 struct state_history_state {
 	u32 counter;
 	ktime_t time;
+	u32 hit_rate;
 
 	u32 latency_count[NUM_LATENCY];
 	ktime_t latency_sum[NUM_LATENCY];
@@ -58,6 +58,7 @@ struct state_history {
 	ktime_t start;
 	u32 state;
 	u32 exit_counter;
+	u32 timed_out;
 	ktime_t measure_begin;
 	struct state_history_state *states;
 };
@@ -204,7 +205,6 @@ void ux500_ci_dbg_console(void)
 	}
 }
 
-
 static void dbg_cpuidle_work_function(struct work_struct *work)
 {
 	force_APE_on = false;
@@ -236,13 +236,29 @@ static void store_latency(struct state_history *sh,
 		spin_unlock_irqrestore(&dbg_lock, flags);
 }
 
-void ux500_ci_dbg_exit_latency(int ctarget, ktime_t t)
+void ux500_ci_dbg_exit_latency(int ctarget, ktime_t now, ktime_t exit,
+			       ktime_t enter,  bool timed_out)
 {
 	struct state_history *sh;
+	bool hit = true;
+	unsigned int d;
 
 	sh = per_cpu(state_history, smp_processor_id());
 
 	sh->exit_counter++;
+
+	if (timed_out)
+		sh->timed_out++;
+
+	d = ktime_to_us(ktime_sub(now, enter));
+
+	if ((ctarget + 1) < deepest_allowed_state)
+		hit = d	< cstates[ctarget + 1].threshold;
+	if (d < cstates[ctarget].threshold)
+		hit = false;
+
+	if (hit)
+		sh->states[ctarget].hit_rate++;
 
 	if (cstates[ctarget].state < CI_IDLE || !measure_latency)
 		return;
@@ -250,7 +266,7 @@ void ux500_ci_dbg_exit_latency(int ctarget, ktime_t t)
 	store_latency(sh,
 		      ctarget,
 		      LATENCY_EXIT,
-		      ktime_sub(ktime_get(), t),
+		      ktime_sub(now, exit),
 		      true);
 }
 
@@ -374,6 +390,7 @@ static void state_history_reset(void)
 		sh = per_cpu(state_history, cpu);
 		for (i = 0; i <= cstates_len; i++) {
 			sh->states[i].counter = 0;
+			sh->states[i].hit_rate = 0;
 
 			sh->states[i].time = ktime_set(0, 0);
 
@@ -390,6 +407,7 @@ static void state_history_reset(void)
 		sh->measure_begin = sh->start;
 		sh->state = cstates_len; /* CI_RUNNING */
 		sh->exit_counter = 0;
+		sh->timed_out = 0;
 	}
 	spin_unlock_irqrestore(&dbg_lock, flags);
 }
@@ -437,7 +455,6 @@ static ssize_t stats_write(struct file *file,
 			   const char __user *user_buf,
 			   size_t count, loff_t *ppos)
 {
-	pr_info("\nreset\n");
 	state_history_reset();
 	return count;
 }
@@ -445,7 +462,6 @@ static ssize_t stats_write(struct file *file,
 static int wake_latency_read(struct seq_file *s, void *p)
 {
 	seq_printf(s, "%s\n", wake_latency ? "on" : "off");
-
 	return 0;
 }
 
@@ -491,10 +507,16 @@ static void stats_disp_one(struct seq_file *s, struct state_history *sh,
 		}
 	}
 
-	seq_printf(s, "\n%d - %s: # %u in %d ms %d%%",
+	seq_printf(s, "\n%d - %s: # %u in %d, ms %d%%",
 		   i, cstates[i].desc,
 		   sh->states[i].counter,
 		   (u32) t_us, (u32)perc);
+
+	if (sh->states[i].counter)
+		seq_printf(s, ", hit rate: %u%% ",
+			   100 * sh->states[i].hit_rate /
+			   sh->states[i].counter);
+
 	if (i == CI_RUNNING || !measure_latency)
 		return;
 
@@ -541,7 +563,7 @@ static int stats_print(struct seq_file *s, void *p)
 	ktime_t total, wall;
 	s64 total_us, total_s;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		sh = per_cpu(state_history, cpu);
 		spin_lock_irqsave(&dbg_lock, flags);
 		seq_printf(s, "\nCPU%d\n", cpu);
@@ -559,10 +581,12 @@ static int stats_print(struct seq_file *s, void *p)
 		do_div(total_s, 1000);
 
 		if (total_s)
-			seq_printf(s, "wake ups per s: %u.%u\n",
+			seq_printf(s,
+				   "wake ups per s: %u.%u timed out: %u%%\n",
 				   sh->exit_counter / (int) total_s,
 				   (10 * sh->exit_counter / (int) total_s) -
-				   10*(sh->exit_counter / (int) total_s));
+				   10 * (sh->exit_counter / (int) total_s),
+				   100 * sh->timed_out / sh->exit_counter);
 
 		seq_printf(s, "delta accounted vs wall clock: %lld us\n",
 			   ktime_to_us(ktime_sub(wall, total)));
@@ -570,6 +594,7 @@ static int stats_print(struct seq_file *s, void *p)
 		for (i = 0; i < cstates_len; i++)
 			stats_disp_one(s, sh, total_us, i);
 
+		seq_printf(s, "\n");
 		spin_unlock_irqrestore(&dbg_lock, flags);
 	}
 	seq_printf(s, "\n");
