@@ -720,7 +720,7 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 	[AB5500_DEVID_USB] = {
 		.name = "ab5500-usb",
 		.id = AB5500_DEVID_USB,
-		.num_resources = 35,
+		.num_resources = 36,
 		.resources = (struct resource[]) {
 			{
 				.name = "Link_Update",
@@ -735,9 +735,15 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 				.end = AB5500_IRQ(8, 4),
 			},
 			{
-				.name = "VBUS",
+				.name = "VBUS_R",
 				.flags = IORESOURCE_IRQ,
 				.start = AB5500_IRQ(8, 5),
+				.end = AB5500_IRQ(8, 5),
+			},
+			{
+				.name = "VBUS_F",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(8, 6),
 				.end = AB5500_IRQ(8, 6),
 			},
 			{
@@ -819,9 +825,15 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 				.end = AB5500_IRQ(16, 1),
 			},
 			{
-				.name = "usb_idgnd",
+				.name = "usb_idgnd_r",
 				.flags = IORESOURCE_IRQ,
 				.start = AB5500_IRQ(16, 2),
+				.end = AB5500_IRQ(16, 2),
+			},
+			{
+				.name = "usb_idgnd_f",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(16, 3),
 				.end = AB5500_IRQ(16, 3),
 			},
 			{
