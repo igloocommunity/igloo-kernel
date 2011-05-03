@@ -15,7 +15,9 @@ void ux500_ci_dbg_remove(void);
 
 void ux500_ci_dbg_log(int ctarget, ktime_t enter_time);
 void ux500_ci_dbg_wake_latency(int ctarget);
-void ux500_ci_dbg_exit_latency(int ctarget, ktime_t t);
+void ux500_ci_dbg_exit_latency(int ctarget, ktime_t now, ktime_t exit,
+			       ktime_t enter, bool timed_out);
+void ux500_ci_dbg_wake_timer(bool timed);
 
 bool ux500_ci_dbg_force_ape_on(void);
 int ux500_ci_dbg_deepest_state(void);
@@ -38,7 +40,10 @@ static inline void ux500_ci_dbg_remove(void) { }
 
 static inline void ux500_ci_dbg_log(int ctarget,
 				    ktime_t enter_time) { }
-static inline void ux500_ci_dbg_exit_latency(int ctarget, ktime_t t) { }
+
+static inline void ux500_ci_dbg_exit_latency(int ctarget,
+					     ktime_t now, ktime_t exit,
+					     ktime_t enter, bool timed_out) { }
 static inline void ux500_ci_dbg_wake_latency(int ctarget) { }
 
 static inline bool ux500_ci_dbg_force_ape_on(void)
