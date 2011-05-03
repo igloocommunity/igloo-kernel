@@ -179,7 +179,6 @@ static ktime_t time_next;  /* protected by cpuidle_lock */
 extern struct clock_event_device u8500_mtu_clkevt;
 
 static atomic_t idle_cpus_counter = ATOMIC_INIT(0);
-static ktime_t time_zero;
 
 struct cstate *ux500_ci_get_cstates(int *len)
 {
@@ -202,8 +201,7 @@ void ux500_cpuidle_unplug(int cpu)
 	wmb();
 }
 
-static void restore_sequence(struct cpu_state *state,
-			     ktime_t now)
+static void restore_sequence(ktime_t now)
 {
 	int this_cpu = smp_processor_id();
 
@@ -257,6 +255,7 @@ static void restore_sequence(struct cpu_state *state,
 	/* Use the ARM local timer for this cpu */
 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,
 			   &this_cpu);
+
 }
 
 /**
@@ -381,6 +380,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 		       struct cpuidle_state *ci_state)
 {
 	ktime_t time_enter, time_exit, time_wake;
+	ktime_t wake_up;
 	u32 sleep_time;
 	s64 diff;
 	int ret;
@@ -396,13 +396,16 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 	state = per_cpu(cpu_state, smp_processor_id());
 
+	wake_up = ktime_add(time_enter, tick_nohz_get_sleep_length());
+
+	spin_lock(&cpuidle_lock);
+
+	/* Save scheduled wake up for this cpu */
+	state->sched_wake_up = wake_up;
+
 	/* Retrive the cstate that the governor recommends for this CPU */
 	state->gov_cstate = (int) cpuidle_get_statedata(ci_state);
 
-	/* Save scheduled wake up for this cpu */
-	spin_lock(&cpuidle_lock);
-	state->sched_wake_up = ktime_add(time_enter,
-					 tick_nohz_get_sleep_length());
 	spin_unlock(&cpuidle_lock);
 
 	atomic_inc(&idle_cpus_counter);
@@ -458,14 +461,15 @@ static int enter_sleep(struct cpuidle_device *dev,
 	/* No PRCMU interrupt was pending => continue the sleeping stages */
 
 	if (cstates[target].APE == APE_OFF) {
-		ktime_t t;
-		int c;
+		ktime_t est_wake_time;
+		int wake_cpu;
 
 		/* We are going to sleep or deep sleep => prepare for it */
 
 		/* Program the only timer that is available when APE is off */
 
-		sleep_time = get_remaining_sleep_time(&t, &c);
+		sleep_time = get_remaining_sleep_time(&est_wake_time,
+						      &wake_cpu);
 
 		if (sleep_time == INT_MAX)
 			goto exit;
@@ -489,7 +493,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 		 * Make sure the cpu that is scheduled first gets
 		 * the prcmu interrupt.
 		 */
-		irq_set_affinity(IRQ_DB8500_PRCMU1, cpumask_of(c));
+		irq_set_affinity(IRQ_DB8500_PRCMU1, cpumask_of(wake_cpu));
 
 		context_vape_save();
 
@@ -498,7 +502,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 		spin_lock(&cpuidle_lock);
 		restore_ape = true;
-		time_next = t;
+		time_next = est_wake_time;
 		spin_unlock(&cpuidle_lock);
 	}
 
@@ -556,18 +560,20 @@ exit:
 		/* Recouple GIC with the interrupt bus */
 		ux500_pm_gic_recouple();
 
-	restore_sequence(state, time_wake);
+	restore_sequence(time_wake);
 
 exit_fast:
 
 	if (target < 0)
 		target = CI_RUNNING;
 
+	/* 16 minutes ahead */
+	wake_up = ktime_add_us(time_enter,
+			       1000000000);
+
 	spin_lock(&cpuidle_lock);
 	/* Remove wake up time i.e. set wake up far ahead */
-	state->sched_wake_up = ktime_add_us(state->sched_wake_up,
-					    1000000000); /* 16 minutes ahead */
-	smp_wmb();
+	state->sched_wake_up = wake_up;
 	spin_unlock(&cpuidle_lock);
 
 	atomic_dec(&idle_cpus_counter);
@@ -588,8 +594,19 @@ exit_fast:
 	ret = (int)diff;
 
 	ux500_ci_dbg_console_check_uart();
-	if (slept_well)
-		ux500_ci_dbg_exit_latency(target, time_wake);
+	if (slept_well) {
+		bool timed_out;
+
+		spin_lock(&cpuidle_lock);
+		timed_out = ktime_to_us(time_wake) > ktime_to_us(time_next);
+		spin_unlock(&cpuidle_lock);
+
+		ux500_ci_dbg_exit_latency(target,
+					  time_exit, /* now */
+					  time_wake, /* exit from wfi */
+					  time_enter, /* enter cpuidle */
+					  timed_out);
+	}
 
 	ux500_ci_dbg_log(CI_RUNNING, time_exit);
 
@@ -643,9 +660,6 @@ static int __init cpuidle_driver_init(void)
 
 	if (ux500_is_svp())
 		goto out;
-
-	/* Zero time used on a few places */
-	time_zero = ktime_set(0, 0);
 
 	/* Configure wake up reasons */
 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
