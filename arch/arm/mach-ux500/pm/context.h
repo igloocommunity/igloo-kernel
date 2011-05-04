@@ -36,6 +36,11 @@ int context_arm_notifier_unregister(struct notifier_block *nb);
 void context_vape_save(void);
 void context_vape_restore(void);
 
+void context_gpio_save(void);
+void context_gpio_restore(void);
+void context_gpio_restore_mux(void);
+void context_gpio_mux_safe_switch(bool begin);
+
 void context_varm_save_common(void);
 void context_varm_restore_common(void);
 

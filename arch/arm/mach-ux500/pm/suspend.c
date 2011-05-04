@@ -21,6 +21,9 @@
 #include "pm.h"
 #include "suspend_dbg.h"
 
+extern void mop500_pins_suspend_force(void);
+extern void mop500_pins_suspend_force_mux(void);
+
 static atomic_t block_sleep = ATOMIC_INIT(0);
 
 void suspend_block_sleep(void)
@@ -54,6 +57,20 @@ static int suspend(bool do_deepsleep)
 	prcmu_enable_wakeups(PRCMU_WAKEUP(ABB));
 
 	context_vape_save();
+
+	/*
+	 * Save GPIO settings before applying power save
+	 * settings
+	 */
+	context_gpio_save();
+
+	/* Apply GPIO power save mux settings */
+	context_gpio_mux_safe_switch(true);
+	mop500_pins_suspend_force_mux();
+	context_gpio_mux_safe_switch(false);
+
+	/* Apply GPIO power save settings */
+	mop500_pins_suspend_force();
 
 	ux500_pm_gic_decouple();
 
@@ -111,6 +128,13 @@ static int suspend(bool do_deepsleep)
 
 	/* APE was turned off, restore IO ring */
 	ux500_pm_prcmu_set_ioforce(false);
+
+	/* Restore gpio settings */
+	context_gpio_mux_safe_switch(true);
+	context_gpio_restore_mux();
+	context_gpio_mux_safe_switch(false);
+	context_gpio_restore();
+
 	prcmu_disable_wakeups();
 
 	nmk_gpio_wakeups_resume();
