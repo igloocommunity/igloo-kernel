@@ -46,6 +46,7 @@
 #include <mach/hardware.h>
 #include <mach/setup.h>
 #include <mach/devices.h>
+#include <mach/ab8500-accdet.h>
 #include <mach/irqs.h>
 #include <mach/ste_audio.h>
 #include <mach/ste-dma40-db8500.h>
@@ -110,6 +111,15 @@ static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
 	.config_reg		= {0x00, 0x9E, 0x80, 0x01,
 					0x7A, 0x00, 0x00},
 };
+
+#ifdef CONFIG_INPUT_AB8500_ACCDET
+static struct ab8500_accdet_platform_data ab8500_accdet_pdata = {
+       .btn_keycode = KEY_MEDIA,
+       .accdet1_dbth = ACCDET1_TH_1200mV | ACCDET1_DB_70ms,
+       .accdet2122_th = ACCDET21_TH_1000mV | ACCDET22_TH_1000mV,
+       .video_ctrl_gpio = MOP500_AB8500_GPIO(35),
+};
+#endif
 
 static struct gpio_keys_button snowball_key_array[] = {
 	{
@@ -218,6 +228,9 @@ static struct ab8500_platform_data ab8500_platdata = {
 	.fg		= &ab8500_fg_plat_data,
 	.chargalg	= &ab8500_chargalg_plat_data,
 	.gpio		= &ab8500_gpio_pdata,
+#ifdef CONFIG_INPUT_AB8500_ACCDET
+	.accdet = &ab8500_accdet_pdata,
+#endif
 };
 
 static struct resource ab8500_resources[] = {
