@@ -49,6 +49,7 @@
 #include <mach/irqs.h>
 #include <mach/ste_audio.h>
 #include <mach/ste-dma40-db8500.h>
+#include <video/av8100.h>
 
 #include "pins-db8500.h"
 #include "devices-db8500.h"
@@ -284,6 +285,14 @@ static struct lp5521_led_config lp5521_pri_led[] = {
        },
 };
 
+static struct av8100_platform_data av8100_plat_data = {
+        .irq			= NOMADIK_GPIO_TO_IRQ(192),
+        .reset 			= MOP500_HDMI_RST_GPIO,
+        .inputclk_id 		= "sysclk2",
+        .regulator_pwr_id 	= "hdmi_1v8",
+};
+
+
 static struct lp5521_platform_data __initdata lp5521_pri_data = {
        .label = "lp5521_pri",
        .led_config     = &lp5521_pri_led[0],
@@ -321,6 +330,10 @@ static struct i2c_board_info __initdata mop500_i2c0_devices[] = {
 		I2C_BOARD_INFO("tc3589x", 0x42),
 		.irq		= NOMADIK_GPIO_TO_IRQ(217),
 		.platform_data  = &mop500_tc35892_data,
+	},
+	{
+		I2C_BOARD_INFO("av8100", 0x70),
+		.platform_data = &av8100_plat_data,
 	},
 	/* I2C0 devices only available prior to HREFv60 */
 	{
