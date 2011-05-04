@@ -415,6 +415,45 @@ static struct resource ab8500_poweronkey_db_resources[] = {
 	},
 };
 
+static struct resource ab8500_av_acc_detect_resources[] = {
+	{
+	       .name = "ACC_DETECT_1DB_F",
+	       .start = AB8500_INT_ACC_DETECT_1DB_F,
+	       .end = AB8500_INT_ACC_DETECT_1DB_F,
+	       .flags = IORESOURCE_IRQ,
+	},
+	{
+	       .name = "ACC_DETECT_1DB_R",
+	       .start = AB8500_INT_ACC_DETECT_1DB_R,
+	       .end = AB8500_INT_ACC_DETECT_1DB_R,
+	       .flags = IORESOURCE_IRQ,
+	},
+	{
+	       .name = "ACC_DETECT_21DB_F",
+	       .start = AB8500_INT_ACC_DETECT_21DB_F,
+	       .end = AB8500_INT_ACC_DETECT_21DB_F,
+	       .flags = IORESOURCE_IRQ,
+	},
+	{
+	       .name = "ACC_DETECT_21DB_R",
+	       .start = AB8500_INT_ACC_DETECT_21DB_R,
+	       .end = AB8500_INT_ACC_DETECT_21DB_R,
+	       .flags = IORESOURCE_IRQ,
+	},
+	{
+	       .name = "ACC_DETECT_22DB_F",
+	       .start = AB8500_INT_ACC_DETECT_22DB_F,
+	       .end = AB8500_INT_ACC_DETECT_22DB_F,
+	       .flags = IORESOURCE_IRQ,
+	},
+	{
+	       .name = "ACC_DETECT_22DB_R",
+	       .start = AB8500_INT_ACC_DETECT_22DB_R,
+	       .end = AB8500_INT_ACC_DETECT_22DB_R,
+	       .flags = IORESOURCE_IRQ,
+	},
+};
+
 static struct resource ab8500_charger_resources[] = {
 	{
 		.name = "MAIN_CH_UNPLUG_DET",
@@ -639,45 +678,6 @@ static struct resource ab8500_temp_resources[] = {
 	},
 };
 
-static struct resource ab8500_codec_resources[] = {
-	{
-		.name = "ACC_DETECT_1DB_F",
-		.start = AB8500_INT_ACC_DETECT_1DB_F,
-		.end = AB8500_INT_ACC_DETECT_1DB_F,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "ACC_DETECT_1DB_R",
-		.start = AB8500_INT_ACC_DETECT_1DB_R,
-		.end = AB8500_INT_ACC_DETECT_1DB_R,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "ACC_DETECT_22DB_F",
-		.start = AB8500_INT_ACC_DETECT_22DB_F,
-		.end = AB8500_INT_ACC_DETECT_22DB_F,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "ACC_DETECT_22DB_R",
-		.start = AB8500_INT_ACC_DETECT_22DB_R,
-		.end = AB8500_INT_ACC_DETECT_22DB_R,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "ACC_DETECT_21DB_F",
-		.start = AB8500_INT_ACC_DETECT_21DB_F,
-		.end = AB8500_INT_ACC_DETECT_21DB_F,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "ACC_DETECT_21DB_R",
-		.start = AB8500_INT_ACC_DETECT_21DB_R,
-		.end = AB8500_INT_ACC_DETECT_21DB_R,
-		.flags = IORESOURCE_IRQ,
-	}
-};
-
 static struct mfd_cell ab8500_devs[] = {
 #ifdef CONFIG_DEBUG_FS
 	{
@@ -731,9 +731,12 @@ static struct mfd_cell ab8500_devs[] = {
 		.resources = ab8500_chargalg_resources,
 	},
 	{
+		.name = "ab8500-acc-det",
+		.num_resources = ARRAY_SIZE(ab8500_av_acc_detect_resources),
+		.resources = ab8500_av_acc_detect_resources,
+	},
+	{
 		.name = "ab8500-codec",
-		.num_resources = ARRAY_SIZE(ab8500_codec_resources),
-		.resources = ab8500_codec_resources,
 	},
 	{
 		.name = "ab8500-usb",
