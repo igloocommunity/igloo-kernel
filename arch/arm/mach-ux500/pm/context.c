@@ -21,7 +21,13 @@
 #include <mach/irqs.h>
 #include <mach/scu.h>
 
+#include <plat/gpio.h>
+
 #include "context.h"
+#include "pm.h"
+
+#define GPIO_NUM_BANKS 9
+#define GPIO_NUM_SAVE_REGISTERS 7
 
 /*
  * TODO:
@@ -166,6 +172,19 @@ static u32 backup_sram_storage[NR_CPUS] = {
 	IO_ADDRESS(U8500_CPU0_CP15_CR_BACKUPRAM_ADDR),
 	IO_ADDRESS(U8500_CPU1_CP15_CR_BACKUPRAM_ADDR),
 };
+
+static u32 gpio_bankaddr[GPIO_NUM_BANKS] = {IO_ADDRESS(U8500_GPIOBANK0_BASE),
+					    IO_ADDRESS(U8500_GPIOBANK1_BASE),
+					    IO_ADDRESS(U8500_GPIOBANK2_BASE),
+					    IO_ADDRESS(U8500_GPIOBANK3_BASE),
+					    IO_ADDRESS(U8500_GPIOBANK4_BASE),
+					    IO_ADDRESS(U8500_GPIOBANK5_BASE),
+					    IO_ADDRESS(U8500_GPIOBANK6_BASE),
+					    IO_ADDRESS(U8500_GPIOBANK7_BASE),
+					    IO_ADDRESS(U8500_GPIOBANK8_BASE)
+};
+
+static u32 gpio_save[GPIO_NUM_BANKS][GPIO_NUM_SAVE_REGISTERS];
 
 /*
  * Stacks and stack pointers
@@ -513,7 +532,6 @@ static void restore_scu(void)
 	       context_scu.base + SCU_ACCESS_CTRL_SAC);
 }
 
-
 /*
  * Save VAPE context
  */
@@ -553,6 +571,138 @@ void context_vape_restore(void)
 
 	atomic_notifier_call_chain(&context_ape_notifier_list,
 				   CONTEXT_APE_RESTORE, NULL);
+}
+
+/*
+ * Save GPIO registers that might be modified
+ * for power save reasons.
+ */
+void context_gpio_save(void)
+{
+	int i;
+
+	for (i = 0; i < GPIO_NUM_BANKS; i++) {
+		gpio_save[i][0] = readl(gpio_bankaddr[i] + NMK_GPIO_AFSLA);
+		gpio_save[i][1] = readl(gpio_bankaddr[i] + NMK_GPIO_AFSLB);
+		gpio_save[i][2] = readl(gpio_bankaddr[i] + NMK_GPIO_PDIS);
+		gpio_save[i][3] = readl(gpio_bankaddr[i] + NMK_GPIO_DIR);
+		gpio_save[i][4] = readl(gpio_bankaddr[i] + NMK_GPIO_DAT);
+		gpio_save[i][6] = readl(gpio_bankaddr[i] + NMK_GPIO_SLPC);
+	}
+}
+
+/*
+ * Restore GPIO registers that might be modified
+ * for power save reasons.
+ */
+void context_gpio_restore(void)
+{
+	int i;
+	u32 output_state;
+	u32 pull_up;
+	u32 pull_down;
+	u32 pull;
+
+	for (i = 0; i < GPIO_NUM_BANKS; i++) {
+		writel(gpio_save[i][2], gpio_bankaddr[i] + NMK_GPIO_PDIS);
+
+		writel(gpio_save[i][3], gpio_bankaddr[i] + NMK_GPIO_DIR);
+
+		/* Set the high outputs. outpute_state = GPIO_DIR & GPIO_DAT */
+		output_state = gpio_save[i][3] & gpio_save[i][4];
+		writel(output_state, gpio_bankaddr[i] + NMK_GPIO_DATS);
+
+		/*
+		 * Set the low outputs.
+		 * outpute_state = ~(GPIO_DIR & GPIO_DAT) & GPIO_DIR
+		 */
+		output_state = ~(gpio_save[i][3] & gpio_save[i][4]) &
+			gpio_save[i][3];
+		writel(output_state, gpio_bankaddr[i] + NMK_GPIO_DATC);
+
+		/*
+		 * Restore pull up/down.
+		 * Only write pull up/down settings on inputs where
+		 * PDIS is not set.
+		 * pull = (~GPIO_DIR & ~GPIO_PDIS)
+		 */
+		pull = (~gpio_save[i][3] & ~gpio_save[i][2]);
+		nmk_gpio_read_pull(i, &pull_up);
+
+		pull_down = pull & ~pull_up;
+		pull_up = pull & pull_up;
+		/* Set pull ups */
+		writel(pull_up, gpio_bankaddr[i] + NMK_GPIO_DATS);
+		/* Set pull downs */
+		writel(pull_down, gpio_bankaddr[i] + NMK_GPIO_DATC);
+
+		writel(gpio_save[i][6], gpio_bankaddr[i] + NMK_GPIO_SLPC);
+
+	}
+
+}
+
+/*
+ * Restore GPIO mux registers that might be modified
+ * for power save reasons.
+ */
+void context_gpio_restore_mux(void)
+{
+	int i;
+
+	/* Change mux settings */
+	for (i = 0; i < GPIO_NUM_BANKS; i++) {
+		writel(gpio_save[i][0], gpio_bankaddr[i] + NMK_GPIO_AFSLA);
+		writel(gpio_save[i][1], gpio_bankaddr[i] + NMK_GPIO_AFSLB);
+	}
+}
+
+/*
+ * Safe sequence used to switch IOs between GPIO and Alternate-C mode:
+ *  - Save SLPM registers
+ *  - Set SLPM=0 for the IOs you want to switch and others to 1
+ *  - Configure the GPIO registers for the IOs that are being switched
+ *  - Set IOFORCE=1
+ *  - Modify the AFLSA/B registers for the IOs that are being switched
+ *  - Set IOFORCE=0
+ *  - Restore SLPM registers
+ *  - Any spurious wake up event during switch sequence to be ignored
+ *    and cleared
+ */
+void context_gpio_mux_safe_switch(bool begin)
+{
+	int i;
+
+	static u32 slpc[GPIO_NUM_BANKS];
+	static u32 rwimsc[GPIO_NUM_BANKS];
+	static u32 fwimsc[GPIO_NUM_BANKS];
+
+	if (begin) {
+		for (i = 0; i < GPIO_NUM_BANKS; i++) {
+			/* Save registers */
+			slpc[i] = readl(gpio_bankaddr[i] + NMK_GPIO_SLPC);
+			rwimsc[i] = readl(gpio_bankaddr[i] + NMK_GPIO_RWIMSC);
+			fwimsc[i] = readl(gpio_bankaddr[i] + NMK_GPIO_FWIMSC);
+
+			/* Prevent spurious wakeups */
+			writel(0, gpio_bankaddr[i] + NMK_GPIO_RWIMSC);
+			writel(0, gpio_bankaddr[i] + NMK_GPIO_FWIMSC);
+			writel(0, gpio_bankaddr[i] + NMK_GPIO_SLPC);
+		}
+
+		ux500_pm_prcmu_set_ioforce(true);
+	} else {
+		ux500_pm_prcmu_set_ioforce(false);
+
+		/* Restore wake up settings */
+		for (i = 0; i < GPIO_NUM_BANKS; i++) {
+			writel(slpc[i], gpio_bankaddr[i] + NMK_GPIO_SLPC);
+			writel(rwimsc[i], gpio_bankaddr[i] + NMK_GPIO_RWIMSC);
+			writel(fwimsc[i], gpio_bankaddr[i] + NMK_GPIO_FWIMSC);
+		}
+
+	}
+
 }
 
 /*
@@ -737,4 +887,3 @@ static int __init context_init(void)
 	return 0;
 }
 subsys_initcall(context_init);
-
