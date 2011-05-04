@@ -15,7 +15,6 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
@@ -103,9 +102,6 @@
 
 /* maximum threshold value */
 #define MAX_I2C_FIFO_THRESHOLD	15
-
-/* per-transfer delay, required for the hardware to stabilize */
-#define I2C_DELAY		150
 
 enum i2c_status {
 	I2C_NOP,
@@ -267,7 +263,6 @@ static int init_hw(struct nmk_i2c_dev *dev)
 	dev->cli.operation = I2C_NO_OPERATION;
 
 exit:
-	udelay(I2C_DELAY);
 	return stat;
 }
 
@@ -643,7 +638,6 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
 
 				break;
 			}
-			udelay(I2C_DELAY);
 		}
 		if (status == 0)
 			break;
@@ -767,13 +761,8 @@ static irqreturn_t i2c_irq_handler(int irq, void *arg)
 			}
 		}
 
-		i2c_set_bit(dev->virtbase + I2C_ICR, I2C_IT_MTD);
-		i2c_set_bit(dev->virtbase + I2C_ICR, I2C_IT_MTDWS);
-
-		disable_interrupts(dev,
-				(I2C_IT_TXFNE | I2C_IT_TXFE | I2C_IT_TXFF
-					| I2C_IT_TXFOVR | I2C_IT_RXFNF
-					| I2C_IT_RXFF | I2C_IT_RXFE));
+		disable_all_interrupts(dev);
+		clear_all_interrupts(dev);
 
 		if (dev->cli.count) {
 			dev->result = -EIO;
