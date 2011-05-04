@@ -67,7 +67,8 @@ static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
 	/* On-board eMMC power */
 	REGULATOR_SUPPLY("vmmc", "sdi4"),
 	/* AB8500 audio codec */
-	REGULATOR_SUPPLY("vcc-N2158", "ab8500-codec.0"),
+	REGULATOR_SUPPLY("vcc-avswitch", "ab8500-codec.0"),
+	REGULATOR_SUPPLY("vcc-avswitch", "ab8500-acc-det.0"),
 	REGULATOR_SUPPLY_DEBUG("aux2", "reg-virt-consumer.1")
 };
 
