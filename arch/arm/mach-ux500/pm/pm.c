@@ -10,12 +10,12 @@
 #include <linux/percpu.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/gpio.h>
 
 #include <asm/hardware/gic.h>
 
 #include <mach/hardware.h>
 #include <mach/prcmu-regs.h>
-#include <mach/gpio.h>
 
 #define STABILIZATION_TIME 30 /* us */
 
@@ -310,8 +310,12 @@ void ux500_pm_gpio_save_wake_up_status(void)
 		banks = u8500_gpio_banks;
 	}
 
+	nmk_gpio_clocks_enable();
+
 	for (i = 0; i < num_banks; i++)
 		ux500_gpio_wks[i] = readl(IO_ADDRESS(banks[i]) + NMK_GPIO_WKS);
+
+	nmk_gpio_clocks_disable();
 }
 
 u32 ux500_pm_gpio_read_wake_up_status(unsigned int bank_num)

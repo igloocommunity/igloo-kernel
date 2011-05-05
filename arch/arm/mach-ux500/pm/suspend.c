@@ -50,6 +50,8 @@ static int suspend(bool do_deepsleep)
 		return -EBUSY;
 	}
 
+	nmk_gpio_clocks_enable();
+
 	ux500_suspend_dbg_add_wake_on_uart();
 	nmk_gpio_wakeups_suspend();
 
@@ -139,6 +141,8 @@ static int suspend(bool do_deepsleep)
 
 	nmk_gpio_wakeups_resume();
 	ux500_suspend_dbg_remove_wake_on_uart();
+
+	nmk_gpio_clocks_disable();
 
 	return 0;
 }
