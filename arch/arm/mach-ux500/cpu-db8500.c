@@ -18,6 +18,7 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/regulator/machine.h>
+#include <linux/sys_soc.h>
 
 #include <asm/mach/map.h>
 #include <asm/pmu.h>
@@ -402,3 +403,69 @@ void __init u8500_init_devices(void)
 
 	return ;
 }
+
+#ifdef CONFIG_SYS_SOC
+#define U8500_BB_UID_BASE (U8500_BACKUPRAM1_BASE + 0xFC0)
+#define U8500_BB_UID_LENGTH 5
+
+static ssize_t ux500_get_machine(char *buf, struct sysfs_soc_info *si)
+{
+	return sprintf(buf, "DB%2x00\n", dbx500_id.partnumber);
+}
+
+static ssize_t ux500_get_soc_id(char *buf, struct sysfs_soc_info *si)
+{
+	void __iomem *uid_base;
+	int i;
+	ssize_t sz = 0;
+
+	if (dbx500_id.partnumber == 0x85) {
+		uid_base = __io_address(U8500_BB_UID_BASE);
+		for (i = 0; i < U8500_BB_UID_LENGTH; i++)
+			sz += sprintf(buf + sz, "%08x", readl(uid_base + i * sizeof(u32)));
+		sz += sprintf(buf + sz, "\n");
+	}
+	else {
+		/* Don't know where it is located for U5500 */
+		sz = sprintf(buf, "N/A\n");
+	}
+
+	return sz;
+}
+
+static ssize_t ux500_get_revision(char *buf, struct sysfs_soc_info *si)
+{
+	unsigned int rev = dbx500_id.revision;
+
+	if (rev == 0x01)
+		return sprintf(buf, "%s\n", "ED");
+	else if (rev >= 0xA0)
+		return sprintf(buf, "%d.%d\n" , (rev >> 4) - 0xA + 1, rev & 0xf);
+
+	return sprintf(buf, "%s", "Unknown\n");
+}
+
+static ssize_t ux500_get_process(char *buf, struct sysfs_soc_info *si)
+{
+	if (dbx500_id.process == 0x00)
+		return sprintf(buf, "Standard\n");
+
+	return sprintf(buf, "%02xnm\n", dbx500_id.process);
+}
+
+static struct sysfs_soc_info soc_info[] = {
+	SYSFS_SOC_ATTR_CALLBACK("machine", ux500_get_machine),
+	SYSFS_SOC_ATTR_VALUE("family", "Ux500"),
+	SYSFS_SOC_ATTR_CALLBACK("soc_id", ux500_get_soc_id),
+	SYSFS_SOC_ATTR_CALLBACK("revision", ux500_get_revision),
+	SYSFS_SOC_ATTR_CALLBACK("process", ux500_get_process),
+};
+
+static int __init ux500_sys_soc_init(void)
+{
+	return register_sysfs_soc(soc_info, ARRAY_SIZE(soc_info));
+}
+
+module_init(ux500_sys_soc_init);
+#endif
+
