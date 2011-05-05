@@ -168,6 +168,7 @@ static int ux500_suspend_valid(suspend_state_t state)
 
 static int ux500_suspend_prepare_late(void)
 {
+	(void)prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_OFF);
 	ab8500_regulator_debug_force();
 
 	return 0;
@@ -176,6 +177,7 @@ static int ux500_suspend_prepare_late(void)
 static void ux500_suspend_wake(void)
 {
 	ab8500_regulator_debug_restore();
+	(void)prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
 }
 
 static struct platform_suspend_ops ux500_suspend_ops = {
