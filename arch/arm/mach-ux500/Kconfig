@@ -155,6 +155,12 @@ config UX500_DEBUG_HWREG
 	  Adds various debug files to access registers.
 	  This should never ever be used for anything else than debugging.
 
+config UX500_DEBUG_NO_LAUTERBACH
+       bool "Disable clocks needed for Lauterbach debugging"
+       help
+	  Disable clocks needed for Lauterbach debugging at boot.
+	  If yes, you will reduce the power consumption.
+
 source "arch/arm/mach-ux500/Kconfig-arch"
 source "arch/arm/mach-ux500/pm/Kconfig"
 endif
