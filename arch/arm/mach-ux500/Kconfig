@@ -6,6 +6,7 @@ config UX500_SOC_COMMON
 	select ARM_GIC
 	select NOMADIK_GPIO
 	select ARM_ERRATA_753970
+	select SYS_SOC
 
 menu "Ux500 SoC"
 
