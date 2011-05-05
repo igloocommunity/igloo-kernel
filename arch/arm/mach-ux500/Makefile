@@ -34,3 +34,4 @@ obj-$(CONFIG_TEE_SVP)		+= tee_ta_start_modem_svp.o
 obj-$(CONFIG_DB8500_MLOADER) 	+= mloader-db8500.o
 obj-$(CONFIG_UX500_PRCMU_TIMER)	+= timer-prcmu.o
 obj-$(CONFIG_U8500_REGULATOR_DEBUG)	+= virt-regulator-u8500.o
+obj-$(CONFIG_UX500_PRCMU_DEBUG)		+= prcmu-debug.o

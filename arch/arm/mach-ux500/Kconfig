@@ -88,6 +88,12 @@ config UX500_MTU_TIMER
 
 endchoice
 
+config UX500_PRCMU_DEBUG
+	bool "PRCMU debug"
+	depends on DEBUG_FS
+	help
+	  Add support for PRCMU debug
+
 config UX500_DEBUG_UART
 	int "Ux500 UART to use for low-level debug"
 	default 2
