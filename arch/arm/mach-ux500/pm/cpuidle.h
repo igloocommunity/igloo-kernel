@@ -69,7 +69,17 @@ struct cstate {
 
 struct cstate *ux500_ci_get_cstates(int *len);
 
+#ifdef CONFIG_U8500_CPUIDLE
 void ux500_cpuidle_plug(int cpu);
 void ux500_cpuidle_unplug(int cpu);
+#else
+static inline void ux500_cpuidle_plug(int cpu)
+{
+}
+
+static inline void ux500_cpuidle_unplug(int cpu)
+{
+}
+#endif
 
 #endif
