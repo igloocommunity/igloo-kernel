@@ -13,6 +13,7 @@
 #include <linux/platform_device.h>
 
 #include <asm/mach-types.h>
+#include <plat/pincfg.h>
 #include <plat/ste_dma40.h>
 #include <mach/devices.h>
 #include <mach/hardware.h>
@@ -124,10 +125,60 @@ static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
 #endif
 
 /*
+ * Reconfigures a GPIO pin with a given number to either ALT_A or
+ * GPIO input pin with pull ups.
+ */
+static void sdio_config_gpio(struct device *dev,
+			     bool cfg_for_mmc,
+			     int gpio_pin_nbr)
+{
+	int err;
+	pin_cfg_t p = gpio_pin_nbr;
+
+	if (cfg_for_mmc)
+		p |= PIN_ALT_A | PIN_INPUT_PULLUP;
+	else
+		p |= PIN_GPIO | PIN_INPUT_PULLUP;
+
+	err = nmk_config_pin(p, false);
+	if (err)
+		dev_err(dev,
+			"error %i while reconfiguring pin %i to %s mode!\n",
+			err, gpio_pin_nbr, cfg_for_mmc ? "ALT_A" : "GPIO");
+}
+
+/*
+ * Reconfigure all SDI1 pins to GPIO when SDI1 is not used since PL18X seems
+ * to drive some of them incorrectly when powered but not initialized.
+ */
+static u32 sdi1_vdd_handler(struct device *dev, unsigned int vdd,
+			     unsigned char power_mode)
+{
+	switch (power_mode) {
+	case MMC_POWER_ON:
+		sdio_config_gpio(dev, true, 210);
+		sdio_config_gpio(dev, true, 211);
+		sdio_config_gpio(dev, true, 212);
+		sdio_config_gpio(dev, true, 213);
+		sdio_config_gpio(dev, true, 214);
+		break;
+	case MMC_POWER_OFF:
+		sdio_config_gpio(dev, false, 210);
+		sdio_config_gpio(dev, false, 211);
+		sdio_config_gpio(dev, false, 212);
+		sdio_config_gpio(dev, false, 213);
+		sdio_config_gpio(dev, false, 214);
+		break;
+	}
+	return 0;
+}
+
+/*
  * TODO 1: SDIO power management not fully supported.
  * TODO 2: SDIO with DMA not yet supported.
  */
 static struct mmci_platform_data mop500_sdi1_data = {
+	.vdd_handler	= sdi1_vdd_handler,
 	.ocr_mask	= MMC_VDD_29_30,
 	.f_max		= 15000000,
 	.capabilities	= MMC_CAP_4_BIT_DATA |
