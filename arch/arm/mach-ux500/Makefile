@@ -2,10 +2,6 @@
 # Makefile for the linux kernel, U8500 machine.
 #
 
-ifeq ($(CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL), y)
-	CFLAGS_board-mop500-bm.o += -DAB8500_BATTERY_THERM_ON_BATCTRL
-endif
-
 obj-y				:= clock.o cpu.o devices.o dcache.o \
 				   devices-common.o id.o pins.o \
 				   timer.o timer-mtu.o usb.o
