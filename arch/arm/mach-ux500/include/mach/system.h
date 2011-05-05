@@ -9,6 +9,7 @@
 #define __ASM_ARCH_SYSTEM_H
 
 #include <mach/prcmu-fw-api.h>
+#include <mach/reboot_reasons.h>
 
 static inline void arch_idle(void)
 {
@@ -22,7 +23,8 @@ static inline void arch_idle(void)
 static inline void arch_reset(char mode, const char *cmd)
 {
 #ifdef CONFIG_UX500_SOC_DB8500
-	prcmu_system_reset();
+	/* Call the PRCMU reset API (w/o reset reason code) */
+	prcmu_system_reset(SW_RESET_NO_ARGUMENT);
 #endif
 }
 

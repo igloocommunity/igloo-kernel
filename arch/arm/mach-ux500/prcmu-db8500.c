@@ -78,6 +78,8 @@
 #define PRCM_ROMCODE_P2A	0xFFD
 #define PRCM_XP70_CUR_PWR_STATE 0xFFC      /* 4 BYTES */
 
+#define PRCM_SW_RST_REASON 0xFF8 /* 2 bytes */
+
 #define _PRCM_MBOX_HEADER		0xFE8 /* 16 bytes */
 #define PRCM_MBOX_HEADER_REQ_MB0	(_PRCM_MBOX_HEADER + 0x0)
 #define PRCM_MBOX_HEADER_REQ_MB1	(_PRCM_MBOX_HEADER + 0x1)
@@ -1677,10 +1679,12 @@ bool prcmu_is_ac_wake_requested(void)
 /**
  * prcmu_system_reset - System reset
  *
- * Sets the APE_SOFRST register which fires interrupt to fw
+ * Saves the reset reason code and then sets the APE_SOFRST register which
+ * fires interrupt to fw
  */
-void prcmu_system_reset(void)
+void prcmu_system_reset(u16 reset_code)
 {
+	writew(reset_code, (tcdm_base + PRCM_SW_RST_REASON));
 	writel(1, (_PRCMU_BASE + PRCM_APE_SOFTRST));
 }
 
