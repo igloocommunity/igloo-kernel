@@ -18,7 +18,6 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/random.h>
-#include <linux/workqueue.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
@@ -48,6 +47,11 @@
 #define AB5500_MASK_END (0x79)
 #define AB5500_CHIP_ID (0x20)
 
+#define AB5500_IT_LATCH0_REG		0x40
+#define AB5500_IT_MASK0_REG		0x60
+#define AB5500_NUM_IRQ_REGS		23
+#define AB5500_NR_IRQS			(23 * 8)
+
 /**
  * struct ab5500
  * @access_mutex: lock out concurrent accesses to the AB registers
@@ -56,8 +60,7 @@
  * @irq_base: the platform configuration irq base for subdevices
  * @chip_name: name of this chip variant
  * @chip_id: 8 bit chip ID for this chip variant
- * @mask_work: a worker for writing to mask registers
- * @event_lock: a lock to protect the event_mask
+ * @irq_lock: a lock to protect the mask
  * @abb_events: a local bit mask of the prcmu wakeup events
  * @event_mask: a local copy of the mask event registers
  * @last_event_mask: a copy of the last event_mask written to hardware
@@ -71,15 +74,11 @@ struct ab5500 {
 	unsigned int irq_base;
 	char chip_name[32];
 	u8 chip_id;
-	struct work_struct mask_work;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 30)
-	struct work_struct irq_work;
-#endif
-	spinlock_t event_lock;
+	struct mutex irq_lock;
 	u32 abb_events;
-	u8 event_mask[AB5500_NUM_EVENT_REG];
-	u8 last_event_mask[AB5500_NUM_EVENT_REG];
-	u8 startup_events[AB5500_NUM_EVENT_REG];
+	u8 mask[AB5500_NUM_IRQ_REGS];
+	u8 oldmask[AB5500_NUM_IRQ_REGS];
+	u8 startup_events[AB5500_NUM_IRQ_REGS];
 	bool startup_events_read;
 #ifdef CONFIG_DEBUG_FS
 	unsigned int debug_bank;
@@ -250,7 +249,7 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 		.nbanks = 1,
 		.bank = (struct ab5500_i2c_ranges[]) {
 			{
-				.bankid = AB5500_BANK_LED,
+				.bankid = AB5500_BANK_RTC,
 				.nranges = 1,
 				.range = (struct ab5500_reg_range[]) {
 					{
@@ -351,6 +350,8 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 	},
 };
 
+#define AB5500_IRQ(bank, bit)	((bank) * 8 + (bit))
+
 /* I appologize for the resource names beeing a mix of upper case
  * and lower case but I want them to be exact as the documentation */
 static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
@@ -382,6 +383,15 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 	[AB5500_DEVID_RTC] = {
 		.name = "ab5500-rtc",
 		.id = AB5500_DEVID_RTC,
+		.num_resources = 1,
+		.resources = (struct resource[]) {
+			{
+				.name	= "RTC_Alarm",
+				.flags	= IORESOURCE_IRQ,
+				.start	= AB5500_IRQ(1, 7),
+				.end	= AB5500_IRQ(1, 7),
+			}
+		},
 	},
 	[AB5500_DEVID_CHARGER] = {
 		.name = "ab5500-charger",
@@ -868,17 +878,25 @@ static int get_register_page_interruptible(struct ab5500 *ab, u8 bank,
 	if (bank >= AB5500_NUM_BANKS)
 		return -EINVAL;
 
-	/* The hardware limit for get page is 4 */
-	if (numregs > 4)
-		return -EINVAL;
-
 	err = mutex_lock_interruptible(&ab->access_mutex);
 	if (err)
 		return err;
 
-	err = db5500_prcmu_abb_read(bankinfo[bank].slave_addr, first_reg,
-		regvals, numregs);
+	while (numregs) {
+		/* The hardware limit for get page is 4 */
+		u8 curnum = min_t(u8, numregs, 4u);
 
+		err = db5500_prcmu_abb_read(bankinfo[bank].slave_addr,
+					    first_reg, regvals, curnum);
+		if (err)
+			goto out;
+
+		numregs -= curnum;
+		first_reg += curnum;
+		regvals += curnum;
+	}
+
+out:
 	mutex_unlock(&ab->access_mutex);
 	return err;
 }
@@ -915,6 +933,12 @@ static int mask_and_set_register_interruptible(struct ab5500 *ab, u8 bank,
 		mutex_unlock(&ab->access_mutex);
 	}
 	return err;
+}
+
+static int
+set_register_interruptible(struct ab5500 *ab, u8 bank, u8 reg, u8 value)
+{
+	return mask_and_set_register_interruptible(ab, bank, reg, 0xff, value);
 }
 
 /*
@@ -999,15 +1023,15 @@ static bool reg_read_allowed(u8 devid, u8 bank, u8 reg)
 /*
  * The exported register access functionality.
  */
-int ab5500_get_chip_id(struct device *dev)
+static int ab5500_get_chip_id(struct device *dev)
 {
 	struct ab5500 *ab = dev_get_drvdata(dev->parent);
 
 	return (int)ab->chip_id;
 }
 
-int ab5500_mask_and_set_register_interruptible(struct device *dev, u8 bank,
-	u8 reg, u8 bitmask, u8 bitvalues)
+static int ab5500_mask_and_set_register_interruptible(struct device *dev,
+		u8 bank, u8 reg, u8 bitmask, u8 bitvalues)
 {
 	struct ab5500 *ab;
 	struct platform_device *pdev = to_platform_device(dev);
@@ -1021,15 +1045,15 @@ int ab5500_mask_and_set_register_interruptible(struct device *dev, u8 bank,
 		bitmask, bitvalues);
 }
 
-int ab5500_set_register_interruptible(struct device *dev, u8 bank, u8 reg,
-	u8 value)
+static int ab5500_set_register_interruptible(struct device *dev, u8 bank,
+	u8 reg, u8 value)
 {
 	return ab5500_mask_and_set_register_interruptible(dev, bank, reg, 0xFF,
 		value);
 }
 
-int ab5500_get_register_interruptible(struct device *dev, u8 bank, u8 reg,
-	u8 *value)
+static int ab5500_get_register_interruptible(struct device *dev, u8 bank,
+		u8 reg, u8 *value)
 {
 	struct ab5500 *ab;
 	struct platform_device *pdev = to_platform_device(dev);
@@ -1042,8 +1066,8 @@ int ab5500_get_register_interruptible(struct device *dev, u8 bank, u8 reg,
 	return get_register_interruptible(ab, bank, reg, value);
 }
 
-int ab5500_get_register_page_interruptible(struct device *dev, u8 bank,
-	u8 first_reg, u8 *regvals, u8 numregs)
+static int ab5500_get_register_page_interruptible(struct device *dev, u8 bank,
+		u8 first_reg, u8 *regvals, u8 numregs)
 {
 	struct ab5500 *ab;
 	struct platform_device *pdev = to_platform_device(dev);
@@ -1058,7 +1082,8 @@ int ab5500_get_register_page_interruptible(struct device *dev, u8 bank,
 		numregs);
 }
 
-int ab5500_event_registers_startup_state_get(struct device *dev, u8 *event)
+static int
+ab5500_event_registers_startup_state_get(struct device *dev, u8 *event)
 {
 	struct ab5500 *ab;
 
@@ -1070,7 +1095,7 @@ int ab5500_event_registers_startup_state_get(struct device *dev, u8 *event)
 	return 0;
 }
 
-int ab5500_startup_irq_enabled(struct device *dev, unsigned int irq)
+static int ab5500_startup_irq_enabled(struct device *dev, unsigned int irq)
 {
 	struct ab5500 *ab;
 	bool val;
@@ -1094,102 +1119,35 @@ static struct abx500_ops ab5500_ops = {
 	.startup_irq_enabled = ab5500_startup_irq_enabled,
 };
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 30)
-static irqreturn_t ab5500_irq_handler(int irq, void *data)
+static irqreturn_t ab5500_irq(int irq, void *data)
 {
 	struct ab5500 *ab = data;
+	u8 i;
 
 	/*
-	 * Disable the IRQ and dispatch a worker to handle the
-	 * event. Since the chip resides on I2C this is slow
-	 * stuff and we will re-enable the interrupts once the
-	 * worker has finished.
+	 * TODO: use the ITMASTER registers to reduce the number of i2c reads.
 	 */
-	disable_irq_nosync(irq);
-	schedule_work(&ab->irq_work);
-	return IRQ_HANDLED;
-}
-
-static void ab5500_irq_work(struct work_struct *work)
-{
-	struct ab5500 *ab = container_of(work, struct ab5500, irq_work);
-	u8 i;
-	u8 *e = 0;
-	u8 events[AB5500_NUM_EVENT_REG];
-	unsigned long flags;
-
-	prcmu_get_abb_event_buf(&e);
-
-	spin_lock_irqsave(&ab->event_lock, flags);
-	for (i = 0; i < AB5500_NUM_EVENT_REG; i++)
-		events[i] = e[i] & ~ab->event_mask[i];
-	spin_unlock_irqrestore(&ab->event_lock, flags);
-
-	local_irq_disable();
-	for (i = 0; i < AB5500_NUM_EVENT_REG; i++) {
-		u8 bit;
-		u8 event_reg;
-
-		dev_dbg(ab->dev, "IRQ Event[%d]: 0x%2x\n",
-			i, events[i]);
-
-		event_reg = events[i];
-		for (bit = 0; event_reg; bit++, event_reg /= 2) {
-			if (event_reg % 2) {
-				unsigned int irq;
-				struct irq_desc *desc;
-
-				irq = ab->irq_base + (i * 8) + bit;
-				desc = irq_to_desc(irq);
-				if (desc->status & IRQ_DISABLED)
-					note_interrupt(irq, desc, IRQ_NONE);
-				else
-					desc->handle_irq(irq, desc);
-			}
-		}
-	}
-	local_irq_enable();
-	/* By now the IRQ should be acked and deasserted so enable it again */
-	enable_irq(ab->ab5500_irq);
-}
-
-#else
-
-static irqreturn_t ab5500_irq_handler(int irq, void *data)
-{
-	struct ab5500 *ab = data;
-	u8 i;
-	u8 *e = 0;
-	u8 events[AB5500_NUM_EVENT_REG];
-
-	prcmu_get_abb_event_buf(&e);
-
-	spin_lock(&ab->event_lock);
-	for (i = 0; i < AB5500_NUM_EVENT_REG; i++)
-		events[i] = e[i] & ~ab->event_mask[i];
-	spin_unlock(&ab->event_lock);
 
 	for (i = 0; i < AB5500_NUM_EVENT_REG; i++) {
-		u8 bit;
-		u8 event_reg;
+		int status;
+		u8 value;
 
-		dev_dbg(ab->dev, "IRQ Event[%d]: 0x%2x\n",
-			i, events[i]);
+		status = get_register_interruptible(ab, AB5500_BANK_IT,
+				AB5500_IT_LATCH0_REG + i, &value);
+		if (status < 0 || value == 0)
+			continue;
 
-		event_reg = events[i];
-		for (bit = 0; event_reg; bit++, event_reg /= 2) {
-			if (event_reg % 2) {
-				unsigned int irq;
+		do {
+			int bit = __ffs(value);
+			int line = i * 8 + bit;
 
-				irq = ab->irq_base + (i * 8) + bit;
-				generic_handle_irq(irq);
-			}
-		}
+			handle_nested_irq(ab->irq_base + line);
+			value &= ~(1 << bit);
+		} while (value);
 	}
 
 	return IRQ_HANDLED;
 }
-#endif
 
 #ifdef CONFIG_DEBUG_FS
 static struct ab5500_i2c_ranges debug_ranges[AB5500_NUM_BANKS] = {
@@ -1854,7 +1812,7 @@ static int __init ab5500_setup(struct ab5500 *ab,
 		if ((settings[i].bank == AB5500_BANK_IT) &&
 			(AB5500_MASK_BASE <= settings[i].reg) &&
 			(settings[i].reg <= AB5500_MASK_END)) {
-			ab->event_mask[settings[i].reg - AB5500_MASK_BASE] =
+			ab->mask[settings[i].reg - AB5500_MASK_BASE] =
 				settings[i].setting;
 		}
 	}
@@ -1862,97 +1820,61 @@ exit_no_setup:
 	return err;
 }
 
-static void ab5500_mask_work(struct work_struct *work)
+static void ab5500_irq_mask(struct irq_data *data)
 {
-	struct ab5500 *ab = container_of(work, struct ab5500, mask_work);
+	struct ab5500 *ab = irq_data_get_irq_chip_data(data);
+	int offset = data->irq - ab->irq_base;
+	int index = offset / 8;
+	int mask = BIT(offset % 8);
+
+	ab->mask[index] |= mask;
+}
+
+static void ab5500_irq_unmask(struct irq_data *data)
+{
+	struct ab5500 *ab = irq_data_get_irq_chip_data(data);
+	int offset = data->irq - ab->irq_base;
+	int index = offset / 8;
+	int mask = BIT(offset % 8);
+
+	ab->mask[index] &= ~mask;
+}
+
+static void ab5500_irq_lock(struct irq_data *data)
+{
+	struct ab5500 *ab = irq_data_get_irq_chip_data(data);
+
+	mutex_lock(&ab->irq_lock);
+}
+
+static void ab5500_irq_sync_unlock(struct irq_data *data)
+{
+	struct ab5500 *ab = irq_data_get_irq_chip_data(data);
 	int i;
-	int err;
-	unsigned long flags;
-	u8 mask[AB5500_NUM_EVENT_REG];
-	int call_prcmu_event_readout = 0;
 
-	spin_lock_irqsave(&ab->event_lock, flags);
-	for (i = 0; i < AB5500_NUM_EVENT_REG; i++)
-		mask[i] = ab->event_mask[i];
-	spin_unlock_irqrestore(&ab->event_lock, flags);
+	for (i = 0; i < AB5500_NUM_IRQ_REGS; i++) {
+		u8 old = ab->oldmask[i];
+		u8 new = ab->mask[i];
+		int reg;
 
-	for (i = 0; i < AB5500_NUM_EVENT_REG; i++) {
-		if (mask[i] != ab->last_event_mask[i]) {
-			err = mask_and_set_register_interruptible(ab, 0,
-				(AB5500_MASK_BASE + i), ~0, mask[i]);
-			if (err) {
-				dev_err(ab->dev,
-					"ab5500_mask_work failed 0x%x,0x%x\n",
-					(AB5500_MASK_BASE + i), mask[i]);
-				break;
-			}
+		if (new == old)
+			continue;
 
-			if (mask[i] == 0xFF) {
-				ab->abb_events &= ~BIT(i);
-				call_prcmu_event_readout = 1;
-			} else {
-				ab->abb_events |= BIT(i);
-				if (ab->last_event_mask[i] == 0xFF)
-					call_prcmu_event_readout = 1;
-			}
+		ab->oldmask[i] = new;
 
-			ab->last_event_mask[i] = mask[i];
-		}
+		reg = AB5500_IT_MASK0_REG + i;
+		set_register_interruptible(ab, AB5500_BANK_IT, reg, new);
 	}
-	if (call_prcmu_event_readout) {
-		err = db5500_prcmu_config_abb_event_readout(ab->abb_events);
-		if (err)
-			dev_err(ab->dev,
-				"prcmu_config_abb_event_readout failed\n");
-	}
-}
 
-static void ab5500_mask(struct irq_data *data)
-{
-	unsigned long flags;
-	struct ab5500 *ab;
- 	int irq;
- 
- 	ab = irq_data_get_irq_chip_data(data);
-	irq = data->irq - ab->irq.base;
-
- 	spin_lock_irqsave(&ab->event_lock, flags);
-	ab->event_mask[irq / 8] |= BIT(irq % 8);
-	spin_unlock_irqrestore(&ab->event_lock, flags);
-
-	schedule_work(&ab->mask_work);
-}
-
-static void ab5500_unmask(struct irq_data *data)
-{
-	unsigned long flags;
-	struct ab5500 *ab;
- 	int irq;
- 
- 	ab = irq_data_get_irq_chip_data(data);
-	irq = data->irq - ab->irq.base;
-
-	spin_lock_irqsave(&ab->event_lock, flags);
-	ab->event_mask[irq / 8] &= ~BIT(irq % 8);
-	spin_unlock_irqrestore(&ab->event_lock, flags);
-
-	schedule_work(&ab->mask_work);
-}
-
-static void noop(unsigned int irq)
-{
+	mutex_unlock(&ab->irq_lock);
 }
 
 static struct irq_chip ab5500_irq_chip = {
-	.name		= "ab5500-core", /* Keep the same name as the request */
-	.startup	= NULL, /* defaults to enable */
-	.shutdown	= NULL, /* defaults to disable */
-	.enable		= NULL, /* defaults to unmask */
-	.disable	= ab5500_mask, /* No default to mask in chip.c */
-	.ack		= noop,
-	.mask		= ab5500_mask,
-	.unmask		= ab5500_unmask,
-	.end		= NULL,
+	.name			= "ab5500",
+	.irq_mask		= ab5500_irq_mask,
+	.irq_unmask		= ab5500_irq_unmask,
+	.irq_bus_lock		= ab5500_irq_lock,
+	.irq_bus_sync_unlock	= ab5500_irq_sync_unlock,
 };
 
 struct ab_family_id {
@@ -1965,6 +1887,10 @@ static const struct ab_family_id ids[] __initdata = {
 	{
 		.id = AB5500_1_0,
 		.name = "1.0"
+	},
+	{
+		.id = AB5500_1_1,
+		.name = "1.1"
 	},
 	/* Terminator */
 	{
@@ -1990,7 +1916,7 @@ static int __init ab5500_probe(struct platform_device *pdev)
 
 	/* Initialize data structure */
 	mutex_init(&ab->access_mutex);
-	spin_lock_init(&ab->event_lock);
+	mutex_init(&ab->irq_lock);
 	ab->dev = &pdev->dev;
 	ab->irq_base = ab5500_plf_data->irq.base;
 
@@ -2032,11 +1958,6 @@ static int __init ab5500_probe(struct platform_device *pdev)
 		goto exit_no_setup;
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 30)
-	INIT_WORK(&ab->irq_work, ab5500_irq_work);
-#endif
-	INIT_WORK(&ab->mask_work, ab5500_mask_work);
-
 	for (i = 0; i < ab5500_plf_data->irq.count; i++) {
 		unsigned int irq;
 
@@ -2044,36 +1965,38 @@ static int __init ab5500_probe(struct platform_device *pdev)
 		set_irq_chip_data(irq, ab);
 		set_irq_chip_and_handler(irq, &ab5500_irq_chip,
 			handle_simple_irq);
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 29)
 		set_irq_nested_thread(irq, 1);
-#endif
+#ifdef CONFIG_ARM
 		set_irq_flags(irq, IRQF_VALID);
+#else
+		set_irq_noprobe(irq);
+#endif
 	}
 
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-
 	if (!res) {
 		dev_err(&pdev->dev, "ab5500_platform_get_resource error\n");
 		goto exit_no_irq;
 	}
 	ab->ab5500_irq = res->start;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 30)
-	/* This really unpredictable IRQ is of course sampled for entropy. */
-	err = request_irq(res->start, ab5500_irq_handler,
-		(IRQF_DISABLED | IRQF_SAMPLE_RANDOM), "ab5500-core", ab);
-	if (err) {
-		dev_err(&pdev->dev, "ab5500_request_irq error\n");
-		goto exit_no_irq;
+	/* Clear and mask all interrupts */
+	for (i = 0; i < AB5500_NUM_IRQ_REGS; i++) {
+		u8 latchreg = AB5500_IT_LATCH0_REG + i;
+		u8 maskreg = AB5500_IT_MASK0_REG + i;
+		u8 val;
+
+		get_register_interruptible(ab, AB5500_BANK_IT, latchreg, &val);
+		set_register_interruptible(ab, AB5500_BANK_IT, maskreg, 0xff);
 	}
 
-	/* We probably already got an irq here, but if not,
-	 * we force a first time and save the startup events here.*/
-	disable_irq_nosync(res->start);
-	schedule_work(&ab->irq_work);
-#else
-	err = request_threaded_irq(res->start, ab5500_irq_handler, NULL,
-		IRQF_SAMPLE_RANDOM, "ab5500-core", ab);
+	for (i = 0; i < AB5500_NUM_IRQ_REGS; i++)
+		ab->mask[i] = ab->oldmask[i] = 0xff;
+
+	err = request_threaded_irq(res->start, NULL, ab5500_irq,
+				   IRQF_NO_SUSPEND | IRQF_ONESHOT,
+				   "ab5500-core", ab);
+
 	/* This real unpredictable IRQ is of course sampled for entropy */
 	rand_initialize_irq(res->start);
 
@@ -2081,7 +2004,6 @@ static int __init ab5500_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "ab5500_request_irq error\n");
 		goto exit_no_irq;
 	}
-#endif
 
 	err = abx500_register_ops(&pdev->dev, &ab5500_ops);
 	if (err) {
@@ -2091,8 +2013,7 @@ static int __init ab5500_probe(struct platform_device *pdev)
 
 	/* Set up and register the platform devices. */
 	for (i = 0; i < AB5500_NUM_DEVICES; i++) {
-		ab5500_devs[i].platform_data = ab5500_plf_data->dev_data[i];
-		ab5500_devs[i].data_size = ab5500_plf_data->dev_data_sz[i];
+		ab5500_devs[i].mfd_data = ab5500_plf_data->dev_data[i];
 	}
 
 	err = mfd_add_devices(&pdev->dev, 0, ab5500_devs,
