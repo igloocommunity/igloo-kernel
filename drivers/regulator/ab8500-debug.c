@@ -1448,18 +1448,6 @@ struct ab8500_force_reg {
 static struct ab8500_force_reg ab8500_force_reg[] = {
 	{
 		/*
-		 * VRF1Vaux3Regu
-		 * OTP: 0x04, HSI: 0x08, suspend: 0x08/0x0f (value/mask)
-		 * [3:2] VRF1Regu[1:0] = VRF1 in HW control
-		 */
-		.name = "VRF1Vaux3Regu",
-		.bank = 0x04,
-		.addr = 0x0a,
-		.mask = 0x0c,
-		.val  = 0x08,
-	},
-	{
-		/*
 		 * SysClkCtrl
 		 * OTP: 0x00, HSI: 0x06, suspend: 0x00/0x07 (value/mask)
 		 * [  2] USBClkEna = disable SysClk path to USB block
