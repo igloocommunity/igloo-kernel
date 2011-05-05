@@ -36,6 +36,7 @@
 #include <mach/hardware.h>
 #include <mach/irqs.h>
 #include "prcmu-regs-db8500.h"
+#include "prcmu-debug.h"
 #include <mach/prcmu-fw-api.h>
 #include <mach/prcmu-fw-defs_v1.h>
 #include <mach/db8500-regs.h>
@@ -2010,6 +2011,9 @@ int __init prcmu_init(void)
 
 	if (cpu_is_u8500v20_or_later())
 		prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
+
+	if (prcmu_debug_init())
+		pr_err("prcmu: Failed to initialize debugfs\n");
 
 no_irq_return:
 	return err;
