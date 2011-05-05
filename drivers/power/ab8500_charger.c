@@ -18,6 +18,8 @@
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
 #include <linux/completion.h>
+#include <linux/regulator/consumer.h>
+#include <linux/err.h>
 #include <linux/workqueue.h>
 #include <linux/kobject.h>
 #include <linux/mfd/ab8500.h>
@@ -169,6 +171,7 @@ struct ab8500_charger_usb_state {
  * @vbus_detected_start:
  *			VBUS detected during startup
  * @ac_conn:		This will be true when the AC charger has been plugged
+ * @vddadc_en:		Indicate if VDD ADC supply is enabled from this driver
  * @parent:		Pointer to the struct ab8500
  * @gpadc:		Pointer to the struct gpadc
  * @pdata:		Pointer to the ab8500_charger platform data
@@ -179,6 +182,7 @@ struct ab8500_charger_usb_state {
  * @usb_chg:		USB charger power supply
  * @ac:			Structure that holds the AC charger properties
  * @usb:		Structure that holds the USB charger properties
+ * @regu:		Pointer to the struct regulator
  * @charger_wq:		Work queue for the IRQs and checking HW state
  * @check_hw_failure_work:	Work for checking HW state
  * @check_usbchgnotok_work:	Work for checking USB charger not ok status
@@ -200,6 +204,7 @@ struct ab8500_charger {
 	bool vbus_detected;
 	bool vbus_detected_start;
 	bool ac_conn;
+	bool vddadc_en;
 	struct ab8500 *parent;
 	struct ab8500_gpadc *gpadc;
 	struct ab8500_charger_platform_data *pdata;
@@ -210,6 +215,7 @@ struct ab8500_charger {
 	struct ux500_charger usb_chg;
 	struct ab8500_charger_info ac;
 	struct ab8500_charger_info usb;
+	struct regulator *regu;
 	struct workqueue_struct *charger_wq;
 	struct delayed_work check_hw_failure_work;
 	struct delayed_work check_usbchgnotok_work;
@@ -419,7 +425,7 @@ static int ab8500_charger_detect_chargers(struct ab8500_charger *di)
 		AB8500_CH_STATUS1_REG, &val);
 	if (ret < 0) {
 		dev_err(di->dev, "%s ab8500 read failed\n", __func__);
-		return ret;
+		goto out;
 	}
 
 	if (val & MAIN_CH_DET)
@@ -430,13 +436,39 @@ static int ab8500_charger_detect_chargers(struct ab8500_charger *di)
 		AB8500_CH_USBCH_STAT1_REG, &val);
 	if (ret < 0) {
 		dev_err(di->dev, "%s ab8500 read failed\n", __func__);
-		return ret;
+		goto out;
 	}
 
 	if (val & (VBUS_DET_DBNC100 | VBUS_DET_DBNC1))
 		result |= USB_PW_CONN;
 
+	/*
+	 * Due to a bug in AB8500, BTEMP_HIGH/LOW interrupts
+	 * will be triggered everytime we enable the VDD ADC supply.
+	 * This will turn off charging for a short while.
+	 * It can be avoided by having the supply on when
+	 * there is a charger connected. Normally the VDD ADC supply
+	 * is enabled everytime a GPADC conversion is triggered. We will
+	 * force it to be enabled from this driver to have
+	 * the GPADC module independant of the AB8500 chargers
+	 */
+	if (result == NO_PW_CONN && di->vddadc_en) {
+		regulator_disable(di->regu);
+		di->vddadc_en = false;
+	} else if ((result & AC_PW_CONN || result & USB_PW_CONN) &&
+		!di->vddadc_en) {
+		regulator_enable(di->regu);
+		di->vddadc_en = true;
+	}
+
 	return result;
+
+out:
+	if (di->vddadc_en) {
+		regulator_disable(di->regu);
+		di->vddadc_en = false;
+	}
+	return ret;
 }
 
 /**
@@ -2247,6 +2279,9 @@ static int __devexit ab8500_charger_remove(struct platform_device *pdev)
 		free_irq(irq, di);
 	}
 
+	/* disable the regulator */
+	regulator_put(di->regu);
+
 	/* Backup battery voltage and current disable */
 	ret = abx500_mask_and_set_register_interruptible(di->dev,
 		AB8500_RTC, AB8500_RTC_CTRL_REG, RTC_BUP_CH_ENA, 0);
@@ -2390,18 +2425,31 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 	di->chip_id = ret;
 	dev_dbg(di->dev, "AB8500 CID is: 0x%02x\n", di->chip_id);
 
+	/*
+	 * VDD ADC supply needs to be enabled from this driver when there
+	 * is a charger connected to avoid erroneous BTEMP_HIGH/LOW
+	 * interrupts during charging
+	 */
+	di->regu = regulator_get(di->dev, "vddadc");
+	if (IS_ERR(di->regu)) {
+		ret = PTR_ERR(di->regu);
+		dev_err(di->dev, "failed to get vddadc regulator\n");
+		goto free_charger_wq;
+	}
+
+
 	/* Initialize OVV, and other registers */
 	ret = ab8500_charger_init_hw_registers(di);
 	if (ret) {
 		dev_err(di->dev, "failed to initialize ABB registers\n");
-		goto free_charger_wq;
+		goto free_regulator;
 	}
 
 	/* Register AC charger class */
 	ret = power_supply_register(di->dev, &di->ac_chg.psy);
 	if (ret) {
 		dev_err(di->dev, "failed to register AC charger\n");
-		goto free_charger_wq;
+		goto free_regulator;
 	}
 
 	/* Register USB charger class */
@@ -2474,6 +2522,8 @@ free_usb:
 	power_supply_unregister(&di->usb_chg.psy);
 free_ac:
 	power_supply_unregister(&di->ac_chg.psy);
+free_regulator:
+	regulator_put(di->regu);
 free_charger_wq:
 	destroy_workqueue(di->charger_wq);
 free_device_info:
