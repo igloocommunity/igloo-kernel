@@ -88,6 +88,12 @@ config UX500_MTU_TIMER
 
 endchoice
 
+config UX500_PRCMU_QOS_POWER
+	bool "UX500 PRCMU power QoS support"
+	default y
+	help
+	  Add support for PRCMU power Quality of Service
+
 config UX500_PRCMU_DEBUG
 	bool "PRCMU debug"
 	depends on DEBUG_FS
