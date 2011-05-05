@@ -529,6 +529,22 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 			},
 		},
 	},
+	[AB5500_DEVID_POWER] = {
+		.nbanks	= 1,
+		.bank	= (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_STARTUP,
+				.nranges = 1,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x30,
+						.last = 0x30,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			}
+		},
+	},
 };
 
 #define AB5500_IRQ(bank, bit)	((bank) * 8 + (bit))
