@@ -411,7 +411,8 @@ int __init clk_init(void)
 
 	if (cpu_is_u8500())
 		db8500_clk_init();
-	/* Here the DB5500 clock tree will be added */
+	else if (cpu_is_u5500())
+		db5500_clk_init();
 
 	return 0;
 }
