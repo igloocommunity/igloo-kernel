@@ -105,6 +105,7 @@ static struct regulator_consumer_supply ab8500_vtvout_consumers[] = {
 	REGULATOR_SUPPLY("vtvout", "ab8500-denc.0"),
 	/* Internal general-purpose ADC */
 	REGULATOR_SUPPLY("vddadc", "ab8500-gpadc.0"),
+	REGULATOR_SUPPLY("vddadc", "ab8500-charger.0"),
 #ifdef CONFIG_DISPLAY_AB8500_TERTIARY
 	REGULATOR_SUPPLY_DEV("vtvout", &tvout_ab8500_display.dev),
 #endif
