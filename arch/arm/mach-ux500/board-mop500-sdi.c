@@ -105,7 +105,6 @@ static struct mmci_platform_data mop500_sdi0_data = {
  * SDI1 (SDIO WLAN)
  */
 #ifdef CONFIG_STE_DMA40
-#ifdef MMC_WITH_DMA
 static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
 	.dir = STEDMA40_PERIPH_TO_MEM,
 	.src_dev_type = DB8500_DMA_DEV32_SD_MM1_RX,
@@ -121,7 +120,6 @@ static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
 	.src_info.data_width = STEDMA40_WORD_WIDTH,
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
 };
-#endif
 #endif
 
 /*
@@ -175,7 +173,6 @@ static u32 sdi1_vdd_handler(struct device *dev, unsigned int vdd,
 
 /*
  * TODO 1: SDIO power management not fully supported.
- * TODO 2: SDIO with DMA not yet supported.
  */
 static struct mmci_platform_data mop500_sdi1_data = {
 	.vdd_handler	= sdi1_vdd_handler,
@@ -186,12 +183,10 @@ static struct mmci_platform_data mop500_sdi1_data = {
 				MMC_CAP_BROKEN_SDIO_CMD53,
 	.gpio_cd	= -1,
 	.gpio_wp	= -1,
-#ifdef MMC_WITH_DMA /* To be verified. */
 #ifdef CONFIG_STE_DMA40
 	.dma_filter	= stedma40_filter,
 	.dma_rx_param	= &sdi1_dma_cfg_rx,
 	.dma_tx_param	= &sdi1_dma_cfg_tx,
-#endif
 #endif
 };
 #endif /* CONFIG_CW1200 */
