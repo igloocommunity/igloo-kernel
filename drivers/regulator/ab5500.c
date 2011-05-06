@@ -58,6 +58,7 @@
 struct ab5500_regulator {
 	struct regulator_desc desc;
 	const int *voltages;
+	int num_holes;
 	bool pwrctrl;
 	int enable_time;
 	u8 bank;
@@ -167,7 +168,10 @@ static int ab5500_regulator_get_voltage(struct regulator_dev *rdev)
 	}
 
 	regval &= AB5500_LDO_VOLT_MASK;
-	if (regval >= r->desc.n_voltages || !r->voltages[regval])
+	if (regval >= r->desc.n_voltages + r->num_holes)
+	       return -EINVAL;
+
+	if (!r->voltages[regval])
 		return -EINVAL;
 
 	return r->voltages[regval];
@@ -339,6 +343,7 @@ static struct ab5500_regulator ab5500_regulators[] = {
 		.bank		= AB5500_BANK_STARTUP,
 		.reg		= AB5500_LDO_L_ST,
 		.voltages	= ab5500_ldo_lg_voltages,
+		.num_holes	= 2, /* 2 register values unused */
 		.enable_time	= 400,
 	},
 	[AB5500_LDO_G] = {
@@ -353,6 +358,7 @@ static struct ab5500_regulator ab5500_regulators[] = {
 		.bank		= AB5500_BANK_STARTUP,
 		.reg		= AB5500_LDO_G_ST,
 		.voltages	= ab5500_ldo_lg_voltages,
+		.num_holes	= 2, /* 2 register values unused */
 		.enable_time	= 400,
 	},
 	[AB5500_LDO_K] = {
