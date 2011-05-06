@@ -38,6 +38,7 @@
 #define SD_CLK_DIV_MASK		0x1F
 #define SD_CLK_DIV_VAL		8
 
+static DEFINE_MUTEX(soc1_pll_mutex);
 static DEFINE_MUTEX(sysclk_mutex);
 static DEFINE_MUTEX(ab_ulpclk_mutex);
 static DEFINE_MUTEX(audioclk_mutex);
@@ -294,7 +295,9 @@ static struct clk soc0_pll = {
 
 static struct clk soc1_pll = {
 	.name = "soc1_pll",
-	.ops = &pll_clk_ops,
+	.ops = &prcmu_clk_ops,
+	.cg_sel = PRCMU_PLLSOC1,
+	.mutex = &soc1_pll_mutex,
 };
 
 static struct clk ddr_pll = {

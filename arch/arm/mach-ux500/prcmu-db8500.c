@@ -137,12 +137,16 @@
 #define MB1H_REQUEST_APE_OPP_100_VOLT 0x3
 #define MB1H_RELEASE_APE_OPP_100_VOLT 0x4
 #define MB1H_RELEASE_USB_WAKEUP 0x5
+#define MB1H_PLL_ON_OFF 0x6
 
 /* Mailbox 1 Requests */
 #define PRCM_REQ_MB1_ARM_OPP			(PRCM_REQ_MB1 + 0x0)
 #define PRCM_REQ_MB1_APE_OPP			(PRCM_REQ_MB1 + 0x1)
 #define PRCM_REQ_MB1_APE_OPP_100_RESTORE	(PRCM_REQ_MB1 + 0x4)
 #define PRCM_REQ_MB1_ARM_OPP_100_RESTORE	(PRCM_REQ_MB1 + 0x8)
+#define PRCM_REQ_MB1_PLL_ON_OFF			(PRCM_REQ_MB1 + 0x4)
+#define PLL_SOC1_OFF	0x4
+#define PLL_SOC1_ON	0x8
 
 /* Mailbox 1 ACKs */
 #define PRCM_ACK_MB1_CURRENT_ARM_OPP	(PRCM_ACK_MB1 + 0x0)
@@ -1052,6 +1056,34 @@ int prcmu_release_usb_wakeup_state(void)
 	return r;
 }
 
+static int request_pll(u8 clock, bool enable)
+{
+	int r = 0;
+
+	if (clock == PRCMU_PLLSOC1)
+		clock = (enable ? PLL_SOC1_ON : PLL_SOC1_OFF);
+	else
+		return -EINVAL;
+
+	mutex_lock(&mb1_transfer.lock);
+
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(1))
+		cpu_relax();
+
+	writeb(MB1H_PLL_ON_OFF, (tcdm_base + PRCM_MBOX_HEADER_REQ_MB1));
+	writeb(clock, (tcdm_base + PRCM_REQ_MB1_PLL_ON_OFF));
+
+	writel(MBOX_BIT(1), (_PRCMU_BASE + PRCM_MBOX_CPU_SET));
+	wait_for_completion(&mb1_transfer.work);
+
+	if (mb1_transfer.ack.header != MB1H_PLL_ON_OFF)
+		r = -EIO;
+
+	mutex_unlock(&mb1_transfer.lock);
+
+	return r;
+}
+
 /**
  * prcmu_set_hwacc - set the power state of a h/w accelerator
  * @hwacc_dev: The hardware accelerator (enum hw_acc_dev).
@@ -1391,6 +1423,8 @@ int prcmu_request_clock(u8 clock, bool enable)
 		return request_timclk(enable);
 	else if (clock == PRCMU_SYSCLK)
 		return request_sysclk(enable);
+	else if (clock == PRCMU_PLLSOC1)
+		return request_pll(clock, enable);
 	else
 		return -EINVAL;
 }
