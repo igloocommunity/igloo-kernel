@@ -16,21 +16,11 @@
 
 #include "pins-db5500.h"
 #include "devices-db5500.h"
+#include "board-u5500.h"
 
-static pin_cfg_t u5500_sdi_pins[] = {
-	/* SDI0 (POP eMMC) */
-	GPIO5_MC0_DAT0		| PIN_DIR_INPUT | PIN_PULL_UP,
-	GPIO6_MC0_DAT1		| PIN_DIR_INPUT | PIN_PULL_UP,
-	GPIO7_MC0_DAT2		| PIN_DIR_INPUT | PIN_PULL_UP,
-	GPIO8_MC0_DAT3		| PIN_DIR_INPUT | PIN_PULL_UP,
-	GPIO9_MC0_DAT4		| PIN_DIR_INPUT | PIN_PULL_UP,
-	GPIO10_MC0_DAT5		| PIN_DIR_INPUT | PIN_PULL_UP,
-	GPIO11_MC0_DAT6		| PIN_DIR_INPUT | PIN_PULL_UP,
-	GPIO12_MC0_DAT7		| PIN_DIR_INPUT | PIN_PULL_UP,
-	GPIO13_MC0_CMD		| PIN_DIR_INPUT | PIN_PULL_UP,
-	GPIO14_MC0_CLK		| PIN_DIR_OUTPUT | PIN_VAL_LOW,
-};
-
+/*
+ * SDI0 (EMMC)
+ */
 #ifdef CONFIG_STE_DMA40
 struct stedma40_chan_cfg u5500_sdi0_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
@@ -46,6 +36,26 @@ static struct stedma40_chan_cfg u5500_sdi0_dma_cfg_tx = {
 	.dir = STEDMA40_MEM_TO_PERIPH,
 	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
 	.dst_dev_type = DB5500_DMA_DEV24_SDMMC0_TX,
+	.src_info.data_width = STEDMA40_WORD_WIDTH,
+	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+};
+#endif
+/*
+ * SDI1 (SD/MMC)
+ */
+#ifdef CONFIG_STE_DMA40
+static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
+	.dir = STEDMA40_PERIPH_TO_MEM,
+	.src_dev_type = DB5500_DMA_DEV25_SDMMC1_RX,
+	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
+	.src_info.data_width = STEDMA40_WORD_WIDTH,
+	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+};
+
+static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
+	.dir = STEDMA40_MEM_TO_PERIPH,
+	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
+	.dst_dev_type = DB5500_DMA_DEV25_SDMMC1_TX,
 	.src_info.data_width = STEDMA40_WORD_WIDTH,
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
 };
@@ -66,9 +76,67 @@ static struct mmci_platform_data u5500_sdi0_data = {
 #endif
 };
 
+static u32 u5500_sdi1_vdd_handler(struct device *dev, unsigned int vdd,
+		unsigned char power_mode)
+{
+	/*
+	* Level shifter voltage should depend on vdd to when deciding
+	* on either 1.8V or 2.9V. Once the decision has been made the
+	* level shifter must be disabled and re-enabled with a changed
+	* select signal in order to switch the voltage. Since there is
+	* no framework support yet for indicating 1.8V in vdd, use the
+	* default 2.9V.
+	*/
+	if (power_mode == MMC_POWER_UP)
+		gpio_set_value_cansleep(GPIO_MMC_CARD_CTRL, 1);
+	else if (power_mode == MMC_POWER_OFF)
+		gpio_set_value_cansleep(GPIO_MMC_CARD_CTRL, 0);
+	return 0;
+}
+
+static struct mmci_platform_data u5500_sdi1_data = {
+	.vdd_handler    = u5500_sdi1_vdd_handler,
+	.ocr_mask       = MMC_VDD_29_30,
+	.f_max          = 50000000,
+	.capabilities   = MMC_CAP_4_BIT_DATA,
+	.gpio_cd        = GPIO_SDMMC_CD,
+	.gpio_wp        = -1,
+	.cd_invert	= true,
+#ifdef CONFIG_STE_DMA40
+	.dma_filter	= stedma40_filter,
+	.dma_rx_param	= &sdi1_dma_cfg_rx,
+	.dma_tx_param	= &sdi1_dma_cfg_tx,
+#endif
+};
+
+static void sdi1_configure(void)
+{
+	int pin[2];
+	int ret;
+
+	/* Level-shifter GPIOs */
+	pin[0] = GPIO_MMC_CARD_CTRL;
+	pin[1] = GPIO_MMC_CARD_VSEL;
+
+	ret = gpio_request(pin[0], "MMC_CARD_CTRL");
+	if (!ret)
+		ret = gpio_request(pin[1], "MMC_CARD_VSEL");
+
+	if (ret) {
+		pr_err("mach-u5500: error in configuring \
+			GPIO pins for MMC\n");
+		return;
+	}
+	 /* Select the default 2.9V and eanble level shifter */
+	gpio_direction_output(pin[0], 1);
+	gpio_direction_output(pin[1], 1);
+
+}
+
 void __init u5500_sdi_init(void)
 {
-	nmk_config_pins(u5500_sdi_pins, ARRAY_SIZE(u5500_sdi_pins));
-
 	db5500_add_sdi0(&u5500_sdi0_data);
+	sdi1_configure();
+	db5500_add_sdi1(&u5500_sdi1_data);
 }
+
