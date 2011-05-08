@@ -189,7 +189,13 @@ static int ux500_suspend_valid(suspend_state_t state)
 
 static int ux500_suspend_prepare_late(void)
 {
-	(void)prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_OFF);
+	/*
+	 * Below should be set to state OFF. Current workaround set state to
+	 * RET since there is a problem with security saving data in esram
+	 * which does not work during deep sleep.
+	 * Once security is fixed below should be state OFF again to save 40uA.
+	 */
+	(void)prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
 	ab8500_regulator_debug_force();
 
 	return 0;
