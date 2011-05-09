@@ -16,10 +16,11 @@ config U8500_CPUIDLE
 
 config U8500_CPUIDLE_DEEPEST_STATE
 	int "Deepest sleep state"
-	default 3
+	default 4
 	depends on U8500_CPUIDLE
 	help
 	  Set deepest sleep state. See the cstate struct in cpuidle.c.
+	  Default is ApSleep.
 
 config U8500_CPUIDLE_DEBUG
 	bool "CPUIdle debug"

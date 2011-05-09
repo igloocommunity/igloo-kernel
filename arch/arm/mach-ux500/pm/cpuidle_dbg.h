@@ -13,7 +13,7 @@
 void ux500_ci_dbg_init(void);
 void ux500_ci_dbg_remove(void);
 
-void ux500_ci_dbg_log(int state, int this_cpu);
+void ux500_ci_dbg_log(enum ci_pwrst pstate, int this_cpu);
 
 bool ux500_ci_dbg_force_ape_on(void);
 int ux500_ci_dbg_deepest_state(void);
@@ -34,7 +34,7 @@ static inline void ux500_ci_dbg_msg(char *dbg_string) { }
 static inline void ux500_ci_dbg_init(void) { }
 static inline void ux500_ci_dbg_remove(void) { }
 
-static inline void ux500_ci_dbg_log(int state, int this_cpu) { }
+static inline void ux500_ci_dbg_log(enum ci_pwrst pstate, int this_cpu) { }
 
 static inline bool ux500_ci_dbg_force_ape_on(void)
 {
