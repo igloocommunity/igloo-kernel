@@ -25,7 +25,11 @@
 #include <mach/irqs.h>
 #include <mach/prcmu-regs.h>
 #include <mach/prcmu-db5500.h>
+#include <mach/prcmu-fw-api.h>
 #include <mach/db5500-regs.h>
+
+#include "prcmu-regs-db5500.h"
+#include "prcmu-db5500.h"
 
 #define _PRCM_MB_HEADER (tcdm_base + 0xFE8)
 #define PRCM_REQ_MB0_HEADER (_PRCM_MB_HEADER + 0x0)
@@ -148,6 +152,102 @@ static struct {
 
 /* PRCMU TCDM base IO address. */
 static __iomem void *tcdm_base;
+
+struct clk_mgt {
+	unsigned int offset;
+	u32 pllsw;
+};
+
+static DEFINE_SPINLOCK(clk_mgt_lock);
+
+#define CLK_MGT_ENTRY(_name)[DB5500_PRCMU_##_name] = {	\
+	(DB5500_PRCM_##_name##_MGT), 0			\
+}
+static struct clk_mgt clk_mgt[DB5500_PRCMU_NUM_REG_CLOCKS] = {
+	CLK_MGT_ENTRY(SGACLK),
+	CLK_MGT_ENTRY(UARTCLK),
+	CLK_MGT_ENTRY(MSP02CLK),
+	CLK_MGT_ENTRY(I2CCLK),
+	CLK_MGT_ENTRY(SDMMCCLK),
+	CLK_MGT_ENTRY(PER1CLK),
+	CLK_MGT_ENTRY(PER2CLK),
+	CLK_MGT_ENTRY(PER3CLK),
+	CLK_MGT_ENTRY(PER5CLK),
+	CLK_MGT_ENTRY(PER6CLK),
+	CLK_MGT_ENTRY(PWMCLK),
+	CLK_MGT_ENTRY(IRDACLK),
+	CLK_MGT_ENTRY(IRRCCLK),
+	CLK_MGT_ENTRY(HDMICLK),
+	CLK_MGT_ENTRY(APEATCLK),
+	CLK_MGT_ENTRY(APETRACECLK),
+	CLK_MGT_ENTRY(MCDECLK),
+	CLK_MGT_ENTRY(DSIALTCLK),
+	CLK_MGT_ENTRY(DMACLK),
+	CLK_MGT_ENTRY(B2R2CLK),
+	CLK_MGT_ENTRY(TVCLK),
+	CLK_MGT_ENTRY(RNGCLK),
+};
+
+static int request_timclk(bool enable)
+{
+	u32 val = (PRCM_TCR_DOZE_MODE | PRCM_TCR_TENSEL_MASK);
+
+	if (!enable)
+		val |= PRCM_TCR_STOP_TIMERS;
+	writel(val, (_PRCMU_BASE + PRCM_TCR));
+
+	return 0;
+}
+
+static int request_reg_clock(u8 clock, bool enable)
+{
+	u32 val;
+	unsigned long flags;
+
+	WARN_ON(!clk_mgt[clock].offset);
+
+	spin_lock_irqsave(&clk_mgt_lock, flags);
+
+	/* Grab the HW semaphore. */
+	while ((readl(_PRCMU_BASE + PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
+		cpu_relax();
+
+	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
+	if (enable) {
+		val |= (PRCM_CLK_MGT_CLKEN | clk_mgt[clock].pllsw);
+	} else {
+		clk_mgt[clock].pllsw = (val & PRCM_CLK_MGT_CLKPLLSW_MASK);
+		val &= ~(PRCM_CLK_MGT_CLKEN | PRCM_CLK_MGT_CLKPLLSW_MASK);
+	}
+	writel(val, (_PRCMU_BASE + clk_mgt[clock].offset));
+
+	/* Release the HW semaphore. */
+	writel(0, (_PRCMU_BASE + PRCM_SEM));
+
+	spin_unlock_irqrestore(&clk_mgt_lock, flags);
+
+	return 0;
+}
+
+/**
+ * db5500_prcmu_request_clock() - Request for a clock to be enabled or disabled.
+ * @clock:      The clock for which the request is made.
+ * @enable:     Whether the clock should be enabled (true) or disabled (false).
+ *
+ * This function should only be used by the clock implementation.
+ * Do not use it from any other place!
+ */
+int db5500_prcmu_request_clock(u8 clock, bool enable)
+{
+	if (clock < DB5500_PRCMU_NUM_REG_CLOCKS)
+		return request_reg_clock(clock, enable);
+	else if (clock == DB5500_PRCMU_TIMCLK)
+		return request_timclk(enable);
+	else if (clock == DB5500_PRCMU_SYSCLK)
+		return -EINVAL;
+	else
+		return -EINVAL;
+}
 
 /**
  * db5500_prcmu_abb_read() - Read register value(s) from the ABB.
