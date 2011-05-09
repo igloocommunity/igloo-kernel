@@ -498,7 +498,7 @@ int cfhsi_probe(struct platform_device *pdev)
 	 */
 	cfhsi->tx_buf = kzalloc(CFHSI_BUF_SZ_TX, GFP_KERNEL);
 	if (!cfhsi->tx_buf) {
-		dev_err(&pdev->dev, "cfhsi: failed to allocate TX buffer.\n");
+		netdev_err(cfhsi->ndev, "cfhsi: failed to allocate TX buffer.\n");
 		res = -ENODEV;
 		goto err_alloc_tx;
 	}
@@ -509,7 +509,7 @@ int cfhsi_probe(struct platform_device *pdev)
 	 */
 	cfhsi->rx_buf = kzalloc(CFHSI_BUF_SZ_RX, GFP_KERNEL);
 	if (!cfhsi->rx_buf) {
-		dev_err(&pdev->dev, "cfhsi: failed to allocate RX buffer.\n");
+		netdev_err(cfhsi->ndev, "cfhsi: failed to allocate RX buffer.\n");
 		res = -ENODEV;
 		goto err_alloc_rx;
 	}
@@ -529,7 +529,7 @@ int cfhsi_probe(struct platform_device *pdev)
 	/* Register network device. */
 	res = register_netdev(ndev);
 	if (res) {
-		dev_err(&pdev->dev, "cfhsi: Reg. error: %d.\n", res);
+		netdev_err(cfhsi->ndev, "cfhsi: Reg. error: %d.\n", res);
 		goto err_net_reg;
 	}
 
@@ -609,7 +609,7 @@ static int __init cfhsi_init_module(void)
 	/* Register platform driver. */
 	result = platform_driver_register(&cfhsi_plat_drv);
 	if (result) {
-		pr_err("Could not register platform HSI driver.\n");
+		pr_warning("Could not register platform HSI driver.\n");
 		goto err_dev_register;
 	}
 
