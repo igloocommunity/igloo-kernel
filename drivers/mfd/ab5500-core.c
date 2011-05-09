@@ -214,7 +214,7 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 		},
 	},
 	[AB5500_DEVID_REGULATORS] =   {
-		.nbanks = 1,
+		.nbanks = 2,
 		.bank = (struct ab5500_i2c_ranges[]) {
 			{
 				.bankid = AB5500_BANK_STARTUP,
@@ -223,6 +223,17 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 					{
 						.first = 0x50,
 						.last = 0xE0,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+			{
+				.bankid = AB5500_BANK_SIM_USBSIM,
+				.nranges = 1,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x14,
+						.last = 0x14,
 						.perm = AB5500_PERM_RW,
 					},
 				},
@@ -364,7 +375,7 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 		.id = AB5500_DEVID_POWER,
 	},
 	[AB5500_DEVID_REGULATORS] = {
-		.name = "ab5500-regulators",
+		.name = "ab5500-regulator",
 		.id = AB5500_DEVID_REGULATORS,
 	},
 	[AB5500_DEVID_SIM] = {
