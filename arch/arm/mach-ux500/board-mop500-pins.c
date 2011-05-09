@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/gpio.h>
 #include <linux/io.h>
+#include <linux/string.h>
 
 #include <asm/mach-types.h>
 #include <plat/pincfg.h>
@@ -16,6 +17,13 @@
 #include <mach/hardware.h>
 
 #include "pins-db8500.h"
+
+enum custom_pin_cfg_t {
+	PINS_FOR_DEFAULT,
+	PINS_FOR_U9500_21,
+};
+
+static enum custom_pin_cfg_t pinsfor = PINS_FOR_DEFAULT;
 
 static pin_cfg_t mop500_pins_common[] = {
 	/* I2C */
@@ -302,6 +310,11 @@ static pin_cfg_t mop500_pins_hrefv60[] = {
 
 	/* SD card detect */
 	GPIO95_GPIO	| PIN_INPUT_PULLUP,
+};
+
+static pin_cfg_t u9500_21_pins[] = {
+	GPIO4_U1_RXD    | PIN_INPUT_PULLUP,
+	GPIO5_U1_TXD    | PIN_OUTPUT_HIGH,
 };
 
 static pin_cfg_t snowball_pins[] = {
@@ -602,6 +615,21 @@ void mop500_pins_suspend_force_mux(void)
 
 }
 
+/*
+ * passing "pinsfor=" in kernel cmdline allows for custom
+ * configuration of GPIOs on u8500 derived boards.
+ */
+static int __init early_pinsfor(char *p)
+{
+	pinsfor = PINS_FOR_DEFAULT;
+
+	if (strcmp(p, "u9500-21") == 0)
+		pinsfor = PINS_FOR_U9500_21;
+
+	return 0;
+}
+early_param("pinsfor", early_pinsfor);
+
 void __init mop500_pins_init(void)
 {
 	nmk_config_pins(mop500_pins_common,
@@ -615,4 +643,14 @@ void __init mop500_pins_init(void)
 	else
 		nmk_config_pins(mop500_pins_default,
 				ARRAY_SIZE(mop500_pins_default));
+	switch (pinsfor) {
+	case PINS_FOR_U9500_21:
+		nmk_config_pins(u9500_21_pins, ARRAY_SIZE(u9500_21_pins));
+		break;
+
+	case PINS_FOR_DEFAULT:
+	default:
+		break;
+	}
 }
+
