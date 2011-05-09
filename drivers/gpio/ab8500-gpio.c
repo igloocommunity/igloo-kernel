@@ -503,20 +503,18 @@ static int __devexit ab8500_gpio_remove(struct platform_device *pdev)
  * @gpio  :gpio number
  * @enable:pull down enabled (True) or disabled (False)
  */
-int ab8500_config_pull_up_or_down(struct platform_device *pdev,
-				unsigned gpio, bool enable)
+int ab8500_config_pull_up_or_down(struct device *dev,
+				unsigned gpio_offset, bool enable)
 {
-	struct ab8500_gpio *ab8500_gpio = platform_get_drvdata(pdev);
-	u8 offset =  gpio - ab8500_gpio->chip.base;
-	u8 pos = offset % 8;
+	u8 pos = gpio_offset % 8;
 	u8 val = enable ? 0 : 1;
-	u8 reg = AB8500_GPIO_PUD1_REG + (offset / 8);
+	u8 reg = AB8500_GPIO_PUD1_REG + (gpio_offset / 8);
 	int ret;
 
-	ret = abx500_mask_and_set_register_interruptible(ab8500_gpio->dev,
+	ret = abx500_mask_and_set_register_interruptible(dev,
 				AB8500_MISC, reg, 1 << pos, val << pos);
 	if (ret < 0)
-		dev_err(&pdev->dev, "%s write failed\n", __func__);
+		dev_err(dev, "%s write failed\n", __func__);
 	return ret;
 }
 EXPORT_SYMBOL(ab8500_config_pull_up_or_down);
