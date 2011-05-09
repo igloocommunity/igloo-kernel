@@ -115,25 +115,25 @@ static struct regulator_consumer_supply ab8500_vtvout_consumers[] = {
 static struct regulator_consumer_supply ab8500_vaudio_consumers[] = {
 	/* vaudio regulator, supply for ab8500-vaudio */
 	REGULATOR_SUPPLY("v-audio", NULL),
-	REGULATOR_SUPPLY_DEBUG("audio", "reg-virt-consumer.6")
+	REGULATOR_SUPPLY_DEBUG("audio", "reg-virt-consumer.5")
 };
 
 static struct regulator_consumer_supply ab8500_vamic1_consumers[] = {
 	/* vamic1 regulator */
 	REGULATOR_SUPPLY("v-amic1", NULL),
-	REGULATOR_SUPPLY_DEBUG("anamic1", "reg-virt-consumer.7")
+	REGULATOR_SUPPLY_DEBUG("anamic1", "reg-virt-consumer.6")
 };
 
 static struct regulator_consumer_supply ab8500_vamic2_consumers[] = {
 	/* vamic2 regulator */
 	REGULATOR_SUPPLY("v-amic2", NULL),
-	REGULATOR_SUPPLY_DEBUG("anamic2", "reg-virt-consumer.8")
+	REGULATOR_SUPPLY_DEBUG("anamic2", "reg-virt-consumer.7")
 };
 
 static struct regulator_consumer_supply ab8500_vdmic_consumers[] = {
 	/* supply for v-dmic, VDMIC LDO */
 	REGULATOR_SUPPLY("v-dmic", NULL),
-	REGULATOR_SUPPLY_DEBUG("dmic", "reg-virt-consumer.9")
+	REGULATOR_SUPPLY_DEBUG("dmic", "reg-virt-consumer.8")
 };
 
 static struct regulator_consumer_supply ab8500_vana_consumers[] = {
@@ -143,7 +143,19 @@ static struct regulator_consumer_supply ab8500_vana_consumers[] = {
 	REGULATOR_SUPPLY("v-ana", "mcde"),
 	/* camera supply */
 	REGULATOR_SUPPLY("v-ana", "mmio_camera"),
-	REGULATOR_SUPPLY_DEBUG("ana", "reg-virt-consumer.10")
+	REGULATOR_SUPPLY_DEBUG("ana", "reg-virt-consumer.9")
+};
+
+/* supply for CG2900 */
+static struct regulator_consumer_supply ab8500_sysclkreq_2_consumers[] = {
+	REGULATOR_SUPPLY("gbf_1v8", "cg2900-uart.0"),
+	REGULATOR_SUPPLY_DEBUG("sysclkreq-2", "reg-virt-consumer.10")
+};
+
+/* supply for CW1200 */
+static struct regulator_consumer_supply ab8500_sysclkreq_4_consumers[] = {
+	REGULATOR_SUPPLY("wlan_1v8", "cw1200"),
+	REGULATOR_SUPPLY_DEBUG("sysclkreq-4", "reg-virt-consumer.11")
 };
 
 /* ab8500 regulator register initialization */
@@ -480,5 +492,25 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 		},
 		.num_consumer_supplies = ARRAY_SIZE(ab8500_vana_consumers),
 		.consumer_supplies = ab8500_vana_consumers,
+	},
+	/* sysclkreq 2 pin */
+	[AB8500_SYSCLKREQ_2] = {
+		.constraints = {
+			.name = "ab8500-sysclkreq-2",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+		.num_consumer_supplies =
+			ARRAY_SIZE(ab8500_sysclkreq_2_consumers),
+		.consumer_supplies = ab8500_sysclkreq_2_consumers,
+	},
+	/* sysclkreq 4 pin */
+	[AB8500_SYSCLKREQ_4] = {
+		.constraints = {
+			.name = "ab8500-sysclkreq-4",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+		.num_consumer_supplies =
+			ARRAY_SIZE(ab8500_sysclkreq_4_consumers),
+		.consumer_supplies = ab8500_sysclkreq_4_consumers,
 	},
 };
