@@ -117,7 +117,7 @@ static struct ab8500_accdet_platform_data ab8500_accdet_pdata = {
        .btn_keycode = KEY_MEDIA,
        .accdet1_dbth = ACCDET1_TH_1200mV | ACCDET1_DB_70ms,
        .accdet2122_th = ACCDET21_TH_1000mV | ACCDET22_TH_1000mV,
-       .video_ctrl_gpio = MOP500_AB8500_GPIO(35),
+       .video_ctrl_gpio = 35,  /*  AB8500_GPIO offset */
 };
 #endif
 
