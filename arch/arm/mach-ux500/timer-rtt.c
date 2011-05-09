@@ -124,7 +124,7 @@ static irqreturn_t rtc_interrupt(int irq, void *dev)
 void smp_timer_broadcast(const struct cpumask *mask);
 #endif
 
-static struct clock_event_device rtc_dev = {
+struct clock_event_device rtt_clkevt = {
 	.name		= "rtc-rtt",
 	.features	= CLOCK_EVT_FEAT_ONESHOT,
 	.shift		= 32,
@@ -141,36 +141,32 @@ static struct irqaction rtc_irq = {
 	.name		= "RTC-RTT Timer Tick",
 	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_SHARED,
 	.handler	= rtc_interrupt,
-	.dev_id		= &rtc_dev,
+	.dev_id		= &rtt_clkevt,
+	.irq		= IRQ_DB8500_RTC,
 };
 
 void rtc_rtt_timer_init(unsigned int cpu)
 {
-	int irq;
 
 	if (cpu_is_u8500()) {
 		rtc_base  = __io_address(U8500_RTC_BASE);
-		irq = IRQ_DB8500_RTC;
 	} else if (cpu_is_u5500()) {
 		rtc_base  = __io_address(U5500_RTC_BASE);
-		irq = IRQ_DB5500_RTC;
+		rtt_clkevt.irq = IRQ_DB5500_RTC;
 	} else {
 		pr_err("timer-rtt: Unknown DB Asic!\n");
 		return;
 	}
 
-	rtc_dev.irq = irq;
-
 	rtc_writel(RTC_TCR_RTTSS | RTC_TCR_RTTOS, RTC_TCR);
 	rtc_writel(RTC_ICR_TIC, RTC_ICR);
 	rtc_writel(RTC_IMSC_TIMSC, RTC_IMSC);
 
-	rtc_dev.mult = div_sc(RATE_32K, NSEC_PER_SEC, rtc_dev.shift);
-	rtc_dev.max_delta_ns = clockevent_delta2ns(0xffffffff, &rtc_dev);
-	rtc_dev.min_delta_ns = clockevent_delta2ns(0xff, &rtc_dev);
-
-	setup_irq(irq, &rtc_irq);
-	clockevents_register_device(&rtc_dev);
+	rtt_clkevt.mult = div_sc(RATE_32K, NSEC_PER_SEC, rtt_clkevt.shift);
+	rtt_clkevt.max_delta_ns = clockevent_delta2ns(0xffffffff, &rtt_clkevt);
+	rtt_clkevt.min_delta_ns = clockevent_delta2ns(0xff, &rtt_clkevt);
+	setup_irq(rtc_irq.irq, &rtc_irq);
+	clockevents_register_device(&rtt_clkevt);
 }
 
 int rtc_rtt_adjust_next_wakeup(int delta_in_us)
@@ -206,5 +202,5 @@ int rtc_rtt_adjust_next_wakeup(int delta_in_us)
 	if (((u64)val + (u64)delta_ticks) > UINT_MAX)
 		return -EINVAL;
 
-	return rtc_set_event(val + delta_ticks, &rtc_dev);
+	return rtc_set_event(val + delta_ticks, &rtt_clkevt);
 }

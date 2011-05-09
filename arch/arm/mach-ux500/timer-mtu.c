@@ -245,7 +245,7 @@ static irqreturn_t u8500_timer_interrupt(int irq, void *dev)
 void smp_timer_broadcast(const struct cpumask *mask);
 #endif
 
-static struct clock_event_device u8500_mtu_clkevt = {
+struct clock_event_device u8500_mtu_clkevt = {
 	.name		= "mtu_0",
 	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
 	.shift		= 32,
