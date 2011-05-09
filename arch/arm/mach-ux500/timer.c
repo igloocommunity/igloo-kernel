@@ -38,10 +38,6 @@ static void ux500_timer_reset(void)
 	mtu_timer_reset();
 }
 
-static void ux500_timer_suspend(void)
-{
-}
-
 static void __init ux500_timer_init(void)
 {
 
@@ -58,7 +54,7 @@ static void __init ux500_timer_init(void)
  * Localtimers (twd) is started when both cpu is up and running.
  * MTU register a clocksource, clockevent and sched_clock.
  * Since the MTU is located in the VAPE power domain
- * it will be cleared in sleep which makes it unsuitible.
+ * it will be cleared in sleep which makes it unsuitable.
  * We however need it as a timer tick (clockevent)
  * during boot to calibrate delay until twd is started.
  * RTC-RTT have problems as timer tick during boot since it is depending
@@ -81,6 +77,5 @@ static void __init ux500_timer_init(void)
 
 struct sys_timer ux500_timer = {
 	.init		= ux500_timer_init,
-	.suspend	= ux500_timer_suspend,
 	.resume		= ux500_timer_reset,
 };
