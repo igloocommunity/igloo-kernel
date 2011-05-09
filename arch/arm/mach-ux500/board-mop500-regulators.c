@@ -299,10 +299,10 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
 	 */
 	INIT_REGULATOR_REGISTER(AB8500_VSMPS1REGU,             0x06),
 	/*
-	 * Vsmps2Regu               = HW control
+	 * Vsmps2Regu               = force HP
 	 * Vsmps2SelCtrl            = Vsmps2 voltage defined by Vsmsp2Sel2
 	 */
-	INIT_REGULATOR_REGISTER(AB8500_VSMPS2REGU,             0x06),
+	INIT_REGULATOR_REGISTER(AB8500_VSMPS2REGU,             0x05),
 	/*
 	 * Vsmps3Sel2               = 1.2125 V
 	 * NOTE! PRCMU register
