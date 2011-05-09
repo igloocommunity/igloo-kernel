@@ -62,6 +62,8 @@ struct cstate {
 	u32 power_usage;
 	u32 threshold;
 	u32 flags;
+	enum ap_pwrst_trans pwrst;
+
 	/* Only used for debugging purpose */
 	enum ci_pwrst state;
 	char desc[CPUIDLE_DESC_LEN];
