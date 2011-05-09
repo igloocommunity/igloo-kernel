@@ -1348,12 +1348,11 @@ static int ab8500_acc_detect_suspend(struct platform_device *pdev,
 			AB8500_ECI_AV_ACC,
 			AB8500_ACC_DET_CTRL_REG,
 			&acc_det_ctrl_suspend_val);
-	/* 0x10 = Keep AccDetect21Ena to avoid headset button irq */
 	(void) abx500_set_register_interruptible(
 			&dd->pdev->dev,
 			AB8500_ECI_AV_ACC,
 			AB8500_ACC_DET_CTRL_REG,
-			0x10);
+			0);
 	return 0;
 }
 
