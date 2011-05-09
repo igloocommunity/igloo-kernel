@@ -20,5 +20,12 @@ struct ab8500_gpio_platform_data {
 
 int ab8500_config_pull_up_or_down(struct device *dev,
 				unsigned ab8500_gpio_offset, bool enable);
+
+int ab8500_gpio_config_select(struct device *dev,
+			unsigned ab8500_gpio_offset, bool gpio_select);
+
+int ab8500_gpio_config_get_select(struct device *dev,
+			unsigned ab8500_gpio_offset, bool *gpio_select);
+
 #endif /* _AB8500_GPIO_H */
 

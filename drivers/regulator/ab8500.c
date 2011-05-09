@@ -20,6 +20,8 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/ab8500.h>
+#include <linux/mfd/ab8500/gpio.h> /* for sysclkreq pins */
+#include <mach/gpio.h> /* for sysclkreq pins */
 
 /**
  * struct ab8500_regulator_info - ab8500 regulator information
@@ -39,6 +41,7 @@
  * @voltages: supported voltage table
  * @voltages_len: number of supported voltages for the regulator
  * @delay: startup/set voltage delay in us
+ * @gpio_pin: ab8500 gpio pin offset number (for sysclkreq regulator only)
  */
 struct ab8500_regulator_info {
 	struct device		*dev;
@@ -57,6 +60,7 @@ struct ab8500_regulator_info {
 	int const *voltages;
 	int voltages_len;
 	unsigned int delay;
+	unsigned int gpio_pin;
 };
 
 /* voltage tables for the vauxn/vintcore supplies */
@@ -348,6 +352,88 @@ static struct regulator_ops ab8500_regulator_fixed_ops = {
 	.set_voltage_time_sel = ab8500_regulator_set_voltage_time_sel,
 };
 
+static int ab8500_sysclkreq_enable(struct regulator_dev *rdev)
+{
+	int ret;
+	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
+
+	if (info == NULL) {
+		dev_err(rdev_get_dev(rdev), "regulator info null pointer\n");
+		return -EINVAL;
+	}
+
+	ret = ab8500_gpio_config_select(info->dev, info->gpio_pin, false);
+	if (ret < 0) {
+		dev_err(rdev_get_dev(rdev),
+			"couldn't set sysclkreq pin selection\n");
+		return ret;
+	}
+
+	dev_vdbg(rdev_get_dev(rdev),
+		"%s-enable (gpio_pin, gpio_select): %i, false\n",
+		info->desc.name, info->gpio_pin);
+
+	return ret;
+}
+
+static int ab8500_sysclkreq_disable(struct regulator_dev *rdev)
+{
+	int ret;
+	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
+
+	if (info == NULL) {
+		dev_err(rdev_get_dev(rdev), "regulator info null pointer\n");
+		return -EINVAL;
+	}
+
+	ret = ab8500_gpio_config_select(info->dev, info->gpio_pin, true);
+	if (ret < 0) {
+		dev_err(rdev_get_dev(rdev),
+			"couldn't set gpio pin selection\n");
+		return ret;
+	}
+
+	dev_vdbg(rdev_get_dev(rdev),
+		"%s-disable (gpio_pin, gpio_select): %i, true\n",
+		info->desc.name, info->gpio_pin);
+
+	return ret;
+}
+
+static int ab8500_sysclkreq_is_enabled(struct regulator_dev *rdev)
+{
+	int ret;
+	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
+	bool gpio_select;
+
+	if (info == NULL) {
+		dev_err(rdev_get_dev(rdev), "regulator info null pointer\n");
+		return -EINVAL;
+	}
+
+	ret = ab8500_gpio_config_get_select(info->dev, info->gpio_pin,
+		&gpio_select);
+	if (ret < 0) {
+		dev_err(rdev_get_dev(rdev),
+			"couldn't read gpio pin selection\n");
+		return ret;
+	}
+
+	dev_vdbg(rdev_get_dev(rdev),
+		"%s-is_enabled (gpio_pin, is_enabled): %i, %i\n",
+		info->desc.name, info->gpio_pin, !gpio_select);
+
+	return !gpio_select;
+}
+
+static struct regulator_ops ab8500_sysclkreq_ops = {
+	.enable		= ab8500_sysclkreq_enable,
+	.disable	= ab8500_sysclkreq_disable,
+	.is_enabled	= ab8500_sysclkreq_is_enabled,
+	.get_voltage	= ab8500_fixed_get_voltage,
+	.list_voltage	= ab8500_list_voltage,
+};
+
 static struct ab8500_regulator_info
 		ab8500_regulator_info[AB8500_NUM_REGULATORS] = {
 	/*
@@ -553,7 +639,33 @@ static struct ab8500_regulator_info
 		.update_val_enable	= 0x04,
 	},
 
-
+	/*
+	 * SysClkReq regulators
+	 */
+	[AB8500_SYSCLKREQ_2] = {
+		.desc = {
+			.name		= "SYSCLKREQ-2",
+			.ops		= &ab8500_sysclkreq_ops,
+			.type		= REGULATOR_VOLTAGE,
+			.id		= AB8500_SYSCLKREQ_2,
+			.owner		= THIS_MODULE,
+			.n_voltages	= 1,
+		},
+		.fixed_uV		= 1, /* bogus value */
+		.gpio_pin		= 0, /* AB8500_PIN_GPIO1 */
+	},
+	[AB8500_SYSCLKREQ_4] = {
+		.desc = {
+			.name		= "SYSCLKREQ-4",
+			.ops		= &ab8500_sysclkreq_ops,
+			.type		= REGULATOR_VOLTAGE,
+			.id		= AB8500_SYSCLKREQ_4,
+			.owner		= THIS_MODULE,
+			.n_voltages	= 1,
+		},
+		.fixed_uV		= 1, /* bogus value */
+		.gpio_pin		= 2, /* AB8500_PIN_GPIO3 */
+	},
 };
 
 struct ab8500_reg_init {
