@@ -13,8 +13,6 @@
 #include <linux/clk.h>
 #include <linux/errno.h>
 #include <linux/mutex.h>
-#include <linux/seq_file.h>
-#include <linux/uaccess.h>
 #include <linux/debugfs.h>
 #include <linux/module.h>
 #include <linux/gpio.h>
@@ -602,290 +600,49 @@ static DEF_PER_CLK(p7_mtu0_ed_clk, &p7_pclk2, &timclk);
 static DEF_PER_CLK(p6_mtu1_clk, &p6_pclk7, &timclk);
 static DEF_PER_CLK(p7_mtu1_ed_clk, &p7_pclk3, &timclk);
 
-#ifdef CONFIG_DEBUG_FS
-
-struct clk_debug_info {
-	struct clk *clk;
-	struct dentry *dir;
-	struct dentry *enable;
-	struct dentry *requests;
-	int enabled;
-};
-
-static struct dentry *clk_dir;
-static struct dentry *clk_show;
-static struct dentry *clk_show_enabled_only;
-
-static struct clk_debug_info dbg_clks[] = {
+static struct clk *db5500_dbg_clks[] = {
 	/* Clock sources */
-	{ .clk = &soc0_pll, },
-	{ .clk = &soc1_pll, },
-	{ .clk = &ddr_pll, },
-	{ .clk = &ulp38m4, },
-	{ .clk = &sysclk, },
-	{ .clk = &rtc32k, },
+	&soc0_pll,
+	&soc1_pll,
+	&ddr_pll,
+	&ulp38m4,
+	&sysclk,
+	&rtc32k,
 	/* PRCMU clocks */
-	{ .clk = &sgaclk, },
-	{ .clk = &uartclk, },
-	{ .clk = &msp02clk, },
-	{ .clk = &msp1clk, },
-	{ .clk = &i2cclk, },
-	{ .clk = &sdmmcclk, },
-	{ .clk = &slimclk, },
-	{ .clk = &per1clk, },
-	{ .clk = &per2clk, },
-	{ .clk = &per3clk, },
-	{ .clk = &per5clk, },
-	{ .clk = &per6clk, },
-	{ .clk = &per7clk, },
-	{ .clk = &lcdclk, },
-	{ .clk = &bmlclk, },
-	{ .clk = &hsitxclk, },
-	{ .clk = &hsirxclk, },
-	{ .clk = &hdmiclk, },
-	{ .clk = &apeatclk, },
-	{ .clk = &apetraceclk, },
-	{ .clk = &mcdeclk, },
-	{ .clk = &ipi2cclk, },
-	{ .clk = &dsialtclk, },
-	{ .clk = &dmaclk, },
-	{ .clk = &b2r2clk, },
-	{ .clk = &tvclk, },
-	{ .clk = &sspclk, },
-	{ .clk = &rngclk, },
-	{ .clk = &uiccclk, },
-};
-
-static struct clk_debug_info dbg_clks_v2[] = {
+	&sgaclk,
+	&uartclk,
+	&msp02clk,
+	&msp1clk,
+	&i2cclk,
+	&sdmmcclk,
+	&slimclk,
+	&per1clk,
+	&per2clk,
+	&per3clk,
+	&per5clk,
+	&per6clk,
+	&per7clk,
+	&lcdclk,
+	&bmlclk,
+	&hsitxclk,
+	&hsirxclk,
+	&hdmiclk,
+	&apeatclk,
+	&apetraceclk,
+	&mcdeclk,
+	&ipi2cclk,
+	&dsialtclk,
+	&dmaclk,
+	&b2r2clk,
+	&tvclk,
+	&sspclk,
+	&rngclk,
+	&uiccclk,
 	/* Clock sources */
-	{ .clk = &sysclk2, },
-	{ .clk = &clkout0, },
-	{ .clk = &clkout1, },
+	&sysclk2,
+	&clkout0,
+	&clkout1,
 };
-
-static int clk_show_print(struct seq_file *s, void *p)
-{
-	int i;
-	int enabled_only = (int)s->private;
-
-	seq_printf(s, "\n%-20s %s\n", "name", "enabled (kernel + debug)");
-	for (i = 0; i < ARRAY_SIZE(dbg_clks); i++) {
-		if (enabled_only && !dbg_clks[i].clk->enabled)
-			continue;
-		seq_printf(s,
-			   "%-20s %5d + %d\n",
-			   dbg_clks[i].clk->name,
-			   dbg_clks[i].clk->enabled - dbg_clks[i].enabled,
-			   dbg_clks[i].enabled);
-	}
-	if (cpu_is_u8500v2()) {
-		for (i = 0; i < ARRAY_SIZE(dbg_clks_v2); i++) {
-			if (enabled_only && !dbg_clks_v2[i].clk->enabled)
-				continue;
-			seq_printf(s,
-				   "%-20s %5d + %d\n",
-				   dbg_clks_v2[i].clk->name,
-				   (dbg_clks_v2[i].clk->enabled -
-				    dbg_clks_v2[i].enabled),
-				   dbg_clks_v2[i].enabled);
-		}
-	}
-
-	return 0;
-}
-
-static int clk_show_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, clk_show_print, inode->i_private);
-}
-
-static int clk_enable_print(struct seq_file *s, void *p)
-{
-	struct clk_debug_info *cdi = s->private;
-
-	return seq_printf(s, "%d\n", cdi->enabled);
-}
-
-static int clk_enable_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, clk_enable_print, inode->i_private);
-}
-
-static ssize_t clk_enable_write(struct file *file, const char __user *user_buf,
-	size_t count, loff_t *ppos)
-{
-	struct clk_debug_info *cdi;
-	char buf[32];
-	ssize_t buf_size;
-	long user_val;
-	int err;
-
-	cdi = ((struct seq_file *)(file->private_data))->private;
-
-	buf_size = min(count, (sizeof(buf) - 1));
-	if (copy_from_user(buf, user_buf, buf_size))
-		return -EFAULT;
-	buf[buf_size] = '\0';
-
-	err = strict_strtol(buf, 0, &user_val);
-	if (err)
-		return -EINVAL;
-	if ((user_val > 0) && (!cdi->enabled)) {
-		err = clk_enable(cdi->clk);
-		if (err) {
-			pr_err("clock: clk_enable(%s) failed.\n",
-				cdi->clk->name);
-			return -EFAULT;
-		}
-		cdi->enabled = 1;
-	} else if ((user_val <= 0) && (cdi->enabled)) {
-		clk_disable(cdi->clk);
-		cdi->enabled = 0;
-	}
-	return buf_size;
-}
-
-static int clk_requests_print(struct seq_file *s, void *p)
-{
-	struct clk_debug_info *cdi = s->private;
-
-	return seq_printf(s, "%d\n", cdi->clk->enabled);
-}
-
-static int clk_requests_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, clk_requests_print, inode->i_private);
-}
-
-static const struct file_operations clk_enable_fops = {
-	.open = clk_enable_open,
-	.write = clk_enable_write,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-	.owner = THIS_MODULE,
-};
-
-static const struct file_operations clk_requests_fops = {
-	.open = clk_requests_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-	.owner = THIS_MODULE,
-};
-
-static const struct file_operations clk_show_fops = {
-	.open = clk_show_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-	.owner = THIS_MODULE,
-};
-
-static int create_clk_dirs(struct clk_debug_info *cdi, int size)
-{
-	int i;
-
-	for (i = 0; i < size; i++) {
-		cdi[i].dir = debugfs_create_dir(cdi[i].clk->name, clk_dir);
-		if (!cdi[i].dir)
-			goto no_dir;
-	}
-
-	for (i = 0; i < size; i++) {
-		cdi[i].enable = debugfs_create_file("enable",
-						    (S_IRUGO | S_IWUGO),
-						    cdi[i].dir, &cdi[i],
-						    &clk_enable_fops);
-		if (!cdi[i].enable)
-			goto no_enable;
-	}
-	for (i = 0; i < size; i++) {
-		cdi[i].requests = debugfs_create_file("requests", S_IRUGO,
-						       cdi[i].dir, &cdi[i],
-						       &clk_requests_fops);
-		if (!cdi[i].requests)
-			goto no_requests;
-	}
-	return 0;
-
-no_requests:
-	while (i--)
-		debugfs_remove(cdi[i].requests);
-	i = size;
-no_enable:
-	while (i--)
-		debugfs_remove(cdi[i].enable);
-	i = size;
-no_dir:
-	while (i--)
-		debugfs_remove(cdi[i].dir);
-
-	return -ENOMEM;
-}
-
-static void remove_clk_dirs(struct clk_debug_info *cdi, int size)
-{
-	int i;
-	for (i = 0; i < size; i++) {
-		debugfs_remove(cdi[i].requests);
-		debugfs_remove(cdi[i].enable);
-		debugfs_remove(cdi[i].dir);
-	}
-}
-
-static int __init clk_debug_init(void)
-{
-	clk_dir = debugfs_create_dir("clk", NULL);
-	if (!clk_dir)
-		goto no_dir;
-
-	clk_show = debugfs_create_file("show", S_IRUGO, clk_dir, (void *)0,
-				       &clk_show_fops);
-	if (!clk_show)
-		goto no_show;
-
-	clk_show_enabled_only = debugfs_create_file("show-enabled-only",
-					       S_IRUGO, clk_dir, (void *)1,
-					       &clk_show_fops);
-	if (!clk_show_enabled_only)
-		goto no_enabled_only;
-
-	if (create_clk_dirs(&dbg_clks[0], ARRAY_SIZE(dbg_clks)))
-		goto no_clks;
-
-	if (cpu_is_u8500v2()) {
-		if (create_clk_dirs(&dbg_clks_v2[0], ARRAY_SIZE(dbg_clks_v2)))
-			goto common_clks;
-	}
-	return 0;
-
-common_clks:
-	remove_clk_dirs(&dbg_clks[0], ARRAY_SIZE(dbg_clks));
-no_clks:
-	debugfs_remove(clk_show_enabled_only);
-no_enabled_only:
-	debugfs_remove(clk_show);
-no_show:
-	debugfs_remove(clk_dir);
-no_dir:
-	return -ENOMEM;
-}
-
-static void __exit clk_debug_exit(void)
-{
-	remove_clk_dirs(&dbg_clks[0], ARRAY_SIZE(dbg_clks));
-	if (cpu_is_u8500v2())
-		remove_clk_dirs(&dbg_clks_v2[0], ARRAY_SIZE(dbg_clks_v2));
-
-	debugfs_remove(clk_show);
-	debugfs_remove(clk_show_enabled_only);
-	debugfs_remove(clk_dir);
-}
-
-subsys_initcall(clk_debug_init);
-module_exit(clk_debug_exit);
-#endif /* CONFIG_DEBUG_FS */
 
 /*
  * TODO: Ensure names match with devices and then remove unnecessary entries
@@ -1259,3 +1016,10 @@ int __init db5500_clk_init(void)
 
 	return 0;
 }
+
+static int __init db5500_clk_debug_init(void)
+{
+	return dbx500_clk_debug_init(db5500_dbg_clks,
+				     ARRAY_SIZE(db5500_dbg_clks));
+}
+module_init(db5500_clk_debug_init);
