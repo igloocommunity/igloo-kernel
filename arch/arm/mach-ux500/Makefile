@@ -7,7 +7,8 @@ obj-y				:= clock.o cpu.o devices.o dcache.o \
 				   timer.o timer-mtu.o usb.o reboot_reasons.o
 obj-y				+= pm/
 obj-$(CONFIG_UX500_SOC_DB5500)	+= cpu-db5500.o dma-db5500.o prcmu-db5500.o \
-				   devices-db5500.o clock-db5500.o
+				   devices-db5500.o clock-db5500.o \
+				   clock-debug.o
 obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o \
 				   prcmu-db8500.o clock-db8500.o \
 			           regulator-db8500.o  timer-rtt.o
