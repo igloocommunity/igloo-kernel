@@ -2,7 +2,7 @@
  * Copyright (C) ST-Ericsson SA 2010
  *
  * License Terms: GNU General Public License v2
- * Author: Rickard Andersson <rickard.andersson@stericsson.com> for ST-Ericsson
+ * Author: Rickard Andersson <rickard.andersson@stericsson.com>,
  *	   Jonas Aaberg <jonas.aberg@stericsson.com> for ST-Ericsson
  */
 
@@ -41,7 +41,6 @@ struct state_history {
 	u32 state;
 	u32 *counter;
 	ktime_t *time;
-	spinlock_t lock;
 };
 static DEFINE_PER_CPU(struct state_history, *state_history);
 
@@ -50,7 +49,7 @@ static u32 dbg_console_enable = 1;
 static void __iomem *uart_base;
 static struct clk *uart_clk;
 
- /* Blocks ApSleep and ApDeepSleep */
+/* Blocks ApSleep and ApDeepSleep */
 static bool force_APE_on;
 static bool reset_timer;
 static int deepest_allowed_state = CONFIG_U8500_CPUIDLE_DEEPEST_STATE;
@@ -155,12 +154,10 @@ void ux500_ci_dbg_console_check_uart(void)
 	spin_lock_irqsave(&dbg_lock, flags);
 	status = readw(uart_base + UART011_MIS);
 
-	if (status & (UART011_MIS_RTIS | UART011_MIS_RXIS)) {
+	if (status & (UART011_MIS_RTIS | UART011_MIS_RXIS))
 		reset_timer = true;
-		spin_unlock_irqrestore(&dbg_lock, flags);
-	} else {
-		spin_unlock_irqrestore(&dbg_lock, flags);
-	}
+
+	spin_unlock_irqrestore(&dbg_lock, flags);
 	clk_disable(uart_clk);
 }
 
@@ -192,11 +189,25 @@ static void dbg_cpuidle_work_function(struct work_struct *work)
 	force_APE_on = false;
 }
 
-void ux500_ci_dbg_log(int state, int this_cpu)
+static void state_record_time(struct state_history *sh, enum ci_pwrst pstate,
+			      ktime_t now)
+{
+	ktime_t dtime;
+
+	dtime = ktime_sub(now, sh->start);
+	sh->time[sh->state] = ktime_add(sh->time[sh->state], dtime);
+
+	sh->start = now;
+
+	sh->state = pstate;
+	sh->counter[sh->state]++;
+}
+
+void ux500_ci_dbg_log(enum ci_pwrst pstate, int this_cpu)
 {
 	int i;
 	ktime_t now;
-	ktime_t dtime;
+
 	unsigned long flags;
 	struct state_history *sh;
 	struct state_history *sh_other;
@@ -205,18 +216,16 @@ void ux500_ci_dbg_log(int state, int this_cpu)
 
 	sh = per_cpu(state_history, this_cpu);
 
-	spin_lock_irqsave(&sh->lock, flags);
+	spin_lock_irqsave(&dbg_lock, flags);
 
-	dtime = ktime_sub(now, sh->start);
-	sh->time[sh->state] = ktime_add(sh->time[sh->state], dtime);
+	/*
+	 * Check if current state is just a repeat of
+	 *  the state we're already in, then just quit.
+	 */
+	if (pstate == sh->state)
+		goto done;
 
-	sh->start = now;
-
-	if (state == CI_RUNNING)
-		sh->state = cstates_len;
-	else
-		sh->state = state;
-	sh->counter[sh->state]++;
+	state_record_time(sh, pstate, now);
 
 	/*
 	 * Update other cpus, (this_cpu = A, other cpus = B) if:
@@ -239,18 +248,18 @@ void ux500_ci_dbg_log(int state, int this_cpu)
 		if (sh_other->state == sh->state)
 			continue;
 
-		if (state == CI_RUNNING && sh_other->state != CI_WFI) {
-			ux500_ci_dbg_log(CI_WFI, i);
+		if (pstate == CI_RUNNING && sh_other->state != CI_WFI) {
+			state_record_time(sh_other, CI_WFI, now);
 			continue;
 		}
 		/*
 		 * This cpu is something else than running or wfi, both must be
 		 * in the same state.
 		 */
-		ux500_ci_dbg_log(state, i);
+		state_record_time(sh_other, pstate, now);
 	}
 done:
-	spin_unlock_irqrestore(&sh->lock, flags);
+	spin_unlock_irqrestore(&dbg_lock, flags);
 }
 
 static ssize_t set_deepest_state(struct file *file,
@@ -273,6 +282,9 @@ static ssize_t set_deepest_state(struct file *file,
 
 	if (i > cstates_len - 1)
 		i = cstates_len - 1;
+
+	if (i == 0)
+		i = 1;
 
 	deepest_allowed_state = i;
 
@@ -303,16 +315,15 @@ static ssize_t stats_write(struct file *file,
 
 	for_each_possible_cpu(cpu) {
 		sh = per_cpu(state_history, cpu);
-		spin_lock_irqsave(&sh->lock, flags);
-		for (i = 0; i <= cstates_len; i++) {
+		spin_lock_irqsave(&dbg_lock, flags);
+		for (i = 0; i < cstates_len; i++) {
 			sh->counter[i] = 0;
 			sh->time[i] = ktime_set(0, 0);
+			sh->start = ktime_get();
 		}
 
-		for (i = 0; i <= cstates_len; i++)
-			sh->start = ktime_get();
-		sh->state = cstates_len; /* CI_RUNNING */
-		spin_unlock_irqrestore(&sh->lock, flags);
+		sh->state = CI_RUNNING;
+		spin_unlock_irqrestore(&dbg_lock, flags);
 	}
 
 	return count;
@@ -331,17 +342,17 @@ static int stats_print(struct seq_file *s, void *p)
 
 	for_each_possible_cpu(cpu) {
 		sh = per_cpu(state_history, cpu);
-		spin_lock_irqsave(&sh->lock, flags);
+		spin_lock_irqsave(&dbg_lock, flags);
 		seq_printf(s, "\nCPU%d\n", cpu);
 
 		total = ktime_set(0, 0);
 
-		for (i = 0; i <= cstates_len; i++)
+		for (i = 0; i < cstates_len; i++)
 			total = ktime_add(total, sh->time[i]);
 		total_us = ktime_to_us(total);
 		do_div(total_us, 100);
 
-		for (i = 0; i <= cstates_len; i++) {
+		for (i = 0; i < cstates_len; i++) {
 
 			t_us = ktime_to_us(sh->time[i]);
 			perc = ktime_to_us(sh->time[i]);
@@ -349,18 +360,12 @@ static int stats_print(struct seq_file *s, void *p)
 			if (total_us != 0)
 				do_div(perc, total_us);
 
-			if (i == cstates_len)
-				seq_printf(s, "  - Running                : # "
-					   "%d in %d ms %d%%\n",
-					   sh->counter[cstates_len],
-					   (u32) t_us, (u32)perc);
-			else
-				seq_printf(s, "%d - %s: # %u in %d ms %d%%\n",
-					   i, cstates[i].desc,
-					   sh->counter[i],
-					   (u32) t_us, (u32)perc);
+			seq_printf(s, "%d - %s: # %u in %d ms %d%%\n",
+				   i, cstates[i].desc,
+				   sh->counter[i],
+				   (u32) t_us, (u32)perc);
 		}
-		spin_unlock_irqrestore(&sh->lock, flags);
+		spin_unlock_irqrestore(&dbg_lock, flags);
 	}
 	return 0;
 }
@@ -374,7 +379,7 @@ static int ap_family_show(struct seq_file *s, void *iter)
 	struct state_history *sh;
 
 	sh = per_cpu(state_history, 0);
-	spin_lock_irqsave(&sh->lock, flags);
+	spin_lock_irqsave(&dbg_lock, flags);
 
 	for (i = 0 ; i < cstates_len; i++) {
 		if (cstates[i].state == (enum ci_pwrst)s->private)
@@ -382,7 +387,7 @@ static int ap_family_show(struct seq_file *s, void *iter)
 	}
 
 	seq_printf(s, "%u\n", count);
-	spin_unlock_irqrestore(&sh->lock, flags);
+	spin_unlock_irqrestore(&dbg_lock, flags);
 
 	return 0;
 }
@@ -431,34 +436,6 @@ static const struct file_operations ap_family_fops = {
 };
 
 static struct dentry *cpuidle_dir;
-static struct dentry *deepest_state_file;
-static struct dentry *stats_file;
-static struct dentry *dbg_console_file;
-static struct dentry *apidle_file;
-static struct dentry *apsleep_file;
-static struct dentry *apdeepidle_file;
-static struct dentry *apdeepsleep_file;
-
-static void remove_debugfs(void)
-{
-	if (!IS_ERR_OR_NULL(dbg_console_file))
-		debugfs_remove(dbg_console_file);
-	if (!IS_ERR_OR_NULL(stats_file))
-		debugfs_remove(stats_file);
-	if (!IS_ERR_OR_NULL(deepest_state_file))
-		debugfs_remove(deepest_state_file);
-	if (!IS_ERR_OR_NULL(apidle_file))
-		debugfs_remove(apidle_file);
-	if (!IS_ERR_OR_NULL(apsleep_file))
-		debugfs_remove(apsleep_file);
-	if (!IS_ERR_OR_NULL(apdeepidle_file))
-		debugfs_remove(apdeepidle_file);
-	if (!IS_ERR_OR_NULL(apdeepsleep_file))
-		debugfs_remove(apdeepsleep_file);
-
-	if (!IS_ERR_OR_NULL(cpuidle_dir))
-		debugfs_remove(cpuidle_dir);
-}
 
 static void setup_debugfs(void)
 {
@@ -466,55 +443,48 @@ static void setup_debugfs(void)
 	if (IS_ERR_OR_NULL(cpuidle_dir))
 		goto fail;
 
-	deepest_state_file = debugfs_create_file("deepest_state",
-						 S_IWUGO | S_IRUGO, cpuidle_dir,
-						 NULL, &deepest_state_fops);
-	if (IS_ERR_OR_NULL(deepest_state_file))
-		goto fail;
-
-	stats_file = debugfs_create_file("stats",
-					 S_IRUGO, cpuidle_dir, NULL,
-					 &stats_fops);
-	if (IS_ERR_OR_NULL(stats_file))
-		goto fail;
-
-	dbg_console_file = debugfs_create_bool("dbg_console_enable",
+	if (IS_ERR_OR_NULL(debugfs_create_file("deepest_state",
 					       S_IWUGO | S_IRUGO, cpuidle_dir,
-					       &dbg_console_enable);
-	if (IS_ERR_OR_NULL(dbg_console_file))
+					       NULL, &deepest_state_fops)))
 		goto fail;
 
-	apidle_file = debugfs_create_file("ap_idle", S_IRUGO,
-					  cpuidle_dir,
-					  (void *)CI_IDLE,
-					  &ap_family_fops);
-	if (IS_ERR_OR_NULL(apidle_file))
+	if (IS_ERR_OR_NULL(debugfs_create_file("stats",
+					       S_IRUGO, cpuidle_dir, NULL,
+					       &stats_fops)))
 		goto fail;
 
-	apsleep_file = debugfs_create_file("ap_sleep", S_IRUGO,
-					   cpuidle_dir,
-					   (void *)CI_SLEEP,
-					   &ap_family_fops);
-	if (IS_ERR_OR_NULL(apsleep_file))
+	if (IS_ERR_OR_NULL(debugfs_create_bool("dbg_console_enable",
+					       S_IWUGO | S_IRUGO, cpuidle_dir,
+					       &dbg_console_enable)))
 		goto fail;
 
-	apdeepidle_file = debugfs_create_file("ap_deepidle", S_IRUGO,
+	if (IS_ERR_OR_NULL(debugfs_create_file("ap_idle", S_IRUGO,
+					       cpuidle_dir,
+					       (void *)CI_IDLE,
+					       &ap_family_fops)))
+		goto fail;
+
+	if (IS_ERR_OR_NULL(debugfs_create_file("ap_sleep", S_IRUGO,
+					       cpuidle_dir,
+					       (void *)CI_SLEEP,
+					       &ap_family_fops)))
+		goto fail;
+
+	if (IS_ERR_OR_NULL(debugfs_create_file("ap_deepidle", S_IRUGO,
 					       cpuidle_dir,
 					       (void *)CI_DEEP_IDLE,
-					       &ap_family_fops);
-	if (IS_ERR_OR_NULL(apdeepidle_file))
+					       &ap_family_fops)))
 		goto fail;
 
-	apdeepsleep_file = debugfs_create_file("ap_deepsleep", S_IRUGO,
+	if (IS_ERR_OR_NULL(debugfs_create_file("ap_deepsleep", S_IRUGO,
 					       cpuidle_dir,
 					       (void *)CI_DEEP_SLEEP,
-					       &ap_family_fops);
-	if (IS_ERR_OR_NULL(apdeepsleep_file))
+					       &ap_family_fops)))
 		goto fail;
 
 	return;
 fail:
-	remove_debugfs();
+	debugfs_remove_recursive(cpuidle_dir);
 }
 
 void ux500_ci_dbg_init(void)
@@ -529,17 +499,16 @@ void ux500_ci_dbg_init(void)
 		per_cpu(state_history, cpu) = kzalloc(sizeof(struct state_history),
 						      GFP_KERNEL);
 		sh = per_cpu(state_history, cpu);
-		sh->counter = kzalloc(sizeof(u32) * (cstates_len + 1),
+		sh->counter = kzalloc(sizeof(u32) * cstates_len,
 				      GFP_KERNEL);
-		sh->time = kzalloc(sizeof(ktime_t) * (cstates_len + 1),
+		sh->time = kzalloc(sizeof(ktime_t) * cstates_len,
 				   GFP_KERNEL);
 
-		spin_lock_init(&sh->lock);
 		/* Only first CPU used during boot */
 		if (cpu == 0)
-			sh->state = cstates_len; /* CI_RUNNING */
+			sh->state = CI_RUNNING;
 		else
-			sh->state  = CI_WFI;
+			sh->state = CI_WFI;
 		sh->start = ktime_get();
 	}
 
@@ -574,7 +543,7 @@ void ux500_ci_dbg_remove(void)
 	int cpu;
 	struct state_history *sh;
 
-	remove_debugfs();
+	debugfs_remove_recursive(cpuidle_dir);
 
 	for_each_possible_cpu(cpu) {
 		sh = per_cpu(state_history, cpu);
