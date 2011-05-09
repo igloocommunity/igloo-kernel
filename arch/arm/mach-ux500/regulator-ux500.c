@@ -364,8 +364,6 @@ ux500_regulator_probe(struct platform_device *pdev,
 			"regulator-%s-probed\n", info->desc.name);
 	}
 
-	regulator_has_full_constraints();
-
 	return 0;
 }
 
