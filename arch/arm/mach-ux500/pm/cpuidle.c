@@ -38,6 +38,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_ON,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
+		.pwrst = NO_TRANSITION,
 		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_WFI,
 		.desc = "Wait for interrupt     ",
@@ -52,6 +53,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_ON,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
+		.pwrst = PRCMU_AP_IDLE,
 		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_IDLE,
 		.desc = "ApIdle                 ",
@@ -66,6 +68,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
+		.pwrst = PRCMU_AP_IDLE,
 		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_IDLE,
 		.desc = "ApIdle, ARM PLL off    ",
@@ -80,6 +83,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
+		.pwrst = PRCMU_AP_SLEEP,
 		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_SLEEP,
 		.desc = "ApSleep                ",
@@ -97,6 +101,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_OFF,
 		.ESRAM = ESRAM_RET,
+		.pwrst = PRCMU_AP_SLEEP,
 		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_SLEEP,
 		.desc = "ApSleep, UL PLL off    ",
@@ -113,6 +118,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
+		.pwrst = PRCMU_AP_DEEP_IDLE,
 		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_DEEP_IDLE,
 		.desc = "ApDeepIdle, UL PLL off ",
@@ -129,6 +135,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_OFF,
 		.ESRAM = ESRAM_RET,
+		.pwrst = PRCMU_AP_DEEP_SLEEP,
 		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_DEEP_SLEEP,
 		.desc = "ApDeepsleep, UL PLL off",
@@ -598,9 +605,6 @@ static int enter_sleep(struct cpuidle_device *dev,
 	ux500_ci_dbg_log(target, smp_processor_id());
 
 	if (cstates[target].ARM == ARM_OFF) {
-
-		/* We are going to ApDeepSleep or ApDeepIdle */
-
 		/* Save gic settings */
 		context_varm_save_common();
 
@@ -615,117 +619,38 @@ static int enter_sleep(struct cpuidle_device *dev,
 		}
 
 		spin_unlock_irqrestore(&cpuidle_lock, iflags);
-
-		context_save_cpu_registers();
-
-		state->ready_deep_sleep = true;
-		smp_wmb();
-
-
-		if (cstates[target].APE == APE_OFF)
-			ux500_ci_dbg_msg("ApDeepSleep");
-		else
-			ux500_ci_dbg_msg("ApDeepIdle");
-
-
-		/*
-		 * Due to we have only 100us between requesting a
-		 * powerstate and wfi, we clean the cache before as
-		 * well to assure the final cache clean before wfi
-		 * has as little as possible to do.
-		 */
-		context_clean_l1_cache_all();
-
-		if (cstates[target].APE == APE_OFF) {
-			/* ApDeepSleep */
-			prcmu_set_power_state(PRCMU_AP_DEEP_SLEEP,
-					      cstates[target].UL_PLL,
-					      /* Is actually the AP PLL */
-					      cstates[target].UL_PLL);
-		} else {
-			/* ApDeepIdle */
-			prcmu_set_power_state(PRCMU_AP_DEEP_IDLE,
-					      cstates[target].UL_PLL,
-					      /* Is actually the AP PLL */
-					      cstates[target].UL_PLL);
-		}
-
-		/*
-		 * Save return address to SRAM and set this CPU in WFI.
-		 * This is last core to enter sleep, so we need to
-		 * clean both L2 and L1 caches
-		 */
-		context_save_to_sram_and_wfi(true);
-
-	} else if (cstates[target].APE == APE_OFF) {
-
-		/*
-		 * Prepare for possible future deep sleep. We do not
-		 * need to save varm common context at this stage
-		 * because we can not go from ApSleep directly to
-		 * ApDeepSleep without waking up any CPU
-		 */
-
-		context_varm_save_core();
-
-		context_save_cpu_registers();
-
-		state->ready_deep_sleep = true;
-		smp_wmb();
-
-		ux500_ci_dbg_msg("ApSleep");
-
-		/*
-		 * Due to we have only 100us between requesting a
-		 * powerstate and wfi, we clean the cache before as
-		 * well to assure the final cache clean before wfi
-		 * has as little as possible to do.
-		 */
-		context_clean_l1_cache_all();
-
-		/* ApSleep */
-		prcmu_set_power_state(PRCMU_AP_SLEEP,
-				      cstates[target].UL_PLL,
-				      /* Is actually the AP PLL */
-				      cstates[target].UL_PLL);
-
-		/*
-		 * Handle DDR, ULPLL, SOC PLL and ARM PLL via
-		 * prcmu-API.
-		 */
-
-		context_save_to_sram_and_wfi(false);
-
-	} else { /* We are going to Idle state */
-
-		context_varm_save_core();
-
-		context_save_cpu_registers();
-
-		state->ready_deep_sleep = true;
-		smp_wmb();
-
-		ux500_ci_dbg_msg("ApIdle");
-
-		/*
-		 * Due to we have only 100us between requesting a
-		 * powerstate and wfi, we clean the cache before as
-		 * well to assure the final cache clean before wfi
-		 * has as little as possible to do.
-		 */
-		context_clean_l1_cache_all();
-
-		/* ApIdle */
-		prcmu_set_power_state(PRCMU_AP_IDLE, true, true);
-
-		context_save_to_sram_and_wfi(false);
-
 	}
 
-	/* The PRCMU restores ARM PLL and recouples the GIC */
 
-	state->ready_deep_sleep = false;
+	context_save_cpu_registers();
+
+	state->ready_deep_sleep = true;
 	smp_wmb();
+
+	/* TODO: To use desc as debug print might be a bad idea */
+	ux500_ci_dbg_msg(cstates[target].desc);
+
+	/*
+	 * Due to we have only 100us between requesting a
+	 * powerstate and wfi, we clean the cache before as
+	 * well to assure the final cache clean before wfi
+	 * has as little as possible to do.
+	 */
+	context_clean_l1_cache_all();
+
+	prcmu_set_power_state(cstates[target].pwrst,
+			      cstates[target].UL_PLL,
+			      /* Is actually the AP PLL */
+			      cstates[target].UL_PLL);
+	/*
+	 * If deepsleep/deepidle, Save return address to SRAM and set
+	 * this CPU in WFI. This is last core to enter sleep, so we need to
+	 * clean both L2 and L1 caches
+	 */
+
+	context_save_to_sram_and_wfi(cstates[target].ARM == ARM_OFF);
+
+	/* The PRCMU restores ARM PLL and recouples the GIC */
 
 	context_restore_cpu_registers();
 	restore_sequence(state);
