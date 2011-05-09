@@ -357,6 +357,7 @@ static void __init u5500_uart_init(void)
 
 static void __init u5500_init_machine(void)
 {
+	u5500_regulators_init();
 	u5500_init_devices();
 	u5500_pins_init();
 
