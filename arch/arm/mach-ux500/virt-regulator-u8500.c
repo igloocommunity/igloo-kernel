@@ -58,7 +58,7 @@ static struct platform_device u8500_tvout_virtual_regulator_device  = {
 
 static struct platform_device u8500_audio_virtual_regulator_device  = {
 	.name = "reg-virt-consumer",
-	.id = 6,
+	.id = 5,
 	.dev = {
 		.platform_data = "audio",
 	},
@@ -66,7 +66,7 @@ static struct platform_device u8500_audio_virtual_regulator_device  = {
 
 static struct platform_device u8500_anamic1_virtual_regulator_device  = {
 	.name = "reg-virt-consumer",
-	.id = 7,
+	.id = 6,
 	.dev = {
 		.platform_data = "anamic1",
 	},
@@ -74,7 +74,7 @@ static struct platform_device u8500_anamic1_virtual_regulator_device  = {
 
 static struct platform_device u8500_anamic2_virtual_regulator_device  = {
 	.name = "reg-virt-consumer",
-	.id = 8,
+	.id = 7,
 	.dev = {
 		.platform_data = "anamic2",
 	},
@@ -82,7 +82,7 @@ static struct platform_device u8500_anamic2_virtual_regulator_device  = {
 
 static struct platform_device u8500_dmic_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 9,
+	.id = 8,
 	.dev = {
 		.platform_data = "dmic",
 	},
@@ -90,9 +90,25 @@ static struct platform_device u8500_dmic_virtual_regulator_device = {
 
 static struct platform_device u8500_ana_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 10,
+	.id = 9,
 	.dev = {
 		.platform_data = "ana",
+	},
+};
+
+static struct platform_device u8500_sysclkreq_2_virtual_regulator_device = {
+	.name = "reg-virt-consumer",
+	.id = 10,
+	.dev = {
+		.platform_data = "sysclkreq-2",
+	},
+};
+
+static struct platform_device u8500_sysclkreq_4_virtual_regulator_device = {
+	.name = "reg-virt-consumer",
+	.id = 11,
+	.dev = {
+		.platform_data = "sysclkreq-4",
 	},
 };
 
@@ -101,7 +117,7 @@ static struct platform_device u8500_ana_virtual_regulator_device = {
  */
 static struct platform_device u8500_ape_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 11,
+	.id = 12,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -109,7 +125,7 @@ static struct platform_device u8500_ape_virtual_regulator_device = {
 
 static struct platform_device u8500_arm_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 12,
+	.id = 13,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -117,7 +133,7 @@ static struct platform_device u8500_arm_virtual_regulator_device = {
 
 static struct platform_device u8500_modem_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 13,
+	.id = 14,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -125,7 +141,7 @@ static struct platform_device u8500_modem_virtual_regulator_device = {
 
 static struct platform_device u8500_pll_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 14,
+	.id = 15,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -133,7 +149,7 @@ static struct platform_device u8500_pll_virtual_regulator_device = {
 
 static struct platform_device u8500_smps1_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 15,
+	.id = 16,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -141,7 +157,7 @@ static struct platform_device u8500_smps1_virtual_regulator_device = {
 
 static struct platform_device u8500_smps2_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 16,
+	.id = 17,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -149,7 +165,7 @@ static struct platform_device u8500_smps2_virtual_regulator_device = {
 
 static struct platform_device u8500_smps3_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 17,
+	.id = 18,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -157,7 +173,7 @@ static struct platform_device u8500_smps3_virtual_regulator_device = {
 
 static struct platform_device u8500_rf1_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 18,
+	.id = 19,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -168,7 +184,7 @@ static struct platform_device u8500_rf1_virtual_regulator_device = {
  */
 static struct platform_device u8500_sva_mmdsp_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 19,
+	.id = 20,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -176,7 +192,7 @@ static struct platform_device u8500_sva_mmdsp_virtual_regulator_device = {
 
 static struct platform_device u8500_sva_mmdsp_ret_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 20,
+	.id = 21,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -184,7 +200,7 @@ static struct platform_device u8500_sva_mmdsp_ret_virtual_regulator_device = {
 
 static struct platform_device u8500_sva_pipe_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 21,
+	.id = 22,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -192,7 +208,7 @@ static struct platform_device u8500_sva_pipe_virtual_regulator_device = {
 
 static struct platform_device u8500_sia_mmdsp_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 22,
+	.id = 23,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -200,7 +216,7 @@ static struct platform_device u8500_sia_mmdsp_virtual_regulator_device = {
 
 static struct platform_device u8500_sia_mmdsp_ret_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 23,
+	.id = 24,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -208,7 +224,7 @@ static struct platform_device u8500_sia_mmdsp_ret_virtual_regulator_device = {
 
 static struct platform_device u8500_sia_pipe_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 24,
+	.id = 25,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -216,7 +232,7 @@ static struct platform_device u8500_sia_pipe_virtual_regulator_device = {
 
 static struct platform_device u8500_sga_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 25,
+	.id = 26,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -224,7 +240,7 @@ static struct platform_device u8500_sga_virtual_regulator_device = {
 
 static struct platform_device u8500_b2r2_mcde_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 26,
+	.id = 27,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -232,7 +248,7 @@ static struct platform_device u8500_b2r2_mcde_virtual_regulator_device = {
 
 static struct platform_device u8500_esram12_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 27,
+	.id = 28,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -240,7 +256,7 @@ static struct platform_device u8500_esram12_virtual_regulator_device = {
 
 static struct platform_device u8500_esram12_ret_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 28,
+	.id = 29,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -248,7 +264,7 @@ static struct platform_device u8500_esram12_ret_virtual_regulator_device = {
 
 static struct platform_device u8500_esram34_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 29,
+	.id = 30,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -256,7 +272,7 @@ static struct platform_device u8500_esram34_virtual_regulator_device = {
 
 static struct platform_device u8500_esram34_ret_virtual_regulator_device = {
 	.name = "reg-virt-consumer",
-	.id = 30,
+	.id = 31,
 	.dev = {
 		.platform_data = "test",
 	},
@@ -273,6 +289,8 @@ static struct platform_device *u8500_virtual_regulator_devices[] = {
 	&u8500_anamic2_virtual_regulator_device,
 	&u8500_dmic_virtual_regulator_device,
 	&u8500_ana_virtual_regulator_device,
+	&u8500_sysclkreq_2_virtual_regulator_device,
+	&u8500_sysclkreq_4_virtual_regulator_device,
 	&u8500_ape_virtual_regulator_device,
 	&u8500_arm_virtual_regulator_device,
 	&u8500_modem_virtual_regulator_device,
