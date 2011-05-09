@@ -40,12 +40,12 @@ enum ESRAM {
 };
 
 enum ci_pwrst {
-	CI_WFI = 0,
+	CI_RUNNING = 0,
+	CI_WFI = 1,
 	CI_IDLE,
 	CI_SLEEP,
 	CI_DEEP_IDLE,
 	CI_DEEP_SLEEP,
-	CI_RUNNING = 255,
 };
 
 struct cstate {

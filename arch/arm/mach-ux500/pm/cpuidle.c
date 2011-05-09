@@ -32,6 +32,20 @@ static struct cstate cstates[] = {
 		.enter_latency = 0,
 		.exit_latency = 0,
 		.threshold = 0,
+		.power_usage = 1000,
+		.APE = APE_ON,
+		.ARM = ARM_ON,
+		.ARM_PLL = ARM_PLL_ON,
+		.UL_PLL = UL_PLL_ON,
+		.ESRAM = ESRAM_RET,
+		.pwrst = NO_TRANSITION,
+		.state = CI_RUNNING,
+		.desc = "Running                ",
+	},
+	{
+		.enter_latency = 0,
+		.exit_latency = 0,
+		.threshold = 0,
 		.power_usage = 10,
 		.APE = APE_ON,
 		.ARM = ARM_ON,
@@ -348,7 +362,7 @@ static int determine_sleep_state(int idle_cpus,
 
 	/* If first cpu to sleep, go to most shallow sleep state */
 	if (idle_cpus < num_online_cpus())
-		return 0;
+		return CI_WFI;
 
 	/* If other CPU is going to WFI, but not yet there wait. */
 	while (1) {
@@ -359,7 +373,7 @@ static int determine_sleep_state(int idle_cpus,
 			return -1;
 
 		if (atomic_read(&idle_cpus_counter) < num_online_cpus())
-			return 0;
+			return CI_WFI;
 	}
 
 	power_state_req = power_state_active_is_enabled() ||
@@ -405,7 +419,7 @@ static int determine_sleep_state(int idle_cpus,
 		break;
 	}
 
-	return max(0, i);
+	return max(CI_WFI, i);
 
 }
 
@@ -453,7 +467,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 				       gov_cstate);
 	if (target < 0) {
 		/* "target" will be last_state in the cpuidle framework */
-		target = 0;
+		target = CI_RUNNING;
 		goto exit_fast;
 	}
 
