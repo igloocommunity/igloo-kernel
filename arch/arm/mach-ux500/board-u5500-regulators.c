@@ -5,10 +5,17 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/platform_device.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/ab5500.h>
 
+#include "regulator-u5500.h"
 #include "board-u5500.h"
+
+/*
+ * AB5500
+ */
 
 static struct regulator_consumer_supply ab5500_ldo_d_consumers[] = {
 };
@@ -132,3 +139,44 @@ struct ab5500_regulator_platform_data u5500_ab5500_regulator_data = {
 	.regulator	= ab5500_regulator_init_data,
 	.num_regulator	= ARRAY_SIZE(ab5500_regulator_init_data),
 };
+
+/*
+ * Power state, ePOD, etc.
+ */
+
+static struct regulator_consumer_supply u5500_vape_consumers[] = {
+	REGULATOR_SUPPLY("v-ape", NULL),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.0"),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.1"),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.2"),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.3"),
+	REGULATOR_SUPPLY("v-mmc", "sdi0"),
+	REGULATOR_SUPPLY("v-mmc", "sdi1"),
+	REGULATOR_SUPPLY("v-mmc", "sdi2"),
+	REGULATOR_SUPPLY("v-mmc", "sdi3"),
+	REGULATOR_SUPPLY("v-mmc", "sdi4"),
+	REGULATOR_SUPPLY("v-uart", "uart0"),
+	REGULATOR_SUPPLY("v-uart", "uart1"),
+	REGULATOR_SUPPLY("v-uart", "uart2"),
+	REGULATOR_SUPPLY("v-uart", "uart3"),
+};
+
+static struct regulator_init_data *
+u5500_regulator_init_data[U5500_NUM_REGULATORS] __initdata = {
+	[U5500_REGULATOR_VAPE] = (struct regulator_init_data []) {
+		{
+			.constraints = {
+				.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+			},
+			.consumer_supplies	= u5500_vape_consumers,
+			.num_consumer_supplies	= ARRAY_SIZE(u5500_vape_consumers),
+		}
+	},
+};
+
+void __init u5500_regulators_init(void)
+{
+	platform_device_register_data(NULL, "u5500-regulators", -1,
+				      u5500_regulator_init_data,
+				      sizeof(u5500_regulator_init_data));
+}

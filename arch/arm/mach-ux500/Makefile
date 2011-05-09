@@ -37,6 +37,10 @@ ifeq ($(CONFIG_UX500_SOC_DB8500), y)
 obj-$(CONFIG_REGULATOR)			+= regulator-db8500.o
 endif
 
+ifeq ($(CONFIG_UX500_SOC_DB5500), y)
+obj-$(CONFIG_REGULATOR)			+= regulator-u5500.o
+endif
+
 obj-$(CONFIG_U8500_REGULATOR_DEBUG)	+= virt-regulator-u8500.o
 obj-$(CONFIG_UX500_PRCMU_DEBUG)		+= prcmu-debug.o
 obj-$(CONFIG_UX500_PRCMU_QOS_POWER)	+= prcmu-qos-power.o
