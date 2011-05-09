@@ -162,9 +162,6 @@ static struct regulator_consumer_supply db8500_vape_consumers[] = {
 };
 
 static struct regulator_consumer_supply db8500_vsmps2_consumers[] = {
-	/* CG2900 and CW1200 power to off-chip peripherals */
-	REGULATOR_SUPPLY("gbf_1v8", "cg2900-uart.0"),
-	REGULATOR_SUPPLY("wlan_1v8", "cw1200.0"),
 	REGULATOR_SUPPLY("musb_1v8", "ab8500-usb.0"),
 	/* AV8100 regulator */
 	REGULATOR_SUPPLY("hdmi_1v8", "0-0070"),
