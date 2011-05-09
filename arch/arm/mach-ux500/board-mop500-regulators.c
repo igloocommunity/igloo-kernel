@@ -406,7 +406,7 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 	/* supply for U8500 CSI/DSI, VANA LDO */
 	[AB8500_LDO_ANA] = {
 		.constraints = {
-			.name = "V-CSI/DSI",
+			.name = "V-CSI-DSI",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
 		.num_consumer_supplies = ARRAY_SIZE(ab8500_vana_consumers),
