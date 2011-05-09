@@ -129,6 +129,15 @@ int __init clk_init(void);
 void clks_register(struct clk_lookup *clks, size_t num);
 unsigned long __clk_get_rate(struct clk *clk, void *current_lock);
 
+#ifdef CONFIG_DEBUG_FS
+int dbx500_clk_debug_init(struct clk **clks, int num);
+#else
+static inline int dbx500_clk_debug_init(struct clk **clks, int num)
+{
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_UX500_SOC_DB8500
 int __init db8500_clk_init(void);
 #else
