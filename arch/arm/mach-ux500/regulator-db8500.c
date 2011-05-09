@@ -144,6 +144,8 @@ void ux500_regulator_put(struct ux500_regulator *regulator)
 	/* Here for symetric reasons and for possible future use */
 }
 
+#ifdef CONFIG_UX500_SOC_DB8500
+
 /**
  * struct db8500_regulator_info - db8500 regulator information
  * @dev: device pointer
@@ -644,3 +646,5 @@ module_exit(db8500_regulator_exit);
 MODULE_AUTHOR("STMicroelectronics/ST-Ericsson");
 MODULE_DESCRIPTION("DB8500 regulator driver");
 MODULE_LICENSE("GPL v2");
+
+#endif /* CONFIG_UX500_SOC_DB8500 */
