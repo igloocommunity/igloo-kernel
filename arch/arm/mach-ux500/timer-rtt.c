@@ -15,7 +15,6 @@
 #include <asm/mach/time.h>
 
 #define RATE_32K	32768
-#define LATCH_32K	((RATE_32K + HZ/2) / HZ)
 
 #define WRITE_DELAY 130 /* in us */
 #define WRITE_DELAY_32KHZ_TICKS ((WRITE_DELAY * RATE_32K) / 1000000)
@@ -43,6 +42,7 @@
 
 #define RTC_IMSC_TIMSC	(1 << 1)
 #define RTC_ICR_TIC	(1 << 1)
+#define RTC_MIS_RTCTMIS	(1 << 1)
 
 static void __iomem *rtc_base;
 
@@ -61,17 +61,14 @@ static void rtc_set_mode(enum clock_event_mode mode,
 {
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
-		rtc_writel(RTC_TCR_RTTSS, RTC_TCR);
-		rtc_writel(LATCH_32K, RTC_TLR1);
-		break;
-
+		pr_err("timer-rtt: periodic timer not supported\n");
 	case CLOCK_EVT_MODE_ONESHOT:
-		rtc_writel(0, RTC_TCR);
 		break;
 
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
-		rtc_writel(0, RTC_TCR);
+		/* Disable, self start and oneshot mode */
+		rtc_writel(RTC_TCR_RTTSS | RTC_TCR_RTTOS, RTC_TCR);
 		break;
 
 	case CLOCK_EVT_MODE_RESUME:
@@ -80,11 +77,15 @@ static void rtc_set_mode(enum clock_event_mode mode,
 	}
 }
 
+/*
+ * Delays are needed since hardware does not like
+ * two writes too close which will be the case running SMP.
+ */
 static int rtc_set_event(unsigned long delta,
 			 struct clock_event_device *dev)
 {
 
-	rtc_writel(RTC_TCR_RTTOS, RTC_TCR);
+	rtc_writel(RTC_TCR_RTTSS | RTC_TCR_RTTOS, RTC_TCR);
 	udelay(WRITE_DELAY);
 
 	/*
@@ -95,10 +96,8 @@ static int rtc_set_event(unsigned long delta,
 		delta -= WRITE_DELAY_32KHZ_TICKS * 2;
 	else
 		delta = 1;
+	/* Load register and enable if self start */
 	rtc_writel(delta, RTC_TLR1);
-	udelay(WRITE_DELAY);
-
-	rtc_writel(RTC_TCR_RTTOS | RTC_TCR_RTTEN, RTC_TCR);
 	udelay(WRITE_DELAY);
 
 	return 0;
@@ -109,7 +108,7 @@ static irqreturn_t rtc_interrupt(int irq, void *dev)
 	struct clock_event_device *clkevt = dev;
 
 	/* we make sure if this is our rtt isr */
-	if (rtc_readl(RTC_MIS) & 0x2) {
+	if (rtc_readl(RTC_MIS) & RTC_MIS_RTCTMIS) {
 		rtc_writel(RTC_ICR_TIC, RTC_ICR);
 		clkevt->event_handler(clkevt);
 		return IRQ_HANDLED;
@@ -127,7 +126,7 @@ void smp_timer_broadcast(const struct cpumask *mask);
 
 static struct clock_event_device rtc_dev = {
 	.name		= "rtc-rtt",
-	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+	.features	= CLOCK_EVT_FEAT_ONESHOT,
 	.shift		= 32,
 	.rating		= 300,
 	.set_next_event	= rtc_set_event,
@@ -162,7 +161,7 @@ void rtc_rtt_timer_init(unsigned int cpu)
 
 	rtc_dev.irq = irq;
 
-	rtc_writel(0, RTC_TCR);
+	rtc_writel(RTC_TCR_RTTSS | RTC_TCR_RTTOS, RTC_TCR);
 	rtc_writel(RTC_ICR_TIC, RTC_ICR);
 	rtc_writel(RTC_IMSC_TIMSC, RTC_IMSC);
 
