@@ -115,7 +115,7 @@ static cycle_t u8500_read_timer_dummy(struct clocksource *cs)
 {
 	return 0;
 }
-void mtu_clockevent_reset(void);
+
 void mtu_clocksource_reset(void)
 {
 	writel(MTU_CRn_DIS, mtu0_base + MTU_CR(1));
@@ -128,12 +128,6 @@ void mtu_clocksource_reset(void)
 	       MTU_CRn_FREERUNNING, mtu0_base + MTU_CR(1));
 }
 
-static void u8500_mtu_clocksource_resume(struct clocksource *cs)
-{
-	mtu_clocksource_reset();
-	mtu_clockevent_reset();
-}
-
 static struct clocksource u8500_clksrc = {
 	.name		= "mtu_1",
 	.rating		= 120,
@@ -141,7 +135,6 @@ static struct clocksource u8500_clksrc = {
 	.shift		= 20,
 	.mask		= CLOCKSOURCE_MASK(32),
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-	.resume		= u8500_mtu_clocksource_resume,
 };
 
 #ifdef ARCH_HAS_READ_CURRENT_TIMER
@@ -167,30 +160,8 @@ int read_current_timer(unsigned long *timer_val)
 #endif
 
 /*
- * Clockevent device: currently only periodic mode is supported
+ * Clockevent
  */
-
-static void u8500_mtu_clkevt_mode(enum clock_event_mode mode,
-			     struct clock_event_device *dev)
-{
-	switch (mode) {
-	case CLOCK_EVT_MODE_PERIODIC:
-		mtu_periodic = true;
-		mtu_clockevent_reset();
-		break;
-	case CLOCK_EVT_MODE_ONESHOT:
-		mtu_periodic = false;
-		break;
-	case CLOCK_EVT_MODE_SHUTDOWN:
-	case CLOCK_EVT_MODE_UNUSED:
-		writel(MTU_CRn_DIS, mtu0_base + MTU_CR(0));
-		writel(0, mtu0_base + MTU_IMSC);
-		break;
-	case CLOCK_EVT_MODE_RESUME:
-		break;
-	}
-}
-
 static int u8500_mtu_clkevt_next(unsigned long evt, struct clock_event_device *ev)
 {
 	writel(1 << 0, mtu0_base + MTU_IMSC);
@@ -215,7 +186,29 @@ void mtu_clockevent_reset(void)
 		       mtu0_base + MTU_CR(0));
 		writel(1 << 0, mtu0_base + MTU_IMSC);
 	} else {
+		/* Generate an interrupt to start the clockevent again */
 		u8500_mtu_clkevt_next(u8500_cycle, NULL);
+	}
+}
+
+static void u8500_mtu_clkevt_mode(enum clock_event_mode mode,
+			     struct clock_event_device *dev)
+{
+	switch (mode) {
+	case CLOCK_EVT_MODE_PERIODIC:
+		mtu_periodic = true;
+		mtu_clockevent_reset();
+		break;
+	case CLOCK_EVT_MODE_ONESHOT:
+		mtu_periodic = false;
+		break;
+	case CLOCK_EVT_MODE_SHUTDOWN:
+	case CLOCK_EVT_MODE_UNUSED:
+		writel(MTU_CRn_DIS, mtu0_base + MTU_CR(0));
+		writel(0, mtu0_base + MTU_IMSC);
+		break;
+	case CLOCK_EVT_MODE_RESUME:
+		break;
 	}
 }
 
@@ -245,7 +238,6 @@ void smp_timer_broadcast(const struct cpumask *mask);
 struct clock_event_device u8500_mtu_clkevt = {
 	.name		= "mtu_0",
 	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-	.shift		= 32,
 	/* Must be of higher rating the timer-rtt but lower than localtimers */
 	.rating		= 310,
 	.set_mode	= u8500_mtu_clkevt_mode,
@@ -304,8 +296,10 @@ void __init mtu_timer_init(void)
 	clocksource_register(&u8500_clksrc);
 
 	/* Register irq and clockevents */
-	u8500_mtu_clkevt.mult = div_sc(rate, NSEC_PER_SEC,
-				       u8500_mtu_clkevt.shift);
+
+	/* We can sleep for max 10s (actually max is longer) */
+	clockevents_calc_mult_shift(&u8500_mtu_clkevt, rate, 10);
+
 	u8500_mtu_clkevt.max_delta_ns = clockevent_delta2ns(0xffffffff,
 							    &u8500_mtu_clkevt);
 	u8500_mtu_clkevt.min_delta_ns = clockevent_delta2ns(0xff,
