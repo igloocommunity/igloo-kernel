@@ -220,6 +220,8 @@ static void restore_sequence(struct cpu_state *state,
 
 	smp_rmb();
 	if (restore_ape) {
+		/* Wake in 1 us */
+		ktime_t time_next = ktime_set(0, 1000);
 
 		restore_ape = false;
 		smp_wmb();
@@ -237,6 +239,32 @@ static void restore_sequence(struct cpu_state *state,
 
 		ux500_ci_dbg_console_handle_ape_resume();
 
+		clockevents_set_mode(&rtt_clkevt, CLOCK_EVT_MODE_SHUTDOWN);
+		/*
+		 * TODO: We might have woken on other interrupt.
+		 * Reprogram MTU to wake at correct time.
+		 */
+
+		/* Make sure have an MTU interrupt waiting for us */
+		clockevents_program_event(&u8500_mtu_clkevt,
+					  time_next,
+					  time_zero);
+	}
+
+	/*
+	 * TODO: Figure out why the second CPU does not get scheduled
+	 * when it should be the first one out of ApSleep.
+	 * (First cpu gets all shared interrupts.)
+	 */
+
+	if (this_cpu == 0) {
+		int cpu;
+		for_each_online_cpu(cpu) {
+			/* TODO: Only kick the CPU that was supposed to wake */
+			if (cpu != this_cpu)
+				/* Send an unused IPI interrupt (2) */
+				gic_raise_softirq(cpumask_of(cpu), 2);
+		}
 	}
 
 	spin_unlock_irqrestore(&cpuidle_lock, iflags);
@@ -378,7 +406,6 @@ static int enter_sleep(struct cpuidle_device *dev,
 	u32 divps_rate;
 	bool slept_well = false;
 	bool always_on_timer_migrated = false;
-	bool restore_timer = false;
 	int this_cpu = smp_processor_id();
 
 	local_irq_disable();
@@ -465,10 +492,11 @@ static int enter_sleep(struct cpuidle_device *dev,
 		sleep_time = ktime_set(0, get_remaining_sleep_time() * 1000);
 
 		if (cstates[target].UL_PLL == UL_PLL_OFF) {
+			ktime_t ulpll_sleep = ktime_set(0,
+						UL_PLL_START_UP_LATENCY * 1000);
 			/* Compensate for ULPLL start up time */
-			sleep_time = ktime_sub(sleep_time,
-					       ktime_set(0,
-							 UL_PLL_START_UP_LATENCY * 1000));
+			sleep_time = ktime_sub(sleep_time, ulpll_sleep);
+
 			/*
 			 * Not checking for negative sleep time since
 			 * determine_sleep_state has already checked that
@@ -481,8 +509,6 @@ static int enter_sleep(struct cpuidle_device *dev,
 					  time_zero);
 
 		context_vape_save();
-
-		restore_timer = true;
 
 		ux500_ci_dbg_console_handle_ape_suspend();
 		ux500_pm_prcmu_set_ioforce(true);
@@ -543,24 +569,6 @@ exit:
 		ux500_pm_gic_recouple();
 
 	restore_sequence(state, always_on_timer_migrated);
-
-	if (restore_timer) {
-		/* Wake in 1 us */
-		ktime_t time_next = ktime_set(0, 1000);
-
-		/*
-		 * TODO: We might have woken on other interrupt.
-		 * Reprogram MTU to wake at correct time.
-		 */
-
-		clockevents_set_mode(&rtt_clkevt,
-				     CLOCK_EVT_MODE_SHUTDOWN);
-
-		/* Make sure have an MTU interrupt waiting for us */
-		clockevents_program_event(&u8500_mtu_clkevt,
-					  time_next,
-					  time_zero);
-	}
 
 exit_fast:
 
@@ -651,6 +659,7 @@ static int __init cpuidle_driver_init(void)
 	/* Zero time used on a few places */
 	time_zero = ktime_set(0, 0);
 
+	/* Configure wake up reasons */
 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
 			     PRCMU_WAKEUP(ABB));
 
