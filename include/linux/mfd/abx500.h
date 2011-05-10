@@ -1,12 +1,13 @@
 /*
- * Copyright (C) 2007-2009 ST-Ericsson AB
- * License terms: GNU General Public License (GPL) version 2
+ * Copyright (C) ST-Ericsson SA 2010
+ * License terms: GNU General Public License v2
  * AB3100 core access functions
  * Author: Linus Walleij <linus.walleij@stericsson.com>
  *
  * ABX500 core access functions.
  * The abx500 interface is used for the Analog Baseband chip
- * ab3100, ab3550, ab5500, and ab8500.
+ * ab3100, ab3550, ab5500 and possibly comming. It is not used for
+ * ab4500 and ab8500 since they are another family of chip.
  *
  * Author: Mattias Wallin <mattias.wallin@stericsson.com>
  * Author: Mattias Nilsson <mattias.i.nilsson@stericsson.com>
@@ -203,54 +204,6 @@ struct ab3550_platform_data {
 	size_t dev_data_sz[AB3550_NUM_DEVICES];
 	struct abx500_init_settings *init_settings;
 	unsigned int init_settings_sz;
-};
-
-enum ab5500_devid {
-	AB5500_DEVID_ADC,
-	AB5500_DEVID_LEDS,
-	AB5500_DEVID_POWER,
-	AB5500_DEVID_REGULATORS,
-	AB5500_DEVID_SIM,
-	AB5500_DEVID_RTC,
-	AB5500_DEVID_CHARGER,
-	AB5500_DEVID_FUELGAUGE,
-	AB5500_DEVID_VIBRATOR,
-	AB5500_DEVID_CODEC,
-	AB5500_DEVID_USB,
-	AB5500_DEVID_OTP,
-	AB5500_DEVID_VIDEO,
-	AB5500_DEVID_DBIECI,
-	AB5500_NUM_DEVICES,
-};
-
-enum ab5500_banks {
-	AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP = 0,
-	AB5500_BANK_VDDDIG_IO_I2C_CLK_TST = 1,
-	AB5500_BANK_VDENC = 2,
-	AB5500_BANK_SIM_USBSIM  = 3,
-	AB5500_BANK_LED = 4,
-	AB5500_BANK_ADC  = 5,
-	AB5500_BANK_RTC  = 6,
-	AB5500_BANK_STARTUP  = 7,
-	AB5500_BANK_DBI_ECI  = 8,
-	AB5500_BANK_CHG  = 9,
-	AB5500_BANK_FG_BATTCOM_ACC = 10,
-	AB5500_BANK_USB = 11,
-	AB5500_BANK_IT = 12,
-	AB5500_BANK_VIBRA = 13,
-	AB5500_BANK_AUDIO_HEADSETUSB = 14,
-	AB5500_NUM_BANKS = 15,
-};
-
-struct ab5500_regulator_platform_data;
-
-struct ab5500_platform_data {
-	struct {unsigned int base; unsigned int count; } irq;
-	void *dev_data[AB5500_NUM_DEVICES];
-	size_t dev_data_sz[AB5500_NUM_DEVICES];
-	struct abx500_init_settings *init_settings;
-	unsigned int init_settings_sz;
-	struct ab5500_regulator_platform_data *regulator;
 };
 
 int abx500_set_register_interruptible(struct device *dev, u8 bank, u8 reg,
