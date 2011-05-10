@@ -339,8 +339,12 @@ static int ab8500_regulator_set_voltage(struct regulator_dev *rdev,
 
 	*selector = ret;
 
+	if (info->desc.id == AB8500_LDO_INTCORE)
+		regval = ((u8)ret) << 3;
+	else
+		regval = (u8)ret;
+
 	/* set the registers for the request */
-	regval = (u8)ret;
 	ret = abx500_mask_and_set_register_interruptible(info->dev,
 			info->voltage_bank, info->voltage_reg,
 			info->voltage_mask, regval);
