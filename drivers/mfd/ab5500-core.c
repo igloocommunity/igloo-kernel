@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2010 ST-Ericsson
+ * Copyright (C) 2007-2011 ST-Ericsson
  * License terms: GNU General Public License (GPL) version 2
  * Low-level core for exclusive access to the AB5500 IC on the I2C bus
  * and some basic chip-configuration.
@@ -8,6 +8,7 @@
  * Author: Mattias Wallin <mattias.wallin@stericsson.com>
  * Author: Rickard Andersson <rickard.andersson@stericsson.com>
  * Author: Karl Komierowski  <karl.komierowski@stericsson.com>
+ * Author: Bibek Basu <bibek.basu@stericsson.com>
  */
 
 #include <linux/mutex.h>
@@ -21,6 +22,7 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
+#include <linux/mfd/abx500/ab5500.h>
 #include <linux/mfd/abx500.h>
 #include <linux/list.h>
 #include <linux/bitops.h>
@@ -32,7 +34,8 @@
 #define AB5500_NAME_STRING "ab5500"
 #define AB5500_ID_FORMAT_STRING "AB5500 %s"
 #define AB5500_NUM_EVENT_REG 23
-
+#define AB5500_IT_LATCH0_REG		0x40
+#define AB5500_IT_MASK0_REG		0x60
 /* These are the only registers inside AB5500 used in this main file */
 
 /* Read/write operation values. */
@@ -47,45 +50,6 @@
 #define AB5500_MASK_END (0x79)
 #define AB5500_CHIP_ID (0x20)
 
-#define AB5500_IT_LATCH0_REG		0x40
-#define AB5500_IT_MASK0_REG		0x60
-#define AB5500_NUM_IRQ_REGS		23
-#define AB5500_NR_IRQS			(23 * 8)
-
-/**
- * struct ab5500
- * @access_mutex: lock out concurrent accesses to the AB registers
- * @dev: a pointer to the device struct for this chip driver
- * @ab5500_irq: the analog baseband irq
- * @irq_base: the platform configuration irq base for subdevices
- * @chip_name: name of this chip variant
- * @chip_id: 8 bit chip ID for this chip variant
- * @irq_lock: a lock to protect the mask
- * @abb_events: a local bit mask of the prcmu wakeup events
- * @event_mask: a local copy of the mask event registers
- * @last_event_mask: a copy of the last event_mask written to hardware
- * @startup_events: a copy of the first reading of the event registers
- * @startup_events_read: whether the first events have been read
- */
-struct ab5500 {
-	struct mutex access_mutex;
-	struct device *dev;
-	unsigned int ab5500_irq;
-	unsigned int irq_base;
-	char chip_name[32];
-	u8 chip_id;
-	struct mutex irq_lock;
-	u32 abb_events;
-	u8 mask[AB5500_NUM_IRQ_REGS];
-	u8 oldmask[AB5500_NUM_IRQ_REGS];
-	u8 startup_events[AB5500_NUM_IRQ_REGS];
-	bool startup_events_read;
-#ifdef CONFIG_DEBUG_FS
-	unsigned int debug_bank;
-	unsigned int debug_address;
-#endif
-};
-
 /**
  * struct ab5500_bank
  * @slave_addr: I2C slave_addr found in AB5500 specification
@@ -97,22 +61,27 @@ struct ab5500_bank {
 };
 
 static const struct ab5500_bank bankinfo[AB5500_NUM_BANKS] = {
-	[AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP] = {0x4A, "VIT_IO_I2C_CLK_TST_OTP"},
-	[AB5500_BANK_VDDDIG_IO_I2C_CLK_TST] = {0x4B, "VDDDIG_IO_I2C_CLK_TST"},
-	[AB5500_BANK_VDENC] = {0x06, "VDENC"},
-	[AB5500_BANK_SIM_USBSIM] = {0x04, "SIM_USBSIM"},
-	[AB5500_BANK_LED] = {0x10, "LED"},
-	[AB5500_BANK_ADC] = {0x0A, "ADC"},
-	[AB5500_BANK_RTC] = {0x0F, "RTC"},
-	[AB5500_BANK_STARTUP] = {0x03, "STARTUP"},
-	[AB5500_BANK_DBI_ECI] = {0x07, "DBI-ECI"},
-	[AB5500_BANK_CHG] = {0x0B, "CHG"},
-	[AB5500_BANK_FG_BATTCOM_ACC] = {0x0C, "FG_BATCOM_ACC"},
-	[AB5500_BANK_USB] = {0x05, "USB"},
-	[AB5500_BANK_IT] = {0x0E, "IT"},
-	[AB5500_BANK_VIBRA] = {0x02, "VIBRA"},
-	[AB5500_BANK_AUDIO_HEADSETUSB] = {0x0D, "AUDIO_HEADSETUSB"},
+	[AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP] = {
+		AB5500_ADDR_VIT_IO_I2C_CLK_TST_OTP, "VIT_IO_I2C_CLK_TST_OTP"},
+	[AB5500_BANK_VDDDIG_IO_I2C_CLK_TST] = {
+		AB5500_ADDR_VDDDIG_IO_I2C_CLK_TST, "VDDDIG_IO_I2C_CLK_TST"},
+	[AB5500_BANK_VDENC] = {AB5500_ADDR_VDENC, "VDENC"},
+	[AB5500_BANK_SIM_USBSIM] = {AB5500_ADDR_SIM_USBSIM, "SIM_USBSIM"},
+	[AB5500_BANK_LED] = {AB5500_ADDR_LED, "LED"},
+	[AB5500_BANK_ADC] = {AB5500_ADDR_ADC, "ADC"},
+	[AB5500_BANK_RTC] = {AB5500_ADDR_RTC, "RTC"},
+	[AB5500_BANK_STARTUP] = {AB5500_ADDR_STARTUP, "STARTUP"},
+	[AB5500_BANK_DBI_ECI] = {AB5500_ADDR_DBI_ECI, "DBI-ECI"},
+	[AB5500_BANK_CHG] = {AB5500_ADDR_CHG, "CHG"},
+	[AB5500_BANK_FG_BATTCOM_ACC] = {
+		AB5500_ADDR_FG_BATTCOM_ACC, "FG_BATCOM_ACC"},
+	[AB5500_BANK_USB] = {AB5500_ADDR_USB, "USB"},
+	[AB5500_BANK_IT] = {AB5500_ADDR_IT, "IT"},
+	[AB5500_BANK_VIBRA] = {AB5500_ADDR_VIBRA, "VIBRA"},
+	[AB5500_BANK_AUDIO_HEADSETUSB] = {
+		AB5500_ADDR_AUDIO_HEADSETUSB, "AUDIO_HEADSETUSB"},
 };
+
 
 /**
  * struct ab5500_reg_range
@@ -157,207 +126,486 @@ struct ab5500_i2c_banks {
  */
 
 #define NO_RANGE {.count = 0, .range = NULL,}
-
-static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
-	[AB5500_DEVID_ADC] =  {
-		.nbanks = 1,
-		.bank = (struct ab5500_i2c_ranges[]) {
+static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
+	[AB5500_BANK_LED] = {
+		.bankid = AB5500_BANK_LED,
+		.nranges = 1,
+		.range = (struct ab5500_reg_range[]) {
 			{
-				.bankid = AB5500_BANK_ADC,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x20,
-						.last = 0x58,
-						.perm = AB5500_PERM_RW,
-					},
-				},
+				.first = 0x00,
+				.last = 0x0C,
+				.perm = AB5500_PERM_RW,
+			},
+			},
+	},
+	[AB5500_BANK_ADC] = {
+		.bankid = AB5500_BANK_ADC,
+		.nranges = 6,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x1F,
+				.last = 0x22,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x23,
+				.last = 0x24,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x26,
+				.last = 0x2D,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x2F,
+				.last = 0x34,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x37,
+				.last = 0x57,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x58,
+				.last = 0x58,
+				.perm = AB5500_PERM_RO,
 			},
 		},
+	},
+	[AB5500_BANK_RTC] = {
+		.bankid = AB5500_BANK_RTC,
+		.nranges = 2,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x04,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x06,
+				.last = 0x0C,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_STARTUP] = {
+		.bankid = AB5500_BANK_STARTUP,
+		.nranges = 12,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x01,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x1F,
+				.last = 0x1F,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x2E,
+				.last = 0x2E,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x2F,
+				.last = 0x30,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x50,
+				.last = 0x51,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x60,
+				.last = 0x61,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x66,
+				.last = 0x8A,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x8C,
+				.last = 0x96,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xAA,
+				.last = 0xB4,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xB7,
+				.last = 0xBF,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xC1,
+				.last = 0xCA,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xD3,
+				.last = 0xE0,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_DBI_ECI] = {
+		.bankid = AB5500_BANK_DBI_ECI,
+		.nranges = 3,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x07,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x10,
+				.last = 0x10,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x13,
+				.last = 0x13,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_CHG] = {
+		.bankid = AB5500_BANK_CHG,
+		.nranges = 2,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x11,
+				.last = 0x11,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x12,
+				.last = 0x1B,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_FG_BATTCOM_ACC] = {
+		.bankid = AB5500_BANK_FG_BATTCOM_ACC,
+		.nranges = 2,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x0B,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x0C,
+				.last = 0x10,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_USB] = {
+		.bankid = AB5500_BANK_USB,
+		.nranges = 12,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x01,
+				.last = 0x01,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x80,
+				.last = 0x83,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x87,
+				.last = 0x8A,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x8B,
+				.last = 0x8B,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x91,
+				.last = 0x92,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x93,
+				.last = 0x93,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x94,
+				.last = 0x94,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0xA8,
+				.last = 0xB0,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0xB2,
+				.last = 0xB2,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0xB4,
+				.last = 0xBC,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0xBF,
+				.last = 0xBF,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0xC1,
+				.last = 0xC5,
+				.perm = AB5500_PERM_RO,
+			},
+		},
+	},
+	[AB5500_BANK_IT] = {
+		.bankid = AB5500_BANK_IT,
+		.nranges = 4,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x02,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x20,
+				.last = 0x36,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x40,
+				.last = 0x56,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x60,
+				.last = 0x76,
+				.perm = AB5500_PERM_RO,
+			},
+		},
+	},
+	[AB5500_BANK_VDDDIG_IO_I2C_CLK_TST] = {
+		.bankid = AB5500_BANK_VDDDIG_IO_I2C_CLK_TST,
+		.nranges = 7,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x02,
+				.last = 0x02,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x12,
+				.last = 0x12,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x30,
+				.last = 0x34,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x40,
+				.last = 0x44,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x50,
+				.last = 0x54,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x60,
+				.last = 0x64,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x70,
+				.last = 0x74,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP] = {
+		.bankid = AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP,
+		.nranges = 13,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x01,
+				.last = 0x01,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x02,
+				.last = 0x02,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x0D,
+				.last = 0x0F,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x1C,
+				.last = 0x1C,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x1E,
+				.last = 0x1E,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x20,
+				.last = 0x21,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x25,
+				.last = 0x25,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x28,
+				.last = 0x2A,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x30,
+				.last = 0x33,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x40,
+				.last = 0x43,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x50,
+				.last = 0x53,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x60,
+				.last = 0x63,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x70,
+				.last = 0x73,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_VIBRA] = {
+		.bankid = AB5500_BANK_VIBRA,
+		.nranges = 2,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x10,
+				.last = 0x13,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xFE,
+				.last = 0xFE,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_AUDIO_HEADSETUSB] = {
+		.bankid = AB5500_BANK_AUDIO_HEADSETUSB,
+		.nranges = 2,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x00,
+				.last = 0x48,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0xEB,
+				.last = 0xFB,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+	[AB5500_BANK_SIM_USBSIM] = {
+		.bankid = AB5500_BANK_SIM_USBSIM,
+		.nranges = 1,
+		.range = (struct ab5500_reg_range[]) {
+			{
+				.first = 0x13,
+				.last = 0x19,
+				.perm = AB5500_PERM_RW,
+			},
+		},
+	},
+};
+
+
+static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
+	[AB5500_DEVID_USB] =  {
+		.nbanks = 1,
+		.bank = &ab5500_reg_ranges[AB5500_BANK_USB],
+	},
+	[AB5500_DEVID_ADC] =  {
+		.nbanks = 1,
+		.bank = &ab5500_reg_ranges[AB5500_BANK_ADC],
 	},
 	[AB5500_DEVID_LEDS] =  {
 		.nbanks = 1,
-		.bank = (struct ab5500_i2c_ranges[]) {
-			{
-				.bankid = AB5500_BANK_LED,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x00,
-						.last = 0x0C,
-						.perm = AB5500_PERM_RW,
-					},
-				},
-			},
-		},
+		.bank = &ab5500_reg_ranges[AB5500_BANK_LED],
 	},
-	/* What registers should this device access?*/
-	[AB5500_DEVID_POWER] =   {
+	[AB5500_DEVID_VIDEO] =   {
 		.nbanks = 1,
-		.bank = (struct ab5500_i2c_ranges[]) {
-			{
-				.bankid = AB5500_BANK_CHG,
-				.nranges = 2,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x00,
-						.last = 0x03,
-						.perm = AB5500_PERM_RW,
-					},
-					{
-						.first = 0x10,
-						.last = 0x30,
-						.perm = AB5500_PERM_RW,
-					},
-				},
-			},
-		},
+		.bank = &ab5500_reg_ranges[AB5500_BANK_VDENC],
 	},
 	[AB5500_DEVID_REGULATORS] =   {
 		.nbanks = 2,
-		.bank = (struct ab5500_i2c_ranges[]) {
-			{
-				.bankid = AB5500_BANK_STARTUP,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x50,
-						.last = 0xE0,
-						.perm = AB5500_PERM_RW,
-					},
-				},
-			},
-			{
-				.bankid = AB5500_BANK_SIM_USBSIM,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x14,
-						.last = 0x14,
-						.perm = AB5500_PERM_RW,
-					},
-				},
-			},
+		.bank =  (struct ab5500_i2c_ranges * []) {
+			&ab5500_reg_ranges[AB5500_BANK_STARTUP],
+			&ab5500_reg_ranges[AB5500_BANK_SIM_USBSIM],
 		},
 	},
 	[AB5500_DEVID_SIM] =   {
 		.nbanks = 1,
-		.bank = (struct ab5500_i2c_ranges[]) {
-			{
-				.bankid = AB5500_BANK_SIM_USBSIM,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x13,
-						.last = 0x19,
-						.perm = AB5500_PERM_RW,
-					},
-				},
-			},
-		},
+		.bank = &ab5500_reg_ranges[AB5500_BANK_SIM_USBSIM],
 	},
 	[AB5500_DEVID_RTC] =   {
 		.nbanks = 1,
-		.bank = (struct ab5500_i2c_ranges[]) {
-			{
-				.bankid = AB5500_BANK_RTC,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x00,
-						.last = 0x0C,
-						.perm = AB5500_PERM_RW,
-					},
-				},
-			},
-		},
+		.bank = &ab5500_reg_ranges[AB5500_BANK_RTC],
 	},
 	[AB5500_DEVID_CHARGER] =   {
-		.nbanks = 2,
-		.bank = (struct ab5500_i2c_ranges[]) {
-			{
-				.bankid = AB5500_BANK_CHG,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x10,
-						.last = 0x18,
-						.perm = AB5500_PERM_RW,
-					},
-				},
-			},
-			{
-				.bankid = AB5500_BANK_ADC,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x1F,
-						.last = 0x58,
-						.perm = AB5500_PERM_RW,
-					},
-				},
-			},
-		},
+		.nbanks = 1,
+		.bank = &ab5500_reg_ranges[AB5500_BANK_CHG],
 	},
 	[AB5500_DEVID_FUELGAUGE] =   {
-		.nbanks = 2,
-		.bank = (struct ab5500_i2c_ranges[]) {
-			{
-				.bankid = AB5500_BANK_FG_BATTCOM_ACC,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x00,
-						.last = 0x10,
-						.perm = AB5500_PERM_RW,
-					},
-				},
-			},
-			{
-				.bankid = AB5500_BANK_ADC,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x20,
-						.last = 0x58,
-						.perm = AB5500_PERM_RW,
-					},
-				},
-			},
-		},
+		.nbanks = 1,
+		.bank = &ab5500_reg_ranges[AB5500_BANK_FG_BATTCOM_ACC],
 	},
 	[AB5500_DEVID_VIBRATOR] =   {
 		.nbanks = 1,
-		.bank = (struct ab5500_i2c_ranges[]) {
-			{
-				.bankid = AB5500_BANK_VIBRA,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x10,
-						.last = 0x13,
-						.perm = AB5500_PERM_RW,
-					},
-				},
-			},
-		},
+		.bank = &ab5500_reg_ranges[AB5500_BANK_VIBRA],
 	},
 	[AB5500_DEVID_CODEC] =   {
 		.nbanks = 1,
-		.bank = (struct ab5500_i2c_ranges[]) {
-			{
-				.bankid = AB5500_BANK_AUDIO_HEADSETUSB,
-				.nranges = 1,
-				.range = (struct ab5500_reg_range[]) {
-					{
-						.first = 0x00,
-						.last = 0x48,
-						.perm = AB5500_PERM_RW,
-					},
-
-				},
-			},
-		},
+		.bank = &ab5500_reg_ranges[AB5500_BANK_AUDIO_HEADSETUSB],
 	},
 };
 
@@ -375,7 +623,7 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 		.id = AB5500_DEVID_POWER,
 	},
 	[AB5500_DEVID_REGULATORS] = {
-		.name = "ab5500-regulator",
+		.name = "ab5500-regulators",
 		.id = AB5500_DEVID_REGULATORS,
 	},
 	[AB5500_DEVID_SIM] = {
@@ -386,8 +634,8 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			{
 				.name = "SIMOFF",
 				.flags = IORESOURCE_IRQ,
-				.start = 16, /*rising*/
-				.end = 17, /*falling*/
+				.start = AB5500_IRQ(2, 0), /*rising*/
+				.end = AB5500_IRQ(2, 1), /*falling*/
 			},
 		},
 	},
@@ -416,62 +664,62 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			{
 				.name = "TRIGGER-0",
 				.flags = IORESOURCE_IRQ,
-				.start = 0,
-				.end = 0,
+				.start = AB5500_IRQ(0, 0),
+				.end = AB5500_IRQ(0, 0),
 			},
 			{
 				.name = "TRIGGER-1",
 				.flags = IORESOURCE_IRQ,
-				.start = 1,
-				.end = 1,
+				.start = AB5500_IRQ(0, 1),
+				.end = AB5500_IRQ(0, 1),
 			},
 			{
 				.name = "TRIGGER-2",
 				.flags = IORESOURCE_IRQ,
-				.start = 2,
-				.end = 2,
+				.start = AB5500_IRQ(0, 2),
+				.end = AB5500_IRQ(0, 2),
 			},
 			{
 				.name = "TRIGGER-3",
 				.flags = IORESOURCE_IRQ,
-				.start = 3,
-				.end = 3,
+				.start = AB5500_IRQ(0, 3),
+				.end = AB5500_IRQ(0, 3),
 			},
 			{
 				.name = "TRIGGER-4",
 				.flags = IORESOURCE_IRQ,
-				.start = 4,
-				.end = 4,
+				.start = AB5500_IRQ(0, 4),
+				.end = AB5500_IRQ(0, 4),
 			},
 			{
 				.name = "TRIGGER-5",
 				.flags = IORESOURCE_IRQ,
-				.start = 5,
-				.end = 5,
+				.start = AB5500_IRQ(0, 5),
+				.end = AB5500_IRQ(0, 5),
 			},
 			{
 				.name = "TRIGGER-6",
 				.flags = IORESOURCE_IRQ,
-				.start = 6,
-				.end = 6,
+				.start = AB5500_IRQ(0, 6),
+				.end = AB5500_IRQ(0, 6),
 			},
 			{
 				.name = "TRIGGER-7",
 				.flags = IORESOURCE_IRQ,
-				.start = 7,
-				.end = 7,
-			},
-			{
-				.name = "TRIGGER-VBAT-TXON",
-				.flags = IORESOURCE_IRQ,
-				.start = 9,
-				.end = 9,
+				.start = AB5500_IRQ(0, 7),
+				.end = AB5500_IRQ(0, 7),
 			},
 			{
 				.name = "TRIGGER-VBAT",
 				.flags = IORESOURCE_IRQ,
-				.start = 8,
-				.end = 8,
+				.start = AB5500_IRQ(0, 8),
+				.end = AB5500_IRQ(0, 8),
+			},
+			{
+				.name = "TRIGGER-VBAT-TXON",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(0, 9),
+				.end = AB5500_IRQ(0, 9),
 			},
 		},
 	},
@@ -483,38 +731,38 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			{
 				.name = "Batt_attach",
 				.flags = IORESOURCE_IRQ,
-				.start = 61,
-				.end = 61,
+				.start = AB5500_IRQ(7, 5),
+				.end = AB5500_IRQ(7, 5),
 			},
 			{
 				.name = "Batt_removal",
 				.flags = IORESOURCE_IRQ,
-				.start = 62,
-				.end = 62,
+				.start = AB5500_IRQ(7, 6),
+				.end = AB5500_IRQ(7, 6),
 			},
 			{
 				.name = "UART_framing",
 				.flags = IORESOURCE_IRQ,
-				.start = 63,
-				.end = 63,
+				.start = AB5500_IRQ(7, 7),
+				.end = AB5500_IRQ(7, 7),
 			},
 			{
 				.name = "UART_overrun",
 				.flags = IORESOURCE_IRQ,
-				.start = 64,
-				.end = 64,
+				.start = AB5500_IRQ(8, 0),
+				.end = AB5500_IRQ(8, 0),
 			},
 			{
 				.name = "UART_Rdy_RX",
 				.flags = IORESOURCE_IRQ,
-				.start = 65,
-				.end = 65,
+				.start = AB5500_IRQ(8, 1),
+				.end = AB5500_IRQ(8, 1),
 			},
 			{
 				.name = "UART_Rdy_TX",
 				.flags = IORESOURCE_IRQ,
-				.start = 66,
-				.end = 66,
+				.start = AB5500_IRQ(8, 2),
+				.end = AB5500_IRQ(8, 2),
 			},
 		},
 	},
@@ -530,20 +778,20 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			{
 				.name = "audio_spkr1_ovc",
 				.flags = IORESOURCE_IRQ,
-				.start = 77,
-				.end = 77,
+				.start = AB5500_IRQ(9, 5),
+				.end = AB5500_IRQ(9, 5),
 			},
 			{
 				.name = "audio_plllocked",
 				.flags = IORESOURCE_IRQ,
-				.start = 78,
-				.end = 78,
+				.start = AB5500_IRQ(9, 6),
+				.end = AB5500_IRQ(9, 6),
 			},
 			{
 				.name = "audio_spkr2_ovc",
 				.flags = IORESOURCE_IRQ,
-				.start = 140,
-				.end = 140,
+				.start = AB5500_IRQ(17, 4),
+				.end = AB5500_IRQ(17, 4),
 			},
 		},
 	},
@@ -553,214 +801,208 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 		.num_resources = 35,
 		.resources = (struct resource[]) {
 			{
+				.name = "Link_Update",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(22, 1),
+				.end = AB5500_IRQ(22, 1),
+			},
+			{
 				.name = "DCIO",
 				.flags = IORESOURCE_IRQ,
-				.start = 67,
-				.end = 68,
+				.start = AB5500_IRQ(8, 3),
+				.end = AB5500_IRQ(8, 4),
 			},
 			{
 				.name = "VBUS",
 				.flags = IORESOURCE_IRQ,
-				.start = 69,
-				.end = 70,
+				.start = AB5500_IRQ(8, 5),
+				.end = AB5500_IRQ(8, 6),
 			},
 			{
 				.name = "CHGstate_10_PCVBUSchg",
 				.flags = IORESOURCE_IRQ,
-				.start = 71,
-				.end = 71,
+				.start = AB5500_IRQ(8, 7),
+				.end = AB5500_IRQ(8, 7),
 			},
 			{
 				.name = "DCIOreverse_ovc",
 				.flags = IORESOURCE_IRQ,
-				.start = 72,
-				.end = 72,
+				.start = AB5500_IRQ(9, 0),
+				.end = AB5500_IRQ(9, 0),
 			},
 			{
 				.name = "USBCharDetDone",
 				.flags = IORESOURCE_IRQ,
-				.start = 73,
-				.end = 73,
+				.start = AB5500_IRQ(9, 1),
+				.end = AB5500_IRQ(9, 1),
 			},
 			{
 				.name = "DCIO_no_limit",
 				.flags = IORESOURCE_IRQ,
-				.start = 74,
-				.end = 74,
+				.start = AB5500_IRQ(9, 2),
+				.end = AB5500_IRQ(9, 2),
 			},
 			{
 				.name = "USB_suspend",
 				.flags = IORESOURCE_IRQ,
-				.start = 75,
-				.end = 75,
+				.start = AB5500_IRQ(9, 3),
+				.end = AB5500_IRQ(9, 3),
 			},
 			{
 				.name = "DCIOreverse_fwdcurrent",
 				.flags = IORESOURCE_IRQ,
-				.start = 76,
-				.end = 76,
+				.start = AB5500_IRQ(9, 4),
+				.end = AB5500_IRQ(9, 4),
 			},
 			{
 				.name = "Vbus_Imeasmax_change",
 				.flags = IORESOURCE_IRQ,
-				.start = 79,
-				.end = 80,
+				.start = AB5500_IRQ(9, 5),
+				.end = AB5500_IRQ(9, 6),
 			},
 			{
 				.name = "OVV",
 				.flags = IORESOURCE_IRQ,
-				.start = 117,
-				.end = 117,
+				.start = AB5500_IRQ(14, 5),
+				.end = AB5500_IRQ(14, 5),
 			},
 			{
 				.name = "USBcharging_NOTok",
 				.flags = IORESOURCE_IRQ,
-				.start = 123,
-				.end = 123,
+				.start = AB5500_IRQ(15, 3),
+				.end = AB5500_IRQ(15, 3),
 			},
 			{
 				.name = "usb_adp_sensoroff",
 				.flags = IORESOURCE_IRQ,
-				.start = 126,
-				.end = 126,
+				.start = AB5500_IRQ(15, 6),
+				.end = AB5500_IRQ(15, 6),
 			},
 			{
 				.name = "usb_adp_probeplug",
 				.flags = IORESOURCE_IRQ,
-				.start = 127,
-				.end = 127,
+				.start = AB5500_IRQ(15, 7),
+				.end = AB5500_IRQ(15, 7),
 			},
 			{
 				.name = "usb_adp_sinkerror",
 				.flags = IORESOURCE_IRQ,
-				.start = 128,
-				.end = 128,
+				.start = AB5500_IRQ(16, 0),
+				.end = AB5500_IRQ(16, 6),
 			},
 			{
 				.name = "usb_adp_sourceerror",
 				.flags = IORESOURCE_IRQ,
-				.start = 129,
-				.end = 129,
+				.start = AB5500_IRQ(16, 1),
+				.end = AB5500_IRQ(16, 1),
 			},
 			{
 				.name = "usb_idgnd",
 				.flags = IORESOURCE_IRQ,
-				.start = 130,
-				.end = 131,
+				.start = AB5500_IRQ(16, 2),
+				.end = AB5500_IRQ(16, 3),
 			},
 			{
 				.name = "usb_iddetR1",
 				.flags = IORESOURCE_IRQ,
-				.start = 132,
-				.end = 133,
+				.start = AB5500_IRQ(16, 4),
+				.end = AB5500_IRQ(16, 5),
 			},
 			{
 				.name = "usb_iddetR2",
 				.flags = IORESOURCE_IRQ,
-				.start = 134,
-				.end = 135,
+				.start = AB5500_IRQ(16, 6),
+				.end = AB5500_IRQ(16, 7),
 			},
 			{
 				.name = "usb_iddetR3",
 				.flags = IORESOURCE_IRQ,
-				.start = 136,
-				.end = 137,
+				.start = AB5500_IRQ(17, 0),
+				.end = AB5500_IRQ(17, 1),
 			},
 			{
 				.name = "usb_iddetR4",
 				.flags = IORESOURCE_IRQ,
-				.start = 138,
-				.end = 139,
+				.start = AB5500_IRQ(17, 2),
+				.end = AB5500_IRQ(17, 3),
 			},
 			{
 				.name = "CharTempWindowOk",
 				.flags = IORESOURCE_IRQ,
-				.start = 143,
-				.end = 144,
+				.start = AB5500_IRQ(17, 7),
+				.end = AB5500_IRQ(18, 0),
 			},
 			{
 				.name = "USB_SprDetect",
 				.flags = IORESOURCE_IRQ,
-				.start = 145,
-				.end = 145,
+				.start = AB5500_IRQ(18, 1),
+				.end = AB5500_IRQ(18, 1),
 			},
 			{
 				.name = "usb_adp_probe_unplug",
 				.flags = IORESOURCE_IRQ,
-				.start = 146,
-				.end = 146,
+				.start = AB5500_IRQ(18, 2),
+				.end = AB5500_IRQ(18, 2),
 			},
 			{
 				.name = "VBUSChDrop",
 				.flags = IORESOURCE_IRQ,
-				.start = 147,
-				.end = 148,
+				.start = AB5500_IRQ(18, 3),
+				.end = AB5500_IRQ(18, 4),
 			},
 			{
 				.name = "dcio_char_rec_done",
 				.flags = IORESOURCE_IRQ,
-				.start = 149,
-				.end = 149,
+				.start = AB5500_IRQ(18, 5),
+				.end = AB5500_IRQ(18, 5),
 			},
 			{
 				.name = "Charging_stopped_by_temp",
 				.flags = IORESOURCE_IRQ,
-				.start = 150,
-				.end = 150,
+				.start = AB5500_IRQ(18, 6),
+				.end = AB5500_IRQ(18, 6),
 			},
 			{
 				.name = "CHGstate_11_SafeModeVBUS",
 				.flags = IORESOURCE_IRQ,
-				.start = 169,
-				.end = 169,
+				.start = AB5500_IRQ(21, 1),
+				.end = AB5500_IRQ(21, 2),
 			},
 			{
 				.name = "CHGstate_12_comletedVBUS",
 				.flags = IORESOURCE_IRQ,
-				.start = 170,
-				.end = 170,
+				.start = AB5500_IRQ(21, 2),
+				.end = AB5500_IRQ(21, 2),
 			},
 			{
 				.name = "CHGstate_13_completedVBUS",
 				.flags = IORESOURCE_IRQ,
-				.start = 171,
-				.end = 171,
+				.start = AB5500_IRQ(21, 3),
+				.end = AB5500_IRQ(21, 3),
 			},
 			{
 				.name = "CHGstate_14_FullChgDCIO",
 				.flags = IORESOURCE_IRQ,
-				.start = 172,
-				.end = 172,
+				.start = AB5500_IRQ(21, 4),
+				.end = AB5500_IRQ(21, 4),
 			},
 			{
 				.name = "CHGstate_15_SafeModeDCIO",
 				.flags = IORESOURCE_IRQ,
-				.start = 173,
-				.end = 173,
+				.start = AB5500_IRQ(21, 5),
+				.end = AB5500_IRQ(21, 5),
 			},
 			{
 				.name = "CHGstate_16_OFFsuspendDCIO",
 				.flags = IORESOURCE_IRQ,
-				.start = 174,
-				.end = 174,
+				.start = AB5500_IRQ(21, 6),
+				.end = AB5500_IRQ(21, 6),
 			},
 			{
 				.name = "CHGstate_17_completedDCIO",
 				.flags = IORESOURCE_IRQ,
-				.start = 175,
-				.end = 175,
-			},
-			{
-				.name = "o_it_dcio_char_rec_notok",
-				.flags = IORESOURCE_IRQ,
-				.start = 176,
-				.end = 176,
-			},
-			{
-				.name = "usb_link_update",
-				.flags = IORESOURCE_IRQ,
-				.start = 177,
-				.end = 177,
+				.start = AB5500_IRQ(21, 7),
+				.end = AB5500_IRQ(21, 7),
 			},
 		},
 	},
@@ -776,8 +1018,8 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			{
 				.name = "plugTVdet",
 				.flags = IORESOURCE_IRQ,
-				.start = 111,
-				.end = 111,
+				.start = AB5500_IRQ(22, 2),
+				.end = AB5500_IRQ(22, 2),
 			},
 		},
 	},
@@ -789,62 +1031,62 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			{
 				.name = "COLL",
 				.flags = IORESOURCE_IRQ,
-				.start = 112,
-				.end = 112,
+				.start = AB5500_IRQ(14, 0),
+				.end = AB5500_IRQ(14, 0),
 			},
 			{
 				.name = "RESERR",
 				.flags = IORESOURCE_IRQ,
-				.start = 113,
-				.end = 113,
+				.start = AB5500_IRQ(14, 1),
+				.end = AB5500_IRQ(14, 1),
 			},
 			{
 				.name = "FRAERR",
 				.flags = IORESOURCE_IRQ,
-				.start = 114,
-				.end = 114,
+				.start = AB5500_IRQ(14, 2),
+				.end = AB5500_IRQ(14, 2),
 			},
 			{
 				.name = "COMERR",
 				.flags = IORESOURCE_IRQ,
-				.start = 115,
-				.end = 115,
+				.start = AB5500_IRQ(14, 3),
+				.end = AB5500_IRQ(14, 3),
 			},
 			{
 				.name = "BSI_indicator",
 				.flags = IORESOURCE_IRQ,
-				.start = 116,
-				.end = 116,
+				.start = AB5500_IRQ(14, 4),
+				.end = AB5500_IRQ(14, 4),
 			},
 			{
 				.name = "SPDSET",
 				.flags = IORESOURCE_IRQ,
-				.start = 118,
-				.end = 118,
+				.start = AB5500_IRQ(14, 6),
+				.end = AB5500_IRQ(14, 6),
 			},
 			{
 				.name = "DSENT",
 				.flags = IORESOURCE_IRQ,
-				.start = 119,
-				.end = 119,
+				.start = AB5500_IRQ(14, 7),
+				.end = AB5500_IRQ(14, 7),
 			},
 			{
 				.name = "DREC",
 				.flags = IORESOURCE_IRQ,
-				.start = 120,
-				.end = 120,
+				.start = AB5500_IRQ(15, 0),
+				.end = AB5500_IRQ(15, 0),
 			},
 			{
 				.name = "ACCINT",
 				.flags = IORESOURCE_IRQ,
-				.start = 121,
-				.end = 121,
+				.start = AB5500_IRQ(15, 1),
+				.end = AB5500_IRQ(15, 1),
 			},
 			{
 				.name = "NOPINT",
 				.flags = IORESOURCE_IRQ,
-				.start = 122,
-				.end = 122,
+				.start = AB5500_IRQ(15, 2),
+				.end = AB5500_IRQ(15, 2),
 			},
 		},
 	},
@@ -1161,346 +1403,6 @@ static irqreturn_t ab5500_irq(int irq, void *data)
 }
 
 #ifdef CONFIG_DEBUG_FS
-static struct ab5500_i2c_ranges debug_ranges[AB5500_NUM_BANKS] = {
-	[AB5500_BANK_LED] = {
-		.nranges = 1,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x0C,
-			},
-		},
-	},
-	[AB5500_BANK_ADC] = {
-		.nranges = 4,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x1F,
-				.last = 0x24,
-			},
-			{
-				.first = 0x26,
-				.last = 0x2D,
-			},
-			{
-				.first = 0x2F,
-				.last = 0x35,
-			},
-			{
-				.first = 0x37,
-				.last = 0x58,
-			},
-		},
-	},
-	[AB5500_BANK_RTC] = {
-		.nranges = 2,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x04,
-			},
-			{
-				.first = 0x06,
-				.last = 0x0C,
-			},
-		},
-	},
-	[AB5500_BANK_STARTUP] = {
-		.nranges = 12,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x01,
-			},
-			{
-				.first = 0x1F,
-				.last = 0x1F,
-			},
-			{
-				.first = 0x2E,
-				.last = 0x30,
-			},
-			{
-				.first = 0x50,
-				.last = 0x51,
-			},
-			{
-				.first = 0x60,
-				.last = 0x61,
-			},
-			{
-				.first = 0x66,
-				.last = 0x8A,
-			},
-			{
-				.first = 0x8C,
-				.last = 0x96,
-			},
-			{
-				.first = 0xAA,
-				.last = 0xB4,
-			},
-			{
-				.first = 0xB7,
-				.last = 0xBF,
-			},
-			{
-				.first = 0xC1,
-				.last = 0xCA,
-			},
-			{
-				.first = 0xD3,
-				.last = 0xE0,
-			},
-			{
-				.first = 0xF0,
-				.last = 0xF8,
-			},
-		},
-	},
-	[AB5500_BANK_DBI_ECI] = {
-		.nranges = 3,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x07,
-			},
-			{
-				.first = 0x10,
-				.last = 0x10,
-			},
-			{
-				.first = 0x13,
-				.last = 0x13,
-			},
-		},
-	},
-	[AB5500_BANK_CHG] = {
-		.nranges = 1,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x11,
-				.last = 0x1B,
-			},
-		},
-	},
-	[AB5500_BANK_FG_BATTCOM_ACC] = {
-		.nranges = 5,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x10,
-			},
-			{
-				.first = 0x1A,
-				.last = 0x1D,
-			},
-			{
-				.first = 0x20,
-				.last = 0x21,
-			},
-			{
-				.first = 0x23,
-				.last = 0x24,
-			},
-			{
-				.first = 0xFC,
-				.last = 0xFE,
-			},
-		},
-	},
-	[AB5500_BANK_USB] = {
-		.nranges = 13,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x01,
-				.last = 0x01,
-			},
-			{
-				.first = 0x80,
-				.last = 0x83,
-			},
-			{
-				.first = 0x87,
-				.last = 0x8B,
-			},
-			{
-				.first = 0x91,
-				.last = 0x94,
-			},
-			{
-				.first = 0xA8,
-				.last = 0xB0,
-			},
-			{
-				.first = 0xB2,
-				.last = 0xB2,
-			},
-			{
-				.first = 0xB4,
-				.last = 0xBC,
-			},
-			{
-				.first = 0xBF,
-				.last = 0xBF,
-			},
-			{
-				.first = 0xC1,
-				.last = 0xC6,
-			},
-			{
-				.first = 0xCD,
-				.last = 0xCD,
-			},
-			{
-				.first = 0xD6,
-				.last = 0xDA,
-			},
-			{
-				.first = 0xDC,
-				.last = 0xDC,
-			},
-			{
-				.first = 0xE0,
-				.last = 0xE4,
-			},
-		},
-	},
-	[AB5500_BANK_IT] = {
-		.nranges = 4,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x02,
-			},
-			{
-				.first = 0x20,
-				.last = 0x36,
-			},
-			{
-				.first = 0x60,
-				.last = 0x76,
-			},
-			{
-				.first = 0x80,
-				.last = 0x80,
-			},
-		},
-	},
-	[AB5500_BANK_VDDDIG_IO_I2C_CLK_TST] = {
-		.nranges = 7,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x02,
-				.last = 0x02,
-			},
-			{
-				.first = 0x12,
-				.last = 0x12,
-			},
-			{
-				.first = 0x30,
-				.last = 0x34,
-			},
-			{
-				.first = 0x40,
-				.last = 0x44,
-			},
-			{
-				.first = 0x50,
-				.last = 0x54,
-			},
-			{
-				.first = 0x60,
-				.last = 0x64,
-			},
-			{
-				.first = 0x70,
-				.last = 0x74,
-			},
-		},
-	},
-	[AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP] = {
-		.nranges = 12,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x01,
-				.last = 0x02,
-			},
-			{
-				.first = 0x0D,
-				.last = 0x0F,
-			},
-			{
-				.first = 0x1C,
-				.last = 0x1C,
-			},
-			{
-				.first = 0x1E,
-				.last = 0x1E,
-			},
-			{
-				.first = 0x20,
-				.last = 0x21,
-			},
-			{
-				.first = 0x25,
-				.last = 0x25,
-			},
-			{
-				.first = 0x28,
-				.last = 0x2A,
-			},
-			{
-				.first = 0x30,
-				.last = 0x33,
-			},
-			{
-				.first = 0x40,
-				.last = 0x43,
-			},
-			{
-				.first = 0x50,
-				.last = 0x53,
-			},
-			{
-				.first = 0x60,
-				.last = 0x63,
-			},
-			{
-				.first = 0x70,
-				.last = 0x73,
-			},
-		},
-	},
-	[AB5500_BANK_VIBRA] = {
-		.nranges = 2,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x10,
-				.last = 0x13,
-			},
-			{
-				.first = 0xFE,
-				.last = 0xFE,
-			},
-		},
-	},
-	[AB5500_BANK_AUDIO_HEADSETUSB] = {
-		.nranges = 2,
-		.range = (struct ab5500_reg_range[]) {
-			{
-				.first = 0x00,
-				.last = 0x48,
-			},
-			{
-				.first = 0xEB,
-				.last = 0xFB,
-			},
-		},
-	},
-};
-
 static int ab5500_registers_print(struct seq_file *s, void *p)
 {
 	struct ab5500 *ab = s->private;
@@ -1508,36 +1410,39 @@ static int ab5500_registers_print(struct seq_file *s, void *p)
 	u8 bank = (u8)ab->debug_bank;
 
 	seq_printf(s, AB5500_NAME_STRING " register values:\n");
+	for (bank = 0; bank < AB5500_NUM_BANKS; bank++) {
+		seq_printf(s, " bank %u, %s (0x%x):\n", bank,
+				bankinfo[bank].name,
+				bankinfo[bank].slave_addr);
+		for (i = 0; i < ab5500_reg_ranges[bank].nranges; i++) {
+			u8 reg;
+			int err;
 
-	seq_printf(s, " bank %u, %s (0x%x):\n", bank,
-		bankinfo[bank].name,
-		bankinfo[bank].slave_addr);
-	for (i = 0; i < debug_ranges[bank].nranges; i++) {
-		u8 reg;
-		int err;
+			for (reg = ab5500_reg_ranges[bank].range[i].first;
+				reg <= ab5500_reg_ranges[bank].range[i].last;
+				reg++) {
+				u8 value;
 
-		for (reg = debug_ranges[bank].range[i].first;
-			reg <= debug_ranges[bank].range[i].last;
-			reg++) {
-			u8 value;
+				err = get_register_interruptible(ab, bank, reg,
+						&value);
+				if (err < 0) {
+					dev_err(ab->dev, "get_reg failed %d"
+						"bank 0x%x reg 0x%x\n",
+						err, bank, reg);
+					return err;
+				}
 
-			err = get_register_interruptible(ab, bank, reg,
-				&value);
-			if (err < 0) {
-				dev_err(ab->dev, "get_reg failed %d, bank 0x%x"
-					", reg 0x%x\n", err, bank, reg);
-				return err;
-			}
-
-			err = seq_printf(s, "  [%d/0x%02X]: 0x%02X\n", bank,
-				reg, value);
-			if (err < 0) {
-				dev_err(ab->dev, "seq_printf overflow\n");
-				/*
-				 * Error is not returned here since
-				 * the output is wanted in any case
-				 */
-				return 0;
+				err = seq_printf(s, "[%d/0x%02X]: 0x%02X\n",
+						bank, reg, value);
+				if (err < 0) {
+					dev_err(ab->dev,
+						"seq_printf overflow\n");
+					/*
+					 * Error is not returned here since
+					 * the output is wanted in any case
+					 */
+					return 0;
+				}
 			}
 		}
 	}
@@ -1800,37 +1705,6 @@ static inline void ab5500_remove_debugfs(void)
 }
 #endif
 
-/*
- * Basic set-up, datastructure creation/destruction and I2C interface.
- * This sets up a default config in the AB5500 chip so that it
- * will work as expected.
- */
-static int __init ab5500_setup(struct ab5500 *ab,
-	struct abx500_init_settings *settings, unsigned int size)
-{
-	int err = 0;
-	int i;
-
-	for (i = 0; i < size; i++) {
-		err = mask_and_set_register_interruptible(ab,
-			settings[i].bank,
-			settings[i].reg,
-			0xFF, settings[i].setting);
-		if (err)
-			goto exit_no_setup;
-
-		/* If event mask register update the event mask in ab5500 */
-		if ((settings[i].bank == AB5500_BANK_IT) &&
-			(AB5500_MASK_BASE <= settings[i].reg) &&
-			(settings[i].reg <= AB5500_MASK_END)) {
-			ab->mask[settings[i].reg - AB5500_MASK_BASE] =
-				settings[i].setting;
-		}
-	}
-exit_no_setup:
-	return err;
-}
-
 static void ab5500_irq_mask(struct irq_data *data)
 {
 	struct ab5500 *ab = irq_data_get_irq_chip_data(data);
@@ -1909,6 +1783,46 @@ static const struct ab_family_id ids[] __initdata = {
 	}
 };
 
+static int ab5500_irq_init(struct ab5500 *ab)
+{
+	struct ab5500_platform_data *ab5500_plf_data =
+				dev_get_platdata(ab->dev);
+	int i;
+	unsigned int irq;
+
+	for (i = 0; i < ab5500_plf_data->irq.count; i++) {
+
+		irq = ab5500_plf_data->irq.base + i;
+		set_irq_chip_data(irq, ab);
+		set_irq_chip_and_handler(irq, &ab5500_irq_chip,
+			handle_simple_irq);
+		set_irq_nested_thread(irq, 1);
+#ifdef CONFIG_ARM
+		set_irq_flags(irq, IRQF_VALID);
+#else
+		set_irq_noprobe(irq);
+#endif
+	}
+	return 0;
+}
+
+static void ab5500_irq_remove(struct ab5500 *ab)
+{
+	struct ab5500_platform_data *ab5500_plf_data =
+				dev_get_platdata(ab->dev);
+	int i;
+	unsigned int irq;
+
+	for (i = 0; i < ab5500_plf_data->irq.count; i++) {
+		irq = ab5500_plf_data->irq.base + i;
+#ifdef CONFIG_ARM
+		set_irq_flags(irq, 0);
+#endif
+		set_irq_chip_and_handler(irq, NULL, NULL);
+		set_irq_chip_data(irq, NULL);
+	}
+}
+
 static int __init ab5500_probe(struct platform_device *pdev)
 {
 	struct ab5500 *ab;
@@ -1962,32 +1876,10 @@ static int __init ab5500_probe(struct platform_device *pdev)
 	/* Readout ab->starup_events when prcmu driver is in place */
 	ab->startup_events[0] = 0;
 
-	err = ab5500_setup(ab, ab5500_plf_data->init_settings,
-		ab5500_plf_data->init_settings_sz);
-	if (err) {
-		dev_err(&pdev->dev, "ab5500_setup error\n");
-		goto exit_no_setup;
-	}
-
-	for (i = 0; i < ab5500_plf_data->irq.count; i++) {
-		unsigned int irq;
-
-		irq = ab5500_plf_data->irq.base + i;
-		set_irq_chip_data(irq, ab);
-		set_irq_chip_and_handler(irq, &ab5500_irq_chip,
-			handle_simple_irq);
-		set_irq_nested_thread(irq, 1);
-#ifdef CONFIG_ARM
-		set_irq_flags(irq, IRQF_VALID);
-#else
-		set_irq_noprobe(irq);
-#endif
-	}
-
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (!res) {
 		dev_err(&pdev->dev, "ab5500_platform_get_resource error\n");
-		goto exit_no_irq;
+		goto exit_no_detect;
 	}
 	ab->ab5500_irq = res->start;
 
@@ -1999,32 +1891,29 @@ static int __init ab5500_probe(struct platform_device *pdev)
 
 		get_register_interruptible(ab, AB5500_BANK_IT, latchreg, &val);
 		set_register_interruptible(ab, AB5500_BANK_IT, maskreg, 0xff);
+		ab->mask[i] = ab->oldmask[i] = 0xff;
 	}
 
-	for (i = 0; i < AB5500_NUM_IRQ_REGS; i++)
-		ab->mask[i] = ab->oldmask[i] = 0xff;
+	if (ab->irq_base) {
+		err = ab5500_irq_init(ab);
+		if (err)
+			return err;
 
 	err = request_threaded_irq(res->start, NULL, ab5500_irq,
 				   IRQF_NO_SUSPEND | IRQF_ONESHOT,
 				   "ab5500-core", ab);
+		if (err)
+			goto exit_remove_irq;
+
+	}
 
 	/* This real unpredictable IRQ is of course sampled for entropy */
 	rand_initialize_irq(res->start);
 
-	if (err) {
-		dev_err(&pdev->dev, "ab5500_request_irq error\n");
-		goto exit_no_irq;
-	}
-
 	err = abx500_register_ops(&pdev->dev, &ab5500_ops);
 	if (err) {
 		dev_err(&pdev->dev, "ab5500_register ops error\n");
-		goto exit_no_ops;
-	}
-
-	/* Set up and register the platform devices. */
-	for (i = 0; i < AB5500_NUM_DEVICES; i++) {
-		ab5500_devs[i].mfd_data = ab5500_plf_data->dev_data[i];
+		goto exit_no_irq;
 	}
 
 	err = mfd_add_devices(&pdev->dev, 0, ab5500_devs,
@@ -2032,16 +1921,18 @@ static int __init ab5500_probe(struct platform_device *pdev)
 		ab5500_plf_data->irq.base);
 	if (err) {
 		dev_err(&pdev->dev, "ab5500_mfd_add_device error\n");
-		goto exit_no_ops;
+		goto exit_no_irq;
 	}
 
 	ab5500_setup_debugfs(ab);
-
 	return 0;
 
-exit_no_ops:
 exit_no_irq:
-exit_no_setup:
+	if (ab->irq_base) {
+		free_irq(ab->ab5500_irq, ab);
+exit_remove_irq:
+	ab5500_irq_remove(ab);
+	}
 exit_no_detect:
 	kfree(ab);
 	return err;
@@ -2056,12 +1947,13 @@ static int __exit ab5500_remove(struct platform_device *pdev)
 	 * At this point, all subscribers should have unregistered
 	 * their notifiers so deactivate IRQ
 	 */
-	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-	free_irq(res->start, ab);
-
-	mfd_remove_devices(&pdev->dev);
 	ab5500_remove_debugfs();
-
+	mfd_remove_devices(&pdev->dev);
+	if (ab->irq_base) {
+		free_irq(ab->ab5500_irq, ab);
+		ab5500_irq_remove(ab);
+	}
+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	kfree(ab);
 	return 0;
 }
