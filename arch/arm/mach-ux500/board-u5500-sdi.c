@@ -98,7 +98,8 @@ static struct mmci_platform_data u5500_sdi1_data = {
 	.vdd_handler    = u5500_sdi1_vdd_handler,
 	.ocr_mask       = MMC_VDD_29_30,
 	.f_max          = 50000000,
-	.capabilities   = MMC_CAP_4_BIT_DATA,
+	.capabilities	= MMC_CAP_4_BIT_DATA |
+				MMC_CAP_MMC_HIGHSPEED,
 	.gpio_cd        = GPIO_SDMMC_CD,
 	.gpio_wp        = -1,
 	.cd_invert	= true,
