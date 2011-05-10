@@ -4,32 +4,21 @@
  * License Terms: GNU General Public License v2
  * Author: Rabin Vincent <rabin.vincent@stericsson.com>
  *
+ * NOTE: This timer is optimized to be used from cpuidle only, so
+ * if you enable this timer as broadcast timer, it won't work.
+ *
  */
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/io.h>
 #include <linux/clockchips.h>
-#include <linux/delay.h>
 
 #include <asm/smp.h>
 #include <asm/mach/time.h>
 
 #define RATE_32K	32768
 
-#define WRITE_DELAY 130 /* in us */
-#define WRITE_DELAY_32KHZ_TICKS ((WRITE_DELAY * RATE_32K) / 1000000)
-
-#define RTT_IMSC	0x04
-#define RTT_ICR		0x10
-#define RTT_DR		0x14
-#define RTT_LR		0x18
-#define RTT_CR		0x1C
-
-#define RTT_CR_RTTEN	(1 << 1)
-#define RTT_CR_RTTOS	(1 << 0)
-
 #define RTC_IMSC	0x10
-#define RTC_RIS		0x14
 #define RTC_MIS		0x18
 #define RTC_ICR		0x1C
 #define RTC_TDR		0x20
@@ -46,18 +35,8 @@
 
 static void __iomem *rtc_base;
 
-static void rtc_writel(unsigned long val, unsigned long addr)
-{
-	writel(val, rtc_base + addr);
-}
-
-static unsigned long rtc_readl(unsigned long addr)
-{
-	return readl(rtc_base + addr);
-}
-
 static void rtc_set_mode(enum clock_event_mode mode,
-			 struct clock_event_device *evt)
+			       struct clock_event_device *evt)
 {
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
@@ -68,7 +47,11 @@ static void rtc_set_mode(enum clock_event_mode mode,
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
 		/* Disable, self start and oneshot mode */
-		rtc_writel(RTC_TCR_RTTSS | RTC_TCR_RTTOS, RTC_TCR);
+		writel(RTC_TCR_RTTSS | RTC_TCR_RTTOS, rtc_base + RTC_TCR);
+		/*
+		 * Here you should actually wait for 130 us before
+		 * touching RTC_TCR again.
+		 */
 		break;
 
 	case CLOCK_EVT_MODE_RESUME:
@@ -77,40 +60,27 @@ static void rtc_set_mode(enum clock_event_mode mode,
 	}
 }
 
-/*
- * Delays are needed since hardware does not like
- * two writes too close which will be the case running SMP.
- */
 static int rtc_set_event(unsigned long delta,
-			 struct clock_event_device *dev)
+			       struct clock_event_device *dev)
 {
-
-	rtc_writel(RTC_TCR_RTTSS | RTC_TCR_RTTOS, RTC_TCR);
-	udelay(WRITE_DELAY);
-
 	/*
-	 * Compensate for the time that it takes to start the
-	 * timer
+	 * Here you must be sure that the timer is off or else
+	 * you'll probably fail programming it.
 	 */
-	if (delta > WRITE_DELAY_32KHZ_TICKS * 2)
-		delta -= WRITE_DELAY_32KHZ_TICKS * 2;
-	else
-		delta = 1;
-	/* Load register and enable if self start */
-	rtc_writel(delta, RTC_TLR1);
-	udelay(WRITE_DELAY);
+	writel(delta, rtc_base + RTC_TLR1);
+
+	/* Here you must be sure not to touch TCR for 130 us */
 
 	return 0;
 }
 
 static irqreturn_t rtc_interrupt(int irq, void *dev)
 {
-	struct clock_event_device *clkevt = dev;
 
 	/* we make sure if this is our rtt isr */
-	if (rtc_readl(RTC_MIS) & RTC_MIS_RTCTMIS) {
-		rtc_writel(RTC_ICR_TIC, RTC_ICR);
-		clkevt->event_handler(clkevt);
+	if (readl(rtc_base + RTC_MIS) & RTC_MIS_RTCTMIS) {
+		writel(RTC_ICR_TIC, rtc_base + RTC_ICR);
+		/* Here you should normally call the event handler */
 		return IRQ_HANDLED;
 	}
 	return IRQ_NONE;
@@ -128,7 +98,8 @@ struct clock_event_device rtt_clkevt = {
 	.name		= "rtc-rtt",
 	.features	= CLOCK_EVT_FEAT_ONESHOT,
 	.shift		= 32,
-	.rating		= 300,
+	/* This timer is not working except from cpuidle */
+	.rating		= 0,
 	.set_next_event	= rtc_set_event,
 	.set_mode	= rtc_set_mode,
 #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
@@ -141,7 +112,6 @@ static struct irqaction rtc_irq = {
 	.name		= "RTC-RTT Timer Tick",
 	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_SHARED,
 	.handler	= rtc_interrupt,
-	.dev_id		= &rtt_clkevt,
 	.irq		= IRQ_DB8500_RTC,
 };
 
@@ -158,49 +128,13 @@ void rtc_rtt_timer_init(unsigned int cpu)
 		return;
 	}
 
-	rtc_writel(RTC_TCR_RTTSS | RTC_TCR_RTTOS, RTC_TCR);
-	rtc_writel(RTC_ICR_TIC, RTC_ICR);
-	rtc_writel(RTC_IMSC_TIMSC, RTC_IMSC);
+	writel(RTC_TCR_RTTSS | RTC_TCR_RTTOS, rtc_base + RTC_TCR);
+	writel(RTC_ICR_TIC, rtc_base + RTC_ICR);
+	writel(RTC_IMSC_TIMSC, rtc_base + RTC_IMSC);
 
 	rtt_clkevt.mult = div_sc(RATE_32K, NSEC_PER_SEC, rtt_clkevt.shift);
 	rtt_clkevt.max_delta_ns = clockevent_delta2ns(0xffffffff, &rtt_clkevt);
 	rtt_clkevt.min_delta_ns = clockevent_delta2ns(0xff, &rtt_clkevt);
 	setup_irq(rtc_irq.irq, &rtc_irq);
 	clockevents_register_device(&rtt_clkevt);
-}
-
-int rtc_rtt_adjust_next_wakeup(int delta_in_us)
-{
-	int delta_ticks;
-	u64 temp;
-	u64 remainder;
-	u32 val;
-
-	/* Convert us to 32768 hz ticks */
-	temp = ((u64)abs(delta_in_us)) * RATE_32K;
-	remainder = do_div(temp, 1000000);
-
-	if (delta_in_us < 0) {
-		delta_ticks = - ((int) temp);
-		/* Round upwards, since better to wake a little early */
-		if ( remainder >= (1000000 / 2))
-			delta_ticks--;
-	} else {
-		delta_ticks = (int) temp;
-	}
-
-	val = readl(rtc_base + RTC_TDR);
-
-	/*
-	 * Make sure that if we want to wake up earlier that it is
-	 * possible.
-	 */
-	if ((int)val < -delta_ticks)
-		return -EINVAL;
-
-	/* Make sure we can wake up as late as requested */
-	if (((u64)val + (u64)delta_ticks) > UINT_MAX)
-		return -EINVAL;
-
-	return rtc_set_event(val + delta_ticks, &rtt_clkevt);
 }

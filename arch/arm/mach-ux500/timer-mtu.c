@@ -35,7 +35,7 @@
 
 static u32 u8500_cycle;		/* write-once */
 static __iomem void *mtu0_base;
-static bool mtu_periodic = true;
+static bool mtu_periodic;
 
 /*
  * U8500 sched_clock implementation. It has a resolution of
@@ -115,8 +115,8 @@ static cycle_t u8500_read_timer_dummy(struct clocksource *cs)
 {
 	return 0;
 }
-static void mtu_clockevent_reset(void);
-static void mtu_clocksource_reset(void)
+void mtu_clockevent_reset(void);
+void mtu_clocksource_reset(void)
 {
 	writel(MTU_CRn_DIS, mtu0_base + MTU_CR(1));
 
@@ -128,15 +128,10 @@ static void mtu_clocksource_reset(void)
 	       MTU_CRn_FREERUNNING, mtu0_base + MTU_CR(1));
 }
 
-void mtu_timer_reset(void)
+static void u8500_mtu_clocksource_resume(struct clocksource *cs)
 {
 	mtu_clocksource_reset();
 	mtu_clockevent_reset();
-}
-
-static void u8500_mtu_clocksource_resume(struct clocksource *cs)
-{
-	mtu_timer_reset();
 }
 
 static struct clocksource u8500_clksrc = {
@@ -175,21 +170,6 @@ int read_current_timer(unsigned long *timer_val)
  * Clockevent device: currently only periodic mode is supported
  */
 
-static void mtu_clockevent_reset(void)
-{
-	if (mtu_periodic) {
-
-		/* Timer: configure load and background-load, and fire it up */
-		writel(u8500_cycle, mtu0_base + MTU_LR(0));
-		writel(u8500_cycle, mtu0_base + MTU_BGLR(0));
-
-		writel(MTU_CRn_PERIODIC | MTU_CRn_PRESCALE_1 |
-		       MTU_CRn_32BITS | MTU_CRn_ENA,
-		       mtu0_base + MTU_CR(0));
-		writel(1 << 0, mtu0_base + MTU_IMSC);
-	}
-}
-
 static void u8500_mtu_clkevt_mode(enum clock_event_mode mode,
 			     struct clock_event_device *dev)
 {
@@ -222,6 +202,23 @@ static int u8500_mtu_clkevt_next(unsigned long evt, struct clock_event_device *e
 	return 0;
 }
 
+void mtu_clockevent_reset(void)
+{
+	if (mtu_periodic) {
+
+		/* Timer: configure load and background-load, and fire it up */
+		writel(u8500_cycle, mtu0_base + MTU_LR(0));
+		writel(u8500_cycle, mtu0_base + MTU_BGLR(0));
+
+		writel(MTU_CRn_PERIODIC | MTU_CRn_PRESCALE_1 |
+		       MTU_CRn_32BITS | MTU_CRn_ENA,
+		       mtu0_base + MTU_CR(0));
+		writel(1 << 0, mtu0_base + MTU_IMSC);
+	} else {
+		u8500_mtu_clkevt_next(u8500_cycle, NULL);
+	}
+}
+
 /*
  * IRQ Handler for the timer 0 of the MTU block. The irq is not shared
  * as we are the only users of mtu0 by now.
@@ -249,8 +246,8 @@ struct clock_event_device u8500_mtu_clkevt = {
 	.name		= "mtu_0",
 	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
 	.shift		= 32,
-	/* Must be of higher rating the timer-rtt at boot */
-	.rating		= 100,
+	/* Must be of higher rating the timer-rtt but lower than localtimers */
+	.rating		= 310,
 	.set_mode	= u8500_mtu_clkevt_mode,
 	.set_next_event	= u8500_mtu_clkevt_next,
 	.irq		= IRQ_MTU0,
