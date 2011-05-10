@@ -1407,6 +1407,28 @@ static int request_reg_clock(u8 clock, bool enable)
 	return 0;
 }
 
+static int request_sga_clock(u8 clock, bool enable)
+{
+	u32 val;
+	int ret;
+
+	if (enable && cpu_is_u8500v20()) {
+		val = readl(_PRCMU_BASE + PRCM_CGATING_BYPASS);
+		writel(val | PRCM_CGATING_BYPASS_ICN2,
+				_PRCMU_BASE + PRCM_CGATING_BYPASS);
+	}
+
+	ret = request_reg_clock(clock, enable);
+
+	if (!ret && !enable && cpu_is_u8500v20()) {
+		val = readl(_PRCMU_BASE + PRCM_CGATING_BYPASS);
+		writel(val & ~PRCM_CGATING_BYPASS_ICN2,
+				_PRCMU_BASE + PRCM_CGATING_BYPASS);
+	}
+
+	return ret;
+}
+
 /**
  * prcmu_request_clock() - Request for a clock to be enabled or disabled.
  * @clock:      The clock for which the request is made.
@@ -1417,7 +1439,9 @@ static int request_reg_clock(u8 clock, bool enable)
  */
 int prcmu_request_clock(u8 clock, bool enable)
 {
-	if (clock < PRCMU_NUM_REG_CLOCKS)
+	if (clock == PRCMU_SGACLK)
+		return request_sga_clock(clock, enable);
+	else if (clock < PRCMU_NUM_REG_CLOCKS)
 		return request_reg_clock(clock, enable);
 	else if (clock == PRCMU_TIMCLK)
 		return request_timclk(enable);
