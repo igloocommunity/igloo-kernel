@@ -152,6 +152,9 @@ void ux500_rtcrtt_measure_latency(bool enable)
 	}
 	measure_latency = enable;
 }
+#else
+static inline void measure_latency_start(void) { }
+static inline void ux500_rtcrtt_measure_latency(bool enable) { }
 #endif
 
 void ux500_rtcrtt_off(void)
