@@ -97,7 +97,6 @@ void smp_timer_broadcast(const struct cpumask *mask);
 struct clock_event_device rtt_clkevt = {
 	.name		= "rtc-rtt",
 	.features	= CLOCK_EVT_FEAT_ONESHOT,
-	.shift		= 32,
 	/* This timer is not working except from cpuidle */
 	.rating		= 0,
 	.set_next_event	= rtc_set_event,
@@ -132,9 +131,14 @@ void rtc_rtt_timer_init(unsigned int cpu)
 	writel(RTC_ICR_TIC, rtc_base + RTC_ICR);
 	writel(RTC_IMSC_TIMSC, rtc_base + RTC_IMSC);
 
-	rtt_clkevt.mult = div_sc(RATE_32K, NSEC_PER_SEC, rtt_clkevt.shift);
+	/* We can sleep for max 10s (actually max is longer) */
+	clockevents_calc_mult_shift(&rtt_clkevt, RATE_32K, 10);
+
 	rtt_clkevt.max_delta_ns = clockevent_delta2ns(0xffffffff, &rtt_clkevt);
-	rtt_clkevt.min_delta_ns = clockevent_delta2ns(0xff, &rtt_clkevt);
+
+	/* Don't program times less than eight cycles */
+	rtt_clkevt.min_delta_ns = clockevent_delta2ns(8, &rtt_clkevt);
+
 	setup_irq(rtc_irq.irq, &rtc_irq);
 	clockevents_register_device(&rtt_clkevt);
 }
