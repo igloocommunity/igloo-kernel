@@ -8,12 +8,13 @@
 #include <mach/setup.h>
 #include <mach/hardware.h>
 
-#include "timer-rtt.h"
 #include "pm/context.h"
 
+void rtc_rtt_timer_init(unsigned int cpu);
 void prcmu_timer_init(void);
 void mtu_timer_init(void);
-void mtu_timer_reset(void);
+void mtu_clocksource_reset(void);
+void mtu_clockevent_reset(void);
 
 #ifdef CONFIG_LOCAL_TIMERS
 #include <asm/smp_twd.h>
@@ -24,7 +25,7 @@ static int mtu_context_notifier_call(struct notifier_block *this,
 				     unsigned long event, void *data)
 {
 	if (event == CONTEXT_APE_RESTORE)
-		mtu_timer_reset();
+		mtu_clocksource_reset();
 	return NOTIFY_OK;
 }
 
@@ -35,7 +36,7 @@ static struct notifier_block mtu_context_notifier = {
 
 static void ux500_timer_reset(void)
 {
-	mtu_timer_reset();
+	mtu_clockevent_reset();
 }
 
 static void __init ux500_timer_init(void)

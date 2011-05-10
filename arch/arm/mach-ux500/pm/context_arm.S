@@ -368,7 +368,7 @@ ENTRY(ux500_clean_l2_cache_all)
  * Last saves and WFI
  *
  * r0 = address to backup_sram_storage base adress
- * r1 = indicate whether L2 cache should be cleaned
+ * r1 = indicate whether L1 and L2 cache should be cleaned
  */
 	.align 4
 	.section ".text", "ax"
@@ -400,12 +400,12 @@ ENTRY(context_save_to_sram_and_wfi_internal)
 	mov r4, r1				@ Set r4 = cleanL2cache, r2
 	                                        @ will be destroyed by
 	                                        @ v7_clean_l1_cache_all
+	dsb
+	cmp r4, #0
 
-
-	bl context_clean_l1_cache_all		@ Commit all dirty data in L1
+	blne context_clean_l1_cache_all		@ Commit all dirty data in L1
 	                                        @ cache to L2 without
 	                                        @ invalidating
-
 	dsb
 	cmp r4, #0
 
