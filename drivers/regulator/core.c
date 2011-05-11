@@ -88,7 +88,7 @@ static int _regulator_get_voltage(struct regulator_dev *rdev);
 static int _regulator_get_current_limit(struct regulator_dev *rdev);
 static unsigned int _regulator_get_mode(struct regulator_dev *rdev);
 static void _notifier_call_chain(struct regulator_dev *rdev,
-				  unsigned long event, void *data);
+				  unsigned long event, void *data, int lock_sublevel);
 static int _regulator_do_set_voltage(struct regulator_dev *rdev,
 				     int min_uV, int max_uV);
 
@@ -1456,7 +1456,7 @@ static int _regulator_disable(struct regulator_dev *rdev,
 			trace_regulator_disable_complete(rdev_get_name(rdev));
 
 			_notifier_call_chain(rdev, REGULATOR_EVENT_DISABLE,
-					     NULL);
+					     NULL, 0);
 		}
 
 		/* decrease our supplies ref count and disable if required */
@@ -1529,7 +1529,7 @@ static int _regulator_force_disable(struct regulator_dev *rdev,
 		}
 		/* notify other consumers that power has been forced off */
 		_notifier_call_chain(rdev, REGULATOR_EVENT_FORCE_DISABLE |
-			REGULATOR_EVENT_DISABLE, NULL);
+			REGULATOR_EVENT_DISABLE, NULL, 0);
 	}
 
 	/* decrease our supplies ref count and disable if required */
@@ -1755,7 +1755,7 @@ static int _regulator_do_set_voltage(struct regulator_dev *rdev,
 
 	if (ret == 0)
 		_notifier_call_chain(rdev, REGULATOR_EVENT_VOLTAGE_CHANGE,
-				     NULL);
+				     NULL, 0);
 
 	trace_regulator_set_voltage_complete(rdev_get_name(rdev), selector);
 
@@ -2237,19 +2237,23 @@ EXPORT_SYMBOL_GPL(regulator_unregister_notifier);
 
 /* notify regulator consumers and downstream regulator consumers.
  * Note mutex must be held by caller.
+ * lock_sublevel should always be 0, only used for recursive calls.
  */
 static void _notifier_call_chain(struct regulator_dev *rdev,
-				  unsigned long event, void *data)
+				  unsigned long event, void *data, int lock_sublevel)
 {
 	struct regulator_dev *_rdev;
 
 	/* call rdev chain first */
 	blocking_notifier_call_chain(&rdev->notifier, event, NULL);
 
+	/* increase sublevel before stepping into nested regulators */
+	lock_sublevel++;
+
 	/* now notify regulator we supply */
 	list_for_each_entry(_rdev, &rdev->supply_list, slist) {
-		mutex_lock(&_rdev->mutex);
-		_notifier_call_chain(_rdev, event, data);
+		mutex_lock_nested(&_rdev->mutex, lock_sublevel);
+		_notifier_call_chain(_rdev, event, data, lock_sublevel);
 		mutex_unlock(&_rdev->mutex);
 	}
 }
@@ -2403,7 +2407,7 @@ EXPORT_SYMBOL_GPL(regulator_bulk_free);
 int regulator_notifier_call_chain(struct regulator_dev *rdev,
 				  unsigned long event, void *data)
 {
-	_notifier_call_chain(rdev, event, data);
+	_notifier_call_chain(rdev, event, data, 0);
 	return NOTIFY_DONE;
 
 }
