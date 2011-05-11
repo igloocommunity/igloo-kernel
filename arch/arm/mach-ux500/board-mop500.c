@@ -788,6 +788,18 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
 	&u8500_b2r2_device,
 };
 
+/*
+ *  On boards hrefpv60 and later, the accessory insertion/removal,
+ *  button press/release are inverted.
+*/
+static void accessory_detect_config(void)
+{
+	if (machine_is_hrefv60())
+		ab8500_accdet_pdata.is_detection_inverted = true;
+	else
+		ab8500_accdet_pdata.is_detection_inverted = false;
+}
+
 static void __init mop500_init_machine(void)
 {
 	int i2c0_devs;
@@ -806,6 +818,8 @@ static void __init mop500_init_machine(void)
 			mop500_gpio_keys[1].gpio = GPIO_HAL_SENSOR;
 		}
 	}
+
+	accessory_detect_config();
 
 	u8500_init_devices();
 
