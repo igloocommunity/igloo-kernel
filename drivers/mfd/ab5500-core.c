@@ -2171,6 +2171,40 @@ static inline void ab5500_remove_debugfs(void)
 }
 #endif
 
+/*
+ * ab5500_setup : Basic set-up, datastructure creation/destruction
+ *		  and I2C interface.This sets up a default config
+ *		  in the AB5500 chip so that it will work as expected.
+ * @ab :	  Pointer to ab5500 structure
+ * @settings :    Pointer to struct abx500_init_settings
+ * @size :        Size of init data
+ */
+static int __init ab5500_setup(struct ab5500 *ab,
+	struct abx500_init_settings *settings, unsigned int size)
+{
+	int err = 0;
+	int i;
+
+	for (i = 0; i < size; i++) {
+		err = mask_and_set_register_interruptible(ab,
+			settings[i].bank,
+			settings[i].reg,
+			0xFF, settings[i].setting);
+		if (err)
+			goto exit_no_setup;
+
+		/* If event mask register update the event mask in ab5500 */
+		if ((settings[i].bank == AB5500_BANK_IT) &&
+			(AB5500_MASK_BASE <= settings[i].reg) &&
+			(settings[i].reg <= AB5500_MASK_END)) {
+			ab->mask[settings[i].reg - AB5500_MASK_BASE] =
+				settings[i].setting;
+		}
+	}
+exit_no_setup:
+	return err;
+}
+
 static void ab5500_irq_mask(struct irq_data *data)
 {
 	struct ab5500 *ab = irq_data_get_irq_chip_data(data);
@@ -2394,7 +2428,12 @@ static int __init ab5500_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "ab5500_mfd_add_device error\n");
 		goto exit_no_irq;
 	}
-
+	err = ab5500_setup(ab, ab5500_plf_data->init_settings,
+		ab5500_plf_data->init_settings_sz);
+	if (err) {
+		dev_err(&pdev->dev, "ab5500_setup error\n");
+		goto exit_no_irq;
+	}
 	ab5500_setup_debugfs(ab);
 	return 0;
 
