@@ -512,6 +512,13 @@ config HWMEM
 	  can be used by hardware. It also enables accessing hwmem allocated
 	  memory buffers through a secure id which can be shared across processes.
 
+config U5500_MBOX
+	bool "Mailbox support"
+	depends on (UX500_SOC_DB5500 && U5500_MODEM_IRQ)
+	default y
+	help
+	  Add support for U5500 mailbox communication with modem side
+
 source "drivers/misc/Kconfig.stm"
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
