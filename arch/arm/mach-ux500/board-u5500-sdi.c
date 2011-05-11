@@ -7,6 +7,7 @@
 
 #include <linux/amba/mmci.h>
 #include <linux/mmc/host.h>
+#include <linux/delay.h>
 #include <linux/gpio.h>
 
 #include <plat/pincfg.h>
@@ -17,6 +18,7 @@
 #include "pins-db5500.h"
 #include "devices-db5500.h"
 #include "board-u5500.h"
+#include "../../../drivers/mmc/host/mmci.h" /* to avoid MCI_ST* redefinition */
 
 /*
  * SDI0 (EMMC)
@@ -99,19 +101,30 @@ static struct mmci_platform_data u5500_sdi0_data = {
 static u32 u5500_sdi1_vdd_handler(struct device *dev, unsigned int vdd,
 		unsigned char power_mode)
 {
-	/*
-	* Level shifter voltage should depend on vdd to when deciding
-	* on either 1.8V or 2.9V. Once the decision has been made the
-	* level shifter must be disabled and re-enabled with a changed
-	* select signal in order to switch the voltage. Since there is
-	* no framework support yet for indicating 1.8V in vdd, use the
-	* default 2.9V.
-	*/
-	if (power_mode == MMC_POWER_UP)
+	switch (power_mode) {
+	case MMC_POWER_UP:
+	case MMC_POWER_ON:
+		/*
+		 * Level shifter voltage should depend on vdd to when deciding
+		 * on either 1.8V or 2.9V. Once the decision has been made the
+		 * level shifter must be disabled and re-enabled with a changed
+		 * select signal in order to switch the voltage. Since there is
+		 * no framework support yet for indicating 1.8V in vdd, use the
+		 * default 2.9V.
+		 */
+
+		/* Enable level shifter */
 		gpio_set_value_cansleep(GPIO_MMC_CARD_CTRL, 1);
-	else if (power_mode == MMC_POWER_OFF)
+		udelay(100);
+		break;
+	case MMC_POWER_OFF:
+		/* Disable level shifter */
 		gpio_set_value_cansleep(GPIO_MMC_CARD_CTRL, 0);
-	return 0;
+		break;
+	}
+
+	return MCI_ST_FBCLKEN | MCI_ST_CMDDIREN | MCI_ST_DATA0DIREN |
+	       MCI_ST_DATA2DIREN;
 }
 
 static struct mmci_platform_data u5500_sdi1_data = {
