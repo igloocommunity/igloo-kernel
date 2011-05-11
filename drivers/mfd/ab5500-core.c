@@ -2366,6 +2366,11 @@ static int __init ab5500_probe(struct platform_device *pdev)
 		goto exit_no_irq;
 	}
 
+	/* Set up and register the platform devices. */
+	for (i = 0; i < AB5500_NUM_DEVICES; i++) {
+		ab5500_devs[i].mfd_data = ab5500_plf_data->dev_data[i];
+	}
+
 	err = mfd_add_devices(&pdev->dev, 0, ab5500_devs,
 		ARRAY_SIZE(ab5500_devs), NULL,
 		ab5500_plf_data->irq.base);
