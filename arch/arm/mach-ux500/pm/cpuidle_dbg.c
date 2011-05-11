@@ -47,6 +47,9 @@ struct state_history_state {
 	u32 counter;
 	ktime_t time;
 	u32 hit_rate;
+	u32 state_ok;
+	u32 state_error;
+	u32 state_int;
 
 	u32 latency_count[NUM_LATENCY];
 	ktime_t latency_sum[NUM_LATENCY];
@@ -241,6 +244,7 @@ void ux500_ci_dbg_exit_latency(int ctarget, ktime_t now, ktime_t exit,
 {
 	struct state_history *sh;
 	bool hit = true;
+	enum prcmu_idle_stat prcmu_status;
 	unsigned int d;
 
 	sh = per_cpu(state_history, smp_processor_id());
@@ -260,7 +264,40 @@ void ux500_ci_dbg_exit_latency(int ctarget, ktime_t now, ktime_t exit,
 	if (hit)
 		sh->states[ctarget].hit_rate++;
 
-	if (cstates[ctarget].state < CI_IDLE || !measure_latency)
+	if (cstates[ctarget].state < CI_IDLE)
+		return;
+
+	prcmu_status = ux500_pm_prcmu_idle_stat();
+
+	switch (prcmu_status) {
+
+	case DEEP_SLEEP_OK:
+		if (cstates[ctarget].state == CI_DEEP_SLEEP)
+			sh->states[ctarget].state_ok++;
+		break;
+	case SLEEP_OK:
+		if (cstates[ctarget].state == CI_SLEEP)
+			sh->states[ctarget].state_ok++;
+		break;
+	case IDLE_OK:
+		if (cstates[ctarget].state == CI_IDLE)
+			sh->states[ctarget].state_ok++;
+		break;
+	case DEEPIDLE_OK:
+		if (cstates[ctarget].state == CI_DEEP_IDLE)
+			sh->states[ctarget].state_ok++;
+		break;
+	case ARM2PRCMUPENDINGIT_ER:
+		sh->states[ctarget].state_int++;
+		break;
+	default:
+		pr_debug("cpuidle: unknown prcmu exit code: 0x%x state: %d\n",
+			prcmu_status, cstates[ctarget].state);
+		sh->states[ctarget].state_error++;
+		break;
+	}
+
+	if (!measure_latency)
 		return;
 
 	store_latency(sh,
@@ -391,6 +428,9 @@ static void state_history_reset(void)
 		for (i = 0; i <= cstates_len; i++) {
 			sh->states[i].counter = 0;
 			sh->states[i].hit_rate = 0;
+			sh->states[i].state_ok = 0;
+			sh->states[i].state_error = 0;
+			sh->states[i].state_int = 0;
 
 			sh->states[i].time = ktime_set(0, 0);
 
@@ -507,9 +547,20 @@ static void stats_disp_one(struct seq_file *s, struct state_history *sh,
 		}
 	}
 
-	seq_printf(s, "\n%d - %s: # %u in %d, ms %d%%",
+	seq_printf(s, "\n%d - %s: %u",
 		   i, cstates[i].desc,
-		   sh->states[i].counter,
+		   sh->states[i].counter);
+
+	if (sh->states[i].counter == 0)
+		return;
+
+	if (i > CI_WFI)
+		seq_printf(s, " (%u int:%u err:%u)",
+			   sh->states[i].state_ok,
+			   sh->states[i].state_int,
+			   sh->states[i].state_error);
+
+	seq_printf(s, " in %d ms %d%%",
 		   (u32) t_us, (u32)perc);
 
 	if (sh->states[i].counter)
