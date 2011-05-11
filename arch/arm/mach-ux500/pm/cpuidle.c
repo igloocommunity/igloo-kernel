@@ -187,20 +187,6 @@ struct cstate *ux500_ci_get_cstates(int *len)
 	return cstates;
 }
 
-/*
- * cpuidle & hotplug - plug or unplug a cpu in idle sequence
- */
-void ux500_cpuidle_plug(int cpu)
-{
-	atomic_dec(&idle_cpus_counter);
-	wmb();
-}
-void ux500_cpuidle_unplug(int cpu)
-{
-	atomic_inc(&idle_cpus_counter);
-	wmb();
-}
-
 static void restore_sequence(ktime_t now)
 {
 	int this_cpu = smp_processor_id();
