@@ -25,7 +25,6 @@ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
 obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
 obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
 obj-$(CONFIG_U5500_MODEM_IRQ)	+= modem-irq-db5500.o
-obj-$(CONFIG_U5500_MBOX)	+= mbox-db5500.o
 obj-$(CONFIG_TEE_UX500) 	+= tee_ux500.o
 obj-$(CONFIG_TEE_SVP)		+= tee_service_svp.o
 obj-$(CONFIG_TEE_SVP)		+= tee_ta_start_modem_svp.o

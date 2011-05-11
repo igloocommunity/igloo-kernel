@@ -120,13 +120,6 @@ config U5500_MODEM_IRQ
 	help
 	  Add support for handling IRQ:s from modem side
 
-config U5500_MBOX
-	bool "Mailbox support"
-	depends on U5500_MODEM_IRQ
-	default y
-	help
-	  Add support for U5500 mailbox communication with modem side
-
 config TEE_UX500
 	bool "Trusted Execution Environment (TEE) ux500 hardware support"
 	depends on (TEE_SUPPORT && MACH_U8500_MOP)
