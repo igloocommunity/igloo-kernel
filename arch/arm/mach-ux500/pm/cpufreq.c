@@ -17,31 +17,8 @@
 #include <mach/prcmu-fw-api.h>
 #include <mach/prcmu-regs.h>
 
-static struct cpufreq_frequency_table freq_table[] = {
-	[0] = {
-		.index = 0,
-		.frequency = 300000,
-	},
-	[1] = {
-		.index = 1,
-		.frequency = 600000,
-	},
-	[2] = {
-		/* Used for MAX_OPP, if available */
-		.index = 2,
-		.frequency = CPUFREQ_TABLE_END,
-	},
-	[3] = {
-		.index = 3,
-		.frequency = CPUFREQ_TABLE_END,
-	},
-};
-
-static enum arm_opp idx2opp[] = {
-	ARM_50_OPP,
-	ARM_100_OPP,
-	ARM_MAX_OPP
-};
+static struct cpufreq_frequency_table *freq_table;
+static enum arm_opp *idx2opp;
 
 static struct freq_attr *u8500_cpufreq_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
@@ -108,15 +85,6 @@ static int __cpuinit u8500_cpufreq_init(struct cpufreq_policy *policy)
 	int res;
 	int i;
 
-	BUILD_BUG_ON(ARRAY_SIZE(idx2opp) + 1 != ARRAY_SIZE(freq_table));
-
-	if (cpu_is_u8500v2() && !prcmu_is_u8400()) {
-		freq_table[0].frequency = 400000;
-		freq_table[1].frequency = 800000;
-		if (prcmu_has_arm_maxopp())
-			freq_table[2].frequency = 1000000;
-	}
-
 	/* get policy fields based on the table */
 	res = cpufreq_frequency_table_cpuinfo(policy, freq_table);
 	if (!res)
@@ -160,12 +128,16 @@ static struct cpufreq_driver u8500_cpufreq_driver = {
 	.attr   = u8500_cpufreq_attr,
 };
 
-static int __init u8500_cpufreq_register(void)
+int __init
+ux500_cpufreq_register(struct cpufreq_frequency_table *table,
+		       enum arm_opp *idx2opplist)
 {
+	freq_table = table;
+	idx2opp = idx2opplist;
+
 	if (cpu_is_u8500v1() || ux500_is_svp())
 		return -ENODEV;
 
 	pr_info("cpufreq for u8500 started\n");
 	return cpufreq_register_driver(&u8500_cpufreq_driver);
 }
-device_initcall(u8500_cpufreq_register);
