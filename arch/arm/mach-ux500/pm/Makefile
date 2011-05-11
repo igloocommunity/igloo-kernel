@@ -9,3 +9,7 @@ obj-$(CONFIG_UX500_CONTEXT) 		+= context.o context_arm.o context-db8500.o contex
 obj-$(CONFIG_U8500_CPUFREQ) 		+= cpufreq.o
 obj-$(CONFIG_UX500_SUSPEND)		+= suspend.o
 obj-$(CONFIG_UX500_SUSPEND_DBG)		+= suspend_dbg.o
+
+ifeq ($(CONFIG_UX500_SOC_DB8500), y)
+obj-$(CONFIG_U8500_CPUFREQ) 		+= cpufreq-db8500.o
+endif
