@@ -451,6 +451,11 @@ static inline bool prcmu_is_ac_wake_requested(void)
 	return false;
 }
 
+static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
+{
+	return 0;
+}
+
 #ifndef CONFIG_UX500_SOC_DB5500
 static inline int prcmu_set_display_clocks(void)
 {
