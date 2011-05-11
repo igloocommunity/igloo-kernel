@@ -23,7 +23,6 @@
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
-#include <mach/prcmu-regs.h>
 #include <mach/prcmu-db5500.h>
 #include <mach/prcmu-fw-api.h>
 #include <mach/db5500-regs.h>
@@ -268,14 +267,14 @@ int db5500_prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size)
 
 	mutex_lock(&mb5_transfer.lock);
 
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(5))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(5))
 		cpu_relax();
 	writeb(slave, PRCM_REQ_MB5_I2C_SLAVE);
 	writeb(reg, PRCM_REQ_MB5_I2C_REG);
 	writeb(size, PRCM_REQ_MB5_I2C_SIZE);
 	writeb(MB5H_I2C_READ, PRCM_REQ_MB5_HEADER);
 
-	writel(MBOX_BIT(5), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(5), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 	wait_for_completion(&mb5_transfer.work);
 
 	r = 0;
@@ -309,7 +308,7 @@ int db5500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
 
 	mutex_lock(&mb5_transfer.lock);
 
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(5))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(5))
 		cpu_relax();
 	writeb(slave, PRCM_REQ_MB5_I2C_SLAVE);
 	writeb(reg, PRCM_REQ_MB5_I2C_REG);
@@ -317,7 +316,7 @@ int db5500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
 	memcpy_toio(PRCM_REQ_MB5_I2C_DATA, value, size);
 	writeb(MB5H_I2C_WRITE, PRCM_REQ_MB5_HEADER);
 
-	writel(MBOX_BIT(5), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(5), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 	wait_for_completion(&mb5_transfer.work);
 
 	if ((mb5_transfer.ack.header == MB5H_I2C_WRITE) &&
@@ -336,44 +335,45 @@ int db5500_prcmu_enable_dsipll(void)
 	int i;
 
 	/* Enable DSIPLL_RESETN resets */
-	writel(PRCMU_RESET_DSIPLL, PRCM_APE_RESETN_CLR);
+	writel(PRCMU_RESET_DSIPLL, _PRCMU_BASE + PRCM_APE_RESETN_CLR);
 	/* Unclamp DSIPLL in/out */
-	writel(PRCMU_UNCLAMP_DSIPLL, PRCM_MMIP_LS_CLAMP_CLR);
+	writel(PRCMU_UNCLAMP_DSIPLL, _PRCMU_BASE + PRCM_MMIP_LS_CLAMP_CLR);
 	/* Set DSI PLL FREQ */
-	writel(PRCMU_PLLDSI_FREQ_SETTING, PRCM_PLLDSI_FREQ);
+	writel(PRCMU_PLLDSI_FREQ_SETTING, _PRCMU_BASE + PRCM_PLLDSI_FREQ);
 	writel(PRCMU_DSI_PLLOUT_SEL_SETTING,
-		PRCM_DSI_PLLOUT_SEL);
+		_PRCMU_BASE + PRCM_DSI_PLLOUT_SEL);
 	/* Enable Escape clocks */
-	writel(PRCMU_ENABLE_ESCAPE_CLOCK_DIV, PRCM_DSITVCLK_DIV);
+	writel(PRCMU_ENABLE_ESCAPE_CLOCK_DIV, _PRCMU_BASE + PRCM_DSITVCLK_DIV);
 
 	/* Start DSI PLL */
-	writel(PRCMU_ENABLE_PLLDSI, PRCM_PLLDSI_ENABLE);
+	writel(PRCMU_ENABLE_PLLDSI, _PRCMU_BASE + PRCM_PLLDSI_ENABLE);
 	/* Reset DSI PLL */
-	writel(PRCMU_DSI_RESET_SW, PRCM_DSI_SW_RESET);
+	writel(PRCMU_DSI_RESET_SW, _PRCMU_BASE + PRCM_DSI_SW_RESET);
 	for (i = 0; i < 10; i++) {
-		if ((readl(PRCM_PLLDSI_LOCKP) &
+		if ((readl(_PRCMU_BASE + PRCM_PLLDSI_LOCKP) &
 			PRCMU_PLLDSI_LOCKP_LOCKED) == PRCMU_PLLDSI_LOCKP_LOCKED)
 			break;
 		udelay(100);
 	}
 	/* Release DSIPLL_RESETN */
-	writel(PRCMU_RESET_DSIPLL, PRCM_APE_RESETN_SET);
+	writel(PRCMU_RESET_DSIPLL, _PRCMU_BASE + PRCM_APE_RESETN_SET);
 	return 0;
 }
 
 int db5500_prcmu_disable_dsipll(void)
 {
 	/* Disable dsi pll */
-	writel(PRCMU_DISABLE_PLLDSI, PRCM_PLLDSI_ENABLE);
+	writel(PRCMU_DISABLE_PLLDSI, _PRCMU_BASE + PRCM_PLLDSI_ENABLE);
 	/* Disable  escapeclock */
-	writel(PRCMU_DISABLE_ESCAPE_CLOCK_DIV, PRCM_DSITVCLK_DIV);
+	writel(PRCMU_DISABLE_ESCAPE_CLOCK_DIV,
+	       _PRCMU_BASE + PRCM_DSITVCLK_DIV);
 	return 0;
 }
 
 int db5500_prcmu_set_display_clocks(void)
 {
-	writel(PRCMU_DSI_CLOCK_SETTING, PRCM_HDMICLK_MGT);
-	writel(PRCMU_DSI_LP_CLOCK_SETTING, PRCM_TVCLK_MGT);
+	writel(PRCMU_DSI_CLOCK_SETTING, _PRCMU_BASE + DB5500_PRCM_HDMICLK_MGT);
+	writel(PRCMU_DSI_LP_CLOCK_SETTING, _PRCMU_BASE + DB5500_PRCM_TVCLK_MGT);
 	return 0;
 }
 
@@ -383,11 +383,11 @@ static void ack_dbb_wakeup(void)
 
 	spin_lock_irqsave(&mb0_transfer.lock, flags);
 
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(0))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(0))
 		cpu_relax();
 
 	writeb(RMB0H_RD_WAKE_UP_ACK, PRCM_REQ_MB0_HEADER);
-	writel(MBOX_BIT(0), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(0), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
 }
@@ -413,31 +413,31 @@ static bool read_mailbox_0(void)
 		r = false;
 		break;
 	}
-	writel(MBOX_BIT(0), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(0), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return r;
 }
 
 static bool read_mailbox_1(void)
 {
-	writel(MBOX_BIT(1), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(1), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
 static bool read_mailbox_2(void)
 {
-	writel(MBOX_BIT(2), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(2), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
 static bool read_mailbox_3(void)
 {
-	writel(MBOX_BIT(3), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(3), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
 static bool read_mailbox_4(void)
 {
-	writel(MBOX_BIT(4), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(4), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
@@ -458,19 +458,19 @@ static bool read_mailbox_5(void)
 		print_unknown_header_warning(5, header);
 		break;
 	}
-	writel(MBOX_BIT(5), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(5), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
 static bool read_mailbox_6(void)
 {
-	writel(MBOX_BIT(6), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(6), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
 static bool read_mailbox_7(void)
 {
-	writel(MBOX_BIT(7), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(7), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
@@ -491,7 +491,7 @@ static irqreturn_t prcmu_irq_handler(int irq, void *data)
 	u8 n;
 	irqreturn_t r;
 
-	bits = (readl(PRCM_ARM_IT1_VAL) & ALL_MBOX_BITS);
+	bits = (readl(_PRCMU_BASE + PRCM_ARM_IT1_VAL) & ALL_MBOX_BITS);
 	if (unlikely(!bits))
 		return IRQ_NONE;
 
@@ -532,7 +532,7 @@ int __init db5500_prcmu_init(void)
 		return -ENODEV;
 
 	/* Clean up the mailbox interrupts after pre-kernel code. */
-	writel(ALL_MBOX_BITS, PRCM_ARM_IT1_CLEAR);
+	writel(ALL_MBOX_BITS, _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 
 	r = request_threaded_irq(IRQ_DB5500_PRCMU1, prcmu_irq_handler,
 		prcmu_irq_thread_fn, 0, "prcmu", NULL);
