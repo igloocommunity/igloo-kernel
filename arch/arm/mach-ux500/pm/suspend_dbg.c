@@ -17,13 +17,7 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 
-#define DEEP_SLEEP_OK 0xf6
-#define SLEEP_OK 0xf3
-
-#define PRCMU_STATUS_REGISTER_V1 0x8015fe08
-#define PRCMU_STATUS_REGISTER_V2 0x801b8e08
-
-static void __iomem *prcmu_status_reg;
+#include "pm.h"
 
 #ifdef CONFIG_UX500_SUSPEND_STANDBY
 static u32 sleep_enabled = 1;
@@ -76,9 +70,9 @@ bool ux500_suspend_deepsleep_enabled(void)
 
 void ux500_suspend_dbg_sleep_status(bool is_deepsleep)
 {
-	u32 prcmu_status;
+	enum prcmu_idle_stat prcmu_status;
 
-	prcmu_status = readl(prcmu_status_reg) & 0xff;
+	prcmu_status = ux500_pm_prcmu_idle_stat();
 
 	if (is_deepsleep) {
 		pr_info("Returning from ApDeepSleep. PRCMU ret: 0x%x - %s\n",
@@ -116,12 +110,6 @@ void ux500_suspend_dbg_init(void)
 	struct dentry *deepsleeps_done_file = NULL;
 	struct dentry *sleeps_failed_file = NULL;
 	struct dentry *deepsleeps_failed_file = NULL;
-
-
-	if (cpu_is_u8500v20_or_later())
-		prcmu_status_reg = (void *)IO_ADDRESS(PRCMU_STATUS_REGISTER_V2);
-	else
-		prcmu_status_reg = (void *)IO_ADDRESS(PRCMU_STATUS_REGISTER_V1);
 
 	suspend_dir = debugfs_create_dir("suspend", NULL);
 	if (IS_ERR_OR_NULL(suspend_dir))

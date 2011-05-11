@@ -10,6 +10,15 @@
 #define PM_COMMON_H
 
 #ifdef CONFIG_PM
+
+enum prcmu_idle_stat {
+	SLEEP_OK		= 0xf3,
+	DEEP_SLEEP_OK		= 0xf6,
+	IDLE_OK			= 0xf0,
+	DEEPIDLE_OK		= 0xe3,
+	ARM2PRCMUPENDINGIT_ER	= 0x91,
+};
+
 /**
  * ux500_pm_arm_on_ext_clk()
  *
@@ -99,6 +108,13 @@ u32 ux500_pm_gpio_read_wake_up_status(unsigned int bank_number);
  * Returns true if the other CPU is in WFI.
  */
 bool ux500_pm_other_cpu_wfi(void);
+
+/**
+ * ux500_pm_prcmu_idle_stat()
+ *
+ * Returns the status of the last prcmu idle/sleep
+ */
+enum prcmu_idle_stat ux500_pm_prcmu_idle_stat(void);
 
 #else
 u32 ux500_pm_gpio_read_wake_up_status(unsigned int bank_number)
