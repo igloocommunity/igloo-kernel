@@ -198,20 +198,20 @@ static int caif_device_notify(struct notifier_block *me, unsigned long what,
 
 	switch (what) {
 	case NETDEV_REGISTER:
-		netdev_info(dev, "register\n");
 		caifd = caif_device_alloc(dev);
 		if (caifd == NULL)
 			break;
+		netdev_info(dev, "register\n");
 		caifdev = netdev_priv(dev);
 		caifdev->flowctrl = dev_flowctrl;
 		atomic_set(&caifd->state, what);
 		break;
 
 	case NETDEV_UP:
-		netdev_info(dev, "up\n");
 		caifd = caif_get(dev);
 		if (caifd == NULL)
 			break;
+		netdev_info(dev, "up\n");
 		caifdev = netdev_priv(dev);
 		if (atomic_read(&caifd->state) == NETDEV_UP) {
 			netdev_info(dev, "already up\n");
