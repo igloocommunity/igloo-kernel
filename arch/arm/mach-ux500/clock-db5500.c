@@ -26,8 +26,9 @@
 #include <mach/prcmu-fw-api.h>
 
 #include "clock.h"
-#include "pins-db8500.h"
+#include "pins-db5500.h"
 #include "prcmu-db5500.h"
+#include "prcmu-regs-db5500.h"
 
 static DEFINE_MUTEX(sysclk_mutex);
 static DEFINE_MUTEX(ab_ulpclk_mutex);
@@ -194,53 +195,57 @@ static struct clkops audioclk_ops = {
 	.set_parent = audioclk_set_parent,
 };
 
-/* Primary camera clock operations */
+static pin_cfg_t clkout0_pins[] = {
+	GPIO161_CLKOUT_0 | PIN_OUTPUT_LOW,
+};
+
+static pin_cfg_t clkout1_pins[] = {
+	GPIO162_CLKOUT_1 | PIN_OUTPUT_LOW,
+};
+
 static int clkout0_enable(struct clk *clk)
 {
-	int r;
+	unsigned int val = readl(_PRCMU_BASE + PRCM_CLKOCR);
 
-	r = prcmu_config_clkout(0, PRCMU_CLKSRC_SYSCLK, 4);
-	if (r)
-		return r;
-	return nmk_config_pin(GPIO227_CLKOUT1, false);
+	val &= ~PRCM_CLKOCR_CLKOUT0_MASK;
+	val |= PRCM_CLKOCR_CLKOUT0_REF_CLK;
+
+	writel(val, _PRCMU_BASE + PRCM_CLKOCR);
+
+	return nmk_config_pins(clkout0_pins, ARRAY_SIZE(clkout0_pins));
 }
 
 static void clkout0_disable(struct clk *clk)
 {
 	int r;
 
-	r = nmk_config_pin(GPIO227_GPIO, false);
-	if (r)
-		goto disable_failed;
-	r = prcmu_config_clkout(0, PRCMU_CLKSRC_SYSCLK, 0);
+	r = nmk_config_pins_sleep(clkout0_pins, ARRAY_SIZE(clkout0_pins));
 	if (!r)
 		return;
-disable_failed:
+
 	pr_err("clock: failed to disable %s.\n", clk->name);
 }
 
-/* Touch screen/secondary camera clock operations. */
 static int clkout1_enable(struct clk *clk)
 {
-	int r;
+	unsigned int val = readl(_PRCMU_BASE + PRCM_CLKOCR);
 
-	r = prcmu_config_clkout(1, PRCMU_CLKSRC_SYSCLK, 4);
-	if (r)
-		return r;
-	return nmk_config_pin(GPIO228_CLKOUT2, false);
+	val &= ~PRCM_CLKOCR_CLKOUT1_MASK;
+	val |= PRCM_CLKOCR_CLKOUT1_REF_CLK;
+
+	writel(val, _PRCMU_BASE + PRCM_CLKOCR);
+
+	return nmk_config_pins(clkout1_pins, ARRAY_SIZE(clkout0_pins));
 }
 
 static void clkout1_disable(struct clk *clk)
 {
 	int r;
 
-	r = nmk_config_pin(GPIO228_GPIO, false);
-	if (r)
-		goto disable_failed;
-	r = prcmu_config_clkout(1, PRCMU_CLKSRC_SYSCLK, 0);
+	r = nmk_config_pins_sleep(clkout1_pins, ARRAY_SIZE(clkout1_pins));
 	if (!r)
 		return;
-disable_failed:
+
 	pr_err("clock: failed to disable %s.\n", clk->name);
 }
 
@@ -308,7 +313,7 @@ static struct clk ulp38m4 = {
 static struct clk sysclk = {
 	.name = "sysclk",
 	.ops = &sysclk_ops,
-	.rate = 38400000,
+	.rate = 26000000,
 	.mutex = &sysclk_mutex,
 };
 
@@ -356,7 +361,6 @@ static struct clk clkout0 = {
 	.name = "clkout0",
 	.ops = &clkout0_ops,
 	.parent = &sysclk,
-	.rate = 9600000,
 	.mutex = &sysclk_mutex,
 };
 
@@ -364,7 +368,6 @@ static struct clk clkout1 = {
 	.name = "clkout1",
 	.ops = &clkout1_ops,
 	.parent = &sysclk,
-	.rate = 9600000,
 	.mutex = &sysclk_mutex,
 };
 
@@ -674,10 +677,8 @@ static struct clk_lookup db5500_prcc_clocks[] = {
 	CLK_LOOKUP(clk_msp1, "MSP_I2S.1", NULL),
 };
 
-static struct clk_lookup u8500_v2_prcmu_clocks[] = {
-	CLK_LOOKUP(clkout0, "pri-cam", NULL),
-	CLK_LOOKUP(clkout1, "3-005c", NULL),
-	CLK_LOOKUP(clkout1, "3-005d", NULL),
+static struct clk_lookup db5500_clkouts[] = {
+	CLK_LOOKUP(clkout1, "pri-cam", NULL),
 	CLK_LOOKUP(clkout1, "sec-cam", NULL),
 };
 
@@ -740,10 +741,6 @@ int __init db5500_clk_init(void)
 {
 	sysclk_ops.enable = NULL;
 	sysclk_ops.disable = NULL;
-	clkout0_ops.enable = NULL;
-	clkout0_ops.disable = NULL;
-	clkout1_ops.enable = NULL;
-	clkout1_ops.disable = NULL;
 
 	prcmu_clk_ops.enable = db5500_prcmu_clk_enable;
 	prcmu_clk_ops.disable = db5500_prcmu_clk_disable;
@@ -762,12 +759,11 @@ int __init db5500_clk_init(void)
 
 	clks_register(db5500_prcmu_clocks, ARRAY_SIZE(db5500_prcmu_clocks));
 	clks_register(db5500_prcc_clocks, ARRAY_SIZE(db5500_prcc_clocks));
+	clks_register(db5500_clkouts, ARRAY_SIZE(db5500_clkouts));
 
 	if (cpu_is_u8500v2()) {
 		clks_register(u8500_v2_sysclks,
 			ARRAY_SIZE(u8500_v2_sysclks));
-		clks_register(u8500_v2_prcmu_clocks,
-			ARRAY_SIZE(u8500_v2_prcmu_clocks));
 	}
 
 	db5500_boot_clk_enable();
