@@ -20,12 +20,6 @@
 #define REGULATOR_SUPPLY_DEBUG(_name, _dev_name)
 #endif
 
-#define REGULATOR_SUPPLY_DEV(_name, _dev)		\
-{							\
-	.supply	= _name,				\
-	.dev	= _dev,					\
-}
-
 /*
  * TPS61052 regulator
  */
@@ -78,10 +72,10 @@ static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
 	REGULATOR_SUPPLY("vcc-avswitch", "ab8500-codec.0"),
 	REGULATOR_SUPPLY("vcc-avswitch", "ab8500-acc-det.0"),
 #ifdef CONFIG_DISPLAY_AB8500_TERTIARY
-	REGULATOR_SUPPLY_DEV("v-ab8500-AV-switch", &tvout_ab8500_display.dev),
+	REGULATOR_SUPPLY("v-ab8500-AV-switch", "mcde_tv_ab8500.2"),
 #endif
 #ifdef CONFIG_DISPLAY_AV8100_TERTIARY
-	REGULATOR_SUPPLY_DEV("v-av8100-AV-switch", &av8100_hdmi.dev),
+	REGULATOR_SUPPLY("v-av8100-AV-switch", "av8100_hdmi.2"),
 #endif
 	REGULATOR_SUPPLY_DEBUG("aux2", "reg-virt-consumer.1")
 };
@@ -107,7 +101,7 @@ static struct regulator_consumer_supply ab8500_vtvout_consumers[] = {
 	REGULATOR_SUPPLY("vddadc", "ab8500-gpadc.0"),
 	REGULATOR_SUPPLY("vddadc", "ab8500-charger.0"),
 #ifdef CONFIG_DISPLAY_AB8500_TERTIARY
-	REGULATOR_SUPPLY_DEV("vtvout", &tvout_ab8500_display.dev),
+	REGULATOR_SUPPLY("v-tvout", "mcde_tv_ab8500.2"),
 #endif
 	REGULATOR_SUPPLY_DEBUG("tvout", "reg-virt-consumer.4")
 };
