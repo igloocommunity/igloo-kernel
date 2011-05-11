@@ -54,13 +54,13 @@ db5500_add_keypad(struct db5500_keypad_platform_data *pdata)
 	dbx500_add_sdi("sdi1", U5500_SDI1_BASE, IRQ_DB5500_SDMMC1, pdata, \
 		       0x10480180)
 #define db5500_add_sdi2(pdata) \
-	dbx500_add_sdi("sdi2", U5500_SDI2_BASE, IRQ_DB5500_SDMMC2, pdata \
+	dbx500_add_sdi("sdi2", U5500_SDI2_BASE, IRQ_DB5500_SDMMC2, pdata, \
 		       0x10480180)
 #define db5500_add_sdi3(pdata) \
-	dbx500_add_sdi("sdi3", U5500_SDI3_BASE, IRQ_DB5500_SDMMC3, pdata \
+	dbx500_add_sdi("sdi3", U5500_SDI3_BASE, IRQ_DB5500_SDMMC3, pdata, \
 		       0x10480180)
 #define db5500_add_sdi4(pdata) \
-	dbx500_add_sdi("sdi4", U5500_SDI4_BASE, IRQ_DB5500_SDMMC4, pdata \
+	dbx500_add_sdi("sdi4", U5500_SDI4_BASE, IRQ_DB5500_SDMMC4, pdata, \
 		       0x10480180)
 
 /* This one has a bad peripheral ID in the U5500 silicon */
