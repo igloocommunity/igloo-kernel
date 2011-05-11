@@ -45,4 +45,32 @@
 #define PRCM_CLK_MGT_CLKPLLSW_MASK	BITS(5, 7)
 #define PRCM_CLK_MGT_CLKEN		BIT(8)
 
+#define PRCM_CLKOCR			0x1CC
+#define PRCM_CLKOCR_CLKOUT0_REF_CLK	(1 << 0)
+#define PRCM_CLKOCR_CLKOUT0_MASK	BITS(0, 13)
+#define PRCM_CLKOCR_CLKOUT1_REF_CLK	(1 << 16)
+#define PRCM_CLKOCR_CLKOUT1_MASK	BITS(16, 29)
+
+#define PRCM_ARM_IT1_CLEAR 0x48C
+#define PRCM_ARM_IT1_VAL 0x494
+
+/* CPU mailbox registers */
+#define PRCM_MBOX_CPU_VAL 0x0FC
+#define PRCM_MBOX_CPU_SET 0x100
+
+/* PRCMU clock/PLL/reset registers */
+#define PRCM_PLLDSI_FREQ	0x500
+#define PRCM_PLLDSI_ENABLE	0x504
+#define PRCM_PLLDSI_LOCKP	0x508
+#define PRCM_DSI_PLLOUT_SEL	0x530
+#define PRCM_DSITVCLK_DIV	0x52C
+#define PRCM_APE_RESETN_SET	0x1E4
+#define PRCM_APE_RESETN_CLR	0x1E8
+
+#define PRCM_MMIP_LS_CLAMP_SET 0x420
+#define PRCM_MMIP_LS_CLAMP_CLR 0x424
+
+/* Miscellaneous unit registers */
+#define PRCM_DSI_SW_RESET 0x324
+
 #endif
