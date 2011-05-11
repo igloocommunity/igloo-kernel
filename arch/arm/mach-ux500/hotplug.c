@@ -16,9 +16,6 @@
 
 #ifdef CONFIG_U8500_CPUIDLE
 #include "pm/cpuidle.h"
-#else
-#define ux500_cpuidle_unplug(cpu)
-#define ux500_cpuidle_plug(cpu)
 #endif
 #include "pm/context.h"
 
@@ -27,7 +24,7 @@ extern volatile int pen_release;
 static inline void platform_do_lowpower(unsigned int cpu)
 {
 	flush_cache_all();
-	ux500_cpuidle_unplug(cpu);
+
 	for (;;) {
 #ifndef CONFIG_U8500_CPUIDLE
 		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
