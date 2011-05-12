@@ -42,6 +42,44 @@ static enum arm_opp idx2opp[] = {
 	ARM_MAX_OPP
 };
 
+/*
+ * Below is a temporary workaround for wlan performance issues
+ */
+
+#include <linux/kernel_stat.h>
+#include <linux/workqueue.h>
+#include <linux/cpu.h>
+
+#include <mach/irqs.h>
+
+#define WLAN_PROBE_DELAY 3000 /* 3 seconds */
+#define WLAN_LIMIT (3000/3) /* If we have more than 1000 irqs per second */
+
+static struct delayed_work work_wlan_workaround;
+bool wlan_mode_on;
+
+static void wlan_load(struct work_struct *work)
+{
+	int cpu;
+	unsigned int num_irqs = 0;
+	static unsigned int old_num_irqs = UINT_MAX;
+
+	for_each_online_cpu(cpu)
+		num_irqs += kstat_irqs_cpu(IRQ_DB8500_SDMMC1, cpu);
+
+	if ((num_irqs > old_num_irqs) &&
+	    (num_irqs - old_num_irqs) > WLAN_LIMIT)
+		wlan_mode_on = true;
+	else
+		wlan_mode_on = false;
+
+	old_num_irqs = num_irqs;
+
+	schedule_delayed_work_on(0,
+				 &work_wlan_workaround,
+				 msecs_to_jiffies(WLAN_PROBE_DELAY));
+}
+
 static int __init u8500_cpufreq_register(void)
 {
 	int i = 0;
@@ -54,6 +92,14 @@ static int __init u8500_cpufreq_register(void)
 		if (prcmu_has_arm_maxopp())
 			freq_table[3].frequency = 1000000;
 	}
+
+	INIT_DELAYED_WORK_DEFERRABLE(&work_wlan_workaround,
+				     wlan_load);
+
+	schedule_delayed_work_on(0,
+				 &work_wlan_workaround,
+				 msecs_to_jiffies(WLAN_PROBE_DELAY));
+
 	pr_info("u8500-cpufreq : Available frequencies:\n");
 	while (freq_table[i].frequency != CPUFREQ_TABLE_END)
 		pr_info("  %d Mhz\n", freq_table[i++].frequency/1000);
