@@ -686,7 +686,6 @@ void context_gpio_mux_safe_switch(bool begin)
 {
 	int i;
 
-	static u32 slpc[GPIO_NUM_BANKS];
 	static u32 rwimsc[GPIO_NUM_BANKS];
 	static u32 fwimsc[GPIO_NUM_BANKS];
 
