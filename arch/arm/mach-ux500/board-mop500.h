@@ -47,6 +47,21 @@
 /* GPIOs on the AB8500 mixed-signals circuit */
 #define MOP500_AB8500_GPIO(x)		(MOP500_EGPIO_END + (x))
 
+/* mop500 AB8500 GPIO */
+
+/*
+ * Snowball AB8500 GPIO
+ * Documentation starts on pin 1
+ * and framework enumerates from 0
+ */
+#define SNOWBALL_VSMPS2_1V8_GPIO	MOP500_AB8500_GPIO(0)	/* SYSCLKREQ2/GPIO1 */
+#define SNOWBALL_PM_GPIO1_GPIO		MOP500_AB8500_GPIO(1)	/* SYSCLKREQ3/GPIO2 */
+#define SNOWBALL_WLAN_CLK_REQ_GPIO	MOP500_AB8500_GPIO(2)	/* SYSCLKREQ4/GPIO3 */
+#define SNOWBALL_PM_GPIO4_GPIO		MOP500_AB8500_GPIO(3)	/* SYSCLKREQ6/GPIO4 */
+#define SNOWBALL_EN_3V6_GPIO		MOP500_AB8500_GPIO(15)	/* PWMOUT3/GPIO16 */
+#define SNOWBALL_PME_ETH_GPIO		MOP500_AB8500_GPIO(23)	/* SYSCLKREQ7/GPIO24 */
+#define SNOWBALL_EN_3V3_ETH_GPIO	MOP500_AB8500_GPIO(25)	/* GPIO26 */
+
 struct i2c_board_info;
 
 extern void mop500_sdi_init(void);

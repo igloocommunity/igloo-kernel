@@ -112,7 +112,7 @@ static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
 			      Pin GPIO39 (ApeSpiDin) are configured as GPIO
 	 * GpioSel6 = 0x02 => Pin GPIO42 (SysClkReq5) is configured as GPIO
 	 * AlternaFunction = 0x00 => If Pins GPIO10 to 13 are not configured
-	 * as GPIO then this register selectes the alternate fucntions
+	 * as GPIO then this register selectes the alternate functions
 	 */
 	.config_reg		= {0x0F, 0x9E, 0x80, 0x01,
 					0x7A, 0x02, 0x00},
