@@ -197,10 +197,31 @@ static int clkout0_enable(struct clk *clk)
 {
 	int r;
 
+	if (clk->regulator == NULL) {
+		struct regulator *reg;
+
+		reg = regulator_get(NULL, "v-ape");
+		if (IS_ERR(reg))
+			return PTR_ERR(reg);
+		clk->regulator = reg;
+	}
+	r = regulator_enable(clk->regulator);
+	if (r)
+		goto regulator_failed;
 	r = prcmu_config_clkout(0, PRCMU_CLKSRC_SYSCLK, 4);
 	if (r)
-		return r;
-	return nmk_config_pin(GPIO227_CLKOUT1, false);
+		goto config_failed;
+	r = nmk_config_pin(GPIO227_CLKOUT1, false);
+	if (r)
+		goto gpio_failed;
+	return r;
+
+gpio_failed:
+	(void)prcmu_config_clkout(0, PRCMU_CLKSRC_SYSCLK, 0);
+config_failed:
+	(void)regulator_disable(clk->regulator);
+regulator_failed:
+	return r;
 }
 
 static void clkout0_disable(struct clk *clk)
@@ -210,9 +231,10 @@ static void clkout0_disable(struct clk *clk)
 	r = nmk_config_pin(GPIO227_GPIO, false);
 	if (r)
 		goto disable_failed;
-	r = prcmu_config_clkout(0, PRCMU_CLKSRC_SYSCLK, 0);
-	if (!r)
-		return;
+	(void)prcmu_config_clkout(0, PRCMU_CLKSRC_SYSCLK, 0);
+	(void)regulator_disable(clk->regulator);
+	return;
+
 disable_failed:
 	pr_err("clock: failed to disable %s.\n", clk->name);
 }
@@ -222,10 +244,31 @@ static int clkout1_enable(struct clk *clk)
 {
 	int r;
 
+	if (clk->regulator == NULL) {
+		struct regulator *reg;
+
+		reg = regulator_get(NULL, "v-ape");
+		if (IS_ERR(reg))
+			return PTR_ERR(reg);
+		clk->regulator = reg;
+	}
+	r = regulator_enable(clk->regulator);
+	if (r)
+		goto regulator_failed;
 	r = prcmu_config_clkout(1, PRCMU_CLKSRC_SYSCLK, 4);
 	if (r)
-		return r;
-	return nmk_config_pin(GPIO228_CLKOUT2, false);
+		goto config_failed;
+	r = nmk_config_pin(GPIO228_CLKOUT2, false);
+	if (r)
+		goto gpio_failed;
+	return r;
+
+gpio_failed:
+	(void)prcmu_config_clkout(1, PRCMU_CLKSRC_SYSCLK, 0);
+config_failed:
+	(void)regulator_disable(clk->regulator);
+regulator_failed:
+	return r;
 }
 
 static void clkout1_disable(struct clk *clk)
@@ -235,9 +278,10 @@ static void clkout1_disable(struct clk *clk)
 	r = nmk_config_pin(GPIO228_GPIO, false);
 	if (r)
 		goto disable_failed;
-	r = prcmu_config_clkout(1, PRCMU_CLKSRC_SYSCLK, 0);
-	if (!r)
-		return;
+	(void)prcmu_config_clkout(1, PRCMU_CLKSRC_SYSCLK, 0);
+	(void)regulator_disable(clk->regulator);
+	return;
+
 disable_failed:
 	pr_err("clock: failed to disable %s.\n", clk->name);
 }
