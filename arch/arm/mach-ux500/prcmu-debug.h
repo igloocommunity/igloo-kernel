@@ -18,6 +18,6 @@ int prcmu_debug_init(void);
 #else
 static inline void prcmu_debug_ape_opp_log(u8 opp) {}
 static inline void prcmu_debug_ddr_opp_log(u8 opp) {}
-static inline int prcmu_debug_init(void) {}
+static inline int prcmu_debug_init(void) {return 0;}
 #endif
 #endif
