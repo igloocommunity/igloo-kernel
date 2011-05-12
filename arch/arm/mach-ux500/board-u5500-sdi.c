@@ -163,7 +163,7 @@ static void sdi1_configure(void)
 	}
 	 /* Select the default 2.9V and eanble level shifter */
 	gpio_direction_output(pin[0], 1);
-	gpio_direction_output(pin[1], 1);
+	gpio_direction_output(pin[1], 0);
 
 }
 
