@@ -30,6 +30,8 @@ static int u8500_cpufreq_verify_speed(struct cpufreq_policy *policy)
 	return cpufreq_frequency_table_verify(policy, freq_table);
 }
 
+extern bool wlan_mode_on;
+
 static int u8500_cpufreq_target(struct cpufreq_policy *policy,
 				unsigned int target_freq,
 				unsigned int relation)
@@ -41,6 +43,10 @@ static int u8500_cpufreq_target(struct cpufreq_policy *policy,
 	if (target_freq < policy->cpuinfo.min_freq)
 		target_freq = policy->cpuinfo.min_freq;
 	if (target_freq > policy->cpuinfo.max_freq)
+		target_freq = policy->cpuinfo.max_freq;
+
+	/* A work around for wlan performance issues */
+	if (wlan_mode_on)
 		target_freq = policy->cpuinfo.max_freq;
 
 	/* Lookup the next frequency */
