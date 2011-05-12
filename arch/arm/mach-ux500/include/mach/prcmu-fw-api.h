@@ -324,12 +324,12 @@ static inline int prcmu_get_arm_opp(void)
 	return ARM_100_OPP;
 }
 
-static bool prcmu_has_arm_maxopp(void)
+static inline bool prcmu_has_arm_maxopp(void)
 {
 	return false;
 }
 
-static bool prcmu_is_u8400(void)
+static inline bool prcmu_is_u8400(void)
 {
 	return false;
 }
