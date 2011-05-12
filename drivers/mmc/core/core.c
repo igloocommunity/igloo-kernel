@@ -23,7 +23,6 @@
 #include <linux/log2.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
-#include <linux/wakelock.h>
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -483,8 +482,6 @@ int mmc_host_enable(struct mmc_host *host)
 	if (host->ops->enable) {
 		int err;
 
-		wake_lock(&host->wakelock);
-
 		host->en_dis_recurs = 1;
 		err = host->ops->enable(host);
 		host->en_dis_recurs = 0;
@@ -492,7 +489,6 @@ int mmc_host_enable(struct mmc_host *host)
 		if (err) {
 			pr_debug("%s: enable error %d\n",
 				 mmc_hostname(host), err);
-			wake_unlock(&host->wakelock);
 			return err;
 		}
 	}
@@ -520,8 +516,6 @@ static int mmc_host_do_disable(struct mmc_host *host, int lazy)
 
 			mmc_schedule_delayed_work(&host->disable, delay);
 		}
-		if (err == 0)
-			wake_unlock(&host->wakelock);
 	}
 	host->enabled = 0;
 	return 0;
@@ -1773,7 +1767,6 @@ void mmc_rescan(struct work_struct *work)
 	struct mmc_host *host =
 		container_of(work, struct mmc_host, detect.work);
 	int i;
-	bool extend_wakelock = false;
 
 	if (host->rescan_disable)
 		return;
@@ -1787,12 +1780,6 @@ void mmc_rescan(struct work_struct *work)
 	if (host->bus_ops && host->bus_ops->detect && !host->bus_dead
 	    && !(host->caps & MMC_CAP_NONREMOVABLE))
 		host->bus_ops->detect(host);
-
-	/* If the card was removed the bus will be marked
-	 * as dead - extend the wakelock so userspace
-	 * can respond */
-	if (host->bus_dead)
-		extend_wakelock = 1;
 
 	/*
 	 * Let mmc_bus_put() free the bus/bus_ops if we've found that
@@ -1818,18 +1805,14 @@ void mmc_rescan(struct work_struct *work)
 
 	mmc_claim_host(host);
 	for (i = 0; i < ARRAY_SIZE(freqs); i++) {
-		if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min))) {
-			extend_wakelock = true;
+		if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min)))
 			break;
-		}
 		if (freqs[i] <= host->f_min)
 			break;
 	}
 	mmc_release_host(host);
 
  out:
-	if (extend_wakelock)
-		wake_lock_timeout(&host->wakelock, HZ / 2);
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
 }
