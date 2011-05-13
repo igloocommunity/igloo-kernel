@@ -529,7 +529,7 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 		},
 	},
 	[AB5500_DEVID_POWER] = {
-		.nbanks	= 1,
+		.nbanks	= 2,
 		.bank	= (struct ab5500_i2c_ranges []) {
 			{
 				.bankid = AB5500_BANK_STARTUP,
@@ -541,7 +541,18 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 						.perm = AB5500_PERM_RW,
 					},
 				},
-			}
+			},
+			{
+				.bankid = AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP,
+				.nranges = 1,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x01,
+						.last = 0x01,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
 		},
 	},
 };

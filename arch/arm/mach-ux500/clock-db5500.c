@@ -19,6 +19,7 @@
 #include <linux/mfd/ab8500/sysctrl.h>
 #include <linux/workqueue.h>
 #include <linux/regulator/consumer.h>
+#include <linux/mfd/abx500.h>
 
 #include <plat/pincfg.h>
 
@@ -195,6 +196,24 @@ static struct clkops audioclk_ops = {
 	.set_parent = audioclk_set_parent,
 };
 
+static int rtc_clk_enable(struct clk *clk)
+{
+	return ab5500_clock_rtc_enable(clk->cg_sel, true);
+}
+
+static void rtc_clk_disable(struct clk *clk)
+{
+	int ret = ab5500_clock_rtc_enable(clk->cg_sel, false);
+
+	if (ret)
+		pr_err("clock: %s failed to disable: %d\n", clk->name, ret);
+}
+
+static struct clkops rtc_clk_ops = {
+	.enable		= rtc_clk_enable,
+	.disable	= rtc_clk_disable,
+};
+
 static pin_cfg_t clkout0_pins[] = {
 	GPIO161_CLKOUT_0 | PIN_OUTPUT_LOW,
 };
@@ -355,6 +374,13 @@ static struct clk clk_dummy = {
 static struct clk clk_msp1 = {
 	.name = "msp1",
 	.rate = 26000000,
+};
+
+static struct clk rtc_clk1 = {
+	.name	= "rtc_clk1",
+	.ops	= &rtc_clk_ops,
+	.cg_sel	= 1,
+	.mutex = &sysclk_mutex,
 };
 
 static struct clk clkout0 = {
@@ -682,6 +708,10 @@ static struct clk_lookup db5500_clkouts[] = {
 	CLK_LOOKUP(clkout1, "sec-cam", NULL),
 };
 
+static struct clk_lookup u5500_clocks[] = {
+	CLK_LOOKUP(rtc_clk1, "cg2900-uart.0", "lpoclk"),
+};
+
 static const char *db5500_boot_clk[] __initdata = {
 	"spi0",
 	"spi1",
@@ -760,6 +790,7 @@ int __init db5500_clk_init(void)
 	clks_register(db5500_prcmu_clocks, ARRAY_SIZE(db5500_prcmu_clocks));
 	clks_register(db5500_prcc_clocks, ARRAY_SIZE(db5500_prcc_clocks));
 	clks_register(db5500_clkouts, ARRAY_SIZE(db5500_clkouts));
+	clks_register(u5500_clocks, ARRAY_SIZE(u5500_clocks));
 
 	if (cpu_is_u8500v2()) {
 		clks_register(u8500_v2_sysclks,
