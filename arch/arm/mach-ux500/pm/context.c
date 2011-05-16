@@ -865,27 +865,43 @@ static int __init context_init(void)
 		       IO_ADDRESS(U8500_CPU1_BACKUPRAM_ADDR_BACKUPRAM_LOG_ADDR));
 	}
 
-	/* FIXME: To UX500 */
-	context_tpiu.base = ioremap(U8500_TPIU_BASE, SZ_4K);
-	context_stm_ape.base = ioremap(U8500_STM_REG_BASE, SZ_4K);
-	context_scu.base = ioremap(U8500_SCU_BASE, SZ_4K);
+	if (cpu_is_u5500()) {
+		context_tpiu.base = ioremap(U5500_TPIU_BASE, SZ_4K);
+		context_stm_ape.base = ioremap(U5500_STM_REG_BASE, SZ_4K);
+		context_scu.base = ioremap(U5500_SCU_BASE, SZ_4K);
 
-	for (i = 0; i < num_possible_cpus(); i++) {
-		per_cpu(context_gic_cpu, i).base = ioremap(U8500_GIC_CPU_BASE,
-							   SZ_4K);
-		per_cpu(context_gic_dist_cpu, i).base =
-			ioremap(U8500_GIC_DIST_BASE,
-				SZ_4K);
+		context_prcc[0].base = ioremap(U5500_CLKRST1_BASE, SZ_4K);
+		context_prcc[1].base = ioremap(U5500_CLKRST2_BASE, SZ_4K);
+		context_prcc[2].base = ioremap(U5500_CLKRST3_BASE, SZ_4K);
+		context_prcc[3].base = ioremap(U5500_CLKRST5_BASE, SZ_4K);
+		context_prcc[4].base = ioremap(U5500_CLKRST6_BASE, SZ_4K);
+
+		context_gic_dist_common.base = ioremap(U5500_GIC_DIST_BASE, SZ_4K);
+		per_cpu(context_gic_cpu, 0).base = ioremap(U5500_GIC_CPU_BASE, SZ_4K);
+	} else if (cpu_is_u8500()) {
+		context_tpiu.base = ioremap(U8500_TPIU_BASE, SZ_4K);
+		context_stm_ape.base = ioremap(U8500_STM_REG_BASE, SZ_4K);
+		context_scu.base = ioremap(U8500_SCU_BASE, SZ_4K);
+
+		/* PERIPH4 is always on, so no need saving prcc */
+		context_prcc[0].base = ioremap(U8500_CLKRST1_BASE, SZ_4K);
+		context_prcc[1].base = ioremap(U8500_CLKRST2_BASE, SZ_4K);
+		context_prcc[2].base = ioremap(U8500_CLKRST3_BASE, SZ_4K);
+		context_prcc[3].base = ioremap(U8500_CLKRST5_BASE, SZ_4K);
+		context_prcc[4].base = ioremap(U8500_CLKRST6_BASE, SZ_4K);
+
+		context_gic_dist_common.base = ioremap(U8500_GIC_DIST_BASE, SZ_4K);
+		per_cpu(context_gic_cpu, 0).base = ioremap(U8500_GIC_CPU_BASE, SZ_4K);
 	}
 
-	context_gic_dist_common.base = ioremap(U8500_GIC_DIST_BASE, SZ_4K);
+	per_cpu(context_gic_dist_cpu, 0).base = context_gic_dist_common.base;
 
-	/* PERIPH4 is always on, so no need saving prcc */
-	context_prcc[0].base = ioremap(U8500_CLKRST1_BASE, SZ_4K);
-	context_prcc[1].base = ioremap(U8500_CLKRST2_BASE, SZ_4K);
-	context_prcc[2].base = ioremap(U8500_CLKRST3_BASE, SZ_4K);
-	context_prcc[3].base = ioremap(U8500_CLKRST5_BASE, SZ_4K);
-	context_prcc[4].base = ioremap(U8500_CLKRST6_BASE, SZ_4K);
+	for (i = 1; i < num_possible_cpus(); i++) {
+		per_cpu(context_gic_cpu, i).base
+			= per_cpu(context_gic_cpu, 0).base;
+		per_cpu(context_gic_dist_cpu, i).base
+			= per_cpu(context_gic_dist_cpu, 0).base;
+	}
 
 	for (i = 0; i < ARRAY_SIZE(context_prcc); i++) {
 		const int clusters[] = {1, 2, 3, 5, 6};
