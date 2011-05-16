@@ -50,12 +50,14 @@
 #define NODE_HIBW2_DDR_IN_0_PRIORITY		0xC00
 #define NODE_HIBW2_DDR_IN_1_PRIORITY		0xC04
 #define NODE_HIBW2_DDR_IN_2_PRIORITY		0xC08
+#define NODE_HIBW2_DDR_IN_3_PRIORITY		0xC0C
 
-#define NODE_HIBW2_DDR_IN_0_LIMIT		0xC24
-#define NODE_HIBW2_DDR_IN_1_LIMIT		0xC28
-#define NODE_HIBW2_DDR_IN_2_LIMIT		0xC2C
+#define NODE_HIBW2_DDR_IN_0_LIMIT		0xC30
+#define NODE_HIBW2_DDR_IN_1_LIMIT		0xC34
+#define NODE_HIBW2_DDR_IN_2_LIMIT		0xC38
+#define NODE_HIBW2_DDR_IN_3_LIMIT		0xC3C
 
-#define NODE_HIBW2_DDR_OUT_0_PRIORITY		0xC30
+#define NODE_HIBW2_DDR_OUT_0_PRIORITY		0xC40
 
 #define NODE_ESRAM0_IN_0_PRIORITY		0x1000
 #define NODE_ESRAM0_IN_1_PRIORITY		0x1004
@@ -103,8 +105,8 @@ static struct {
 	u32 hibw2_esram_in_pri[2];
 	u32 hibw2_esram_in0_arblimit[3];
 	u32 hibw2_esram_in1_arblimit[3];
-	u32 hibw2_ddr_in_prio[3];
-	u32 hibw2_ddr_in_limit[3];
+	u32 hibw2_ddr_in_prio[4];
+	u32 hibw2_ddr_in_limit[4];
 	u32 hibw2_ddr_out_prio_reg;
 
 	/* ESRAM node registers */
@@ -187,6 +189,8 @@ void u5500_context_save_icn(void)
 		readl(context_icn.base + NODE_HIBW2_DDR_IN_1_PRIORITY);
 	context_icn.hibw2_ddr_in_prio[2] =
 		readl(context_icn.base + NODE_HIBW2_DDR_IN_2_PRIORITY);
+	context_icn.hibw2_ddr_in_prio[3] =
+		readl(context_icn.base + NODE_HIBW2_DDR_IN_3_PRIORITY);
 
 	context_icn.hibw2_ddr_in_limit[0] =
 		readl(context_icn.base + NODE_HIBW2_DDR_IN_0_LIMIT);
@@ -194,6 +198,8 @@ void u5500_context_save_icn(void)
 		readl(context_icn.base + NODE_HIBW2_DDR_IN_1_LIMIT);
 	context_icn.hibw2_ddr_in_limit[2] =
 		readl(context_icn.base + NODE_HIBW2_DDR_IN_2_LIMIT);
+	context_icn.hibw2_ddr_in_limit[3] =
+		readl(context_icn.base + NODE_HIBW2_DDR_IN_3_LIMIT);
 
 	context_icn.hibw2_ddr_out_prio_reg =
 		readl(context_icn.base + NODE_HIBW2_DDR_OUT_0_PRIORITY);
@@ -322,6 +328,8 @@ void u5500_context_restore_icn(void)
 	       context_icn.base + NODE_HIBW2_DDR_IN_1_PRIORITY);
 	writel(context_icn.hibw2_ddr_in_prio[2],
 	       context_icn.base + NODE_HIBW2_DDR_IN_2_PRIORITY);
+	writel(context_icn.hibw2_ddr_in_prio[3],
+	       context_icn.base + NODE_HIBW2_DDR_IN_3_PRIORITY);
 
 	writel(context_icn.hibw2_ddr_in_limit[0],
 	       context_icn.base + NODE_HIBW2_DDR_IN_0_LIMIT);
@@ -329,6 +337,8 @@ void u5500_context_restore_icn(void)
 	       context_icn.base + NODE_HIBW2_DDR_IN_1_LIMIT);
 	writel(context_icn.hibw2_ddr_in_limit[2],
 	       context_icn.base + NODE_HIBW2_DDR_IN_2_LIMIT);
+	writel(context_icn.hibw2_ddr_in_limit[3],
+	       context_icn.base + NODE_HIBW2_DDR_IN_3_LIMIT);
 
 	writel(context_icn.hibw2_ddr_out_prio_reg,
 	       context_icn.base + NODE_HIBW2_DDR_OUT_0_PRIORITY);
@@ -391,5 +401,5 @@ void u5500_context_restore_icn(void)
 
 void u5500_context_init(void)
 {
-	context_icn.base = ioremap(U5500_ICN_BASE, SZ_4K);
+	context_icn.base = ioremap(U5500_ICN_BASE, SZ_8K);
 }
