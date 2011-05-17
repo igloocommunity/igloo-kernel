@@ -372,7 +372,6 @@ static int enter_sleep(struct cpuidle_device *dev,
 	int ret;
 	int target;
 	struct cpu_state *state;
-	u32 divps_rate;
 	bool slept_well = false;
 	int this_cpu = smp_processor_id();
 
@@ -432,17 +431,9 @@ static int enter_sleep(struct cpuidle_device *dev,
 	/* Copy GIC interrupt settings to PRCMU interrupt settings */
 	ux500_pm_prcmu_copy_gic_settings();
 
-	/* Clean the cache before slowing down cpu frequency */
-	if (cstates[target].ARM == ARM_OFF)
-		context_clean_l1_cache_all();
-
-	divps_rate = ux500_pm_arm_on_ext_clk(cstates[target].ARM_PLL);
-
-	if (ux500_pm_prcmu_pending_interrupt()) {
+	if (ux500_pm_prcmu_pending_interrupt())
 		/* An interrupt found => abort */
-		ux500_pm_arm_on_arm_pll(divps_rate);
 		goto exit;
-	}
 
 	/* No PRCMU interrupt was pending => continue the sleeping stages */
 
