@@ -13,12 +13,12 @@
 #include <linux/platform_device.h>
 #include <linux/amba/bus.h>
 #include <linux/pm.h>
+#include <linux/gpio.h>
 
 #include <video/mcde_display.h>
 #include <video/mcde_display-av8100.h>
 #include <video/mcde_fb.h>
 
-#include <plat/gpio.h>
 extern struct dev_power_domain ux500_dev_power_domain;
 
 #include <mach/hardware.h>
