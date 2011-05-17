@@ -39,6 +39,8 @@ static enum arm_opp idx2opp[] = {
 
 static int __init u8500_cpufreq_register(void)
 {
+	int i = 0;
+
 	BUILD_BUG_ON(ARRAY_SIZE(idx2opp) + 1 != ARRAY_SIZE(freq_table));
 
 	if (cpu_is_u8500v2() && !prcmu_is_u8400()) {
@@ -47,6 +49,9 @@ static int __init u8500_cpufreq_register(void)
 		if (prcmu_has_arm_maxopp())
 			freq_table[2].frequency = 1000000;
 	}
+	pr_info("u8500-cpufreq : Available frequencies:\n");
+	while (freq_table[i].frequency != CPUFREQ_TABLE_END)
+		pr_info("  %d Mhz\n", freq_table[i++].frequency/1000);
 
 	return ux500_cpufreq_register(freq_table, idx2opp);
 }
