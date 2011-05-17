@@ -21,6 +21,27 @@
 #endif
 
 /*
+ * GPIO regulator controlled by the ab8500 GPIO16
+ */
+static struct regulator_consumer_supply gpio_wlan_vbat_consumers[] = {
+	/* for cg2900 chip */
+	REGULATOR_SUPPLY("vdd", "cg2900-uart.0"),
+	/* for cw1200 chip */
+	REGULATOR_SUPPLY("vdd", "cw1200_wlan"),
+};
+
+struct regulator_init_data gpio_wlan_vbat_regulator = {
+	.constraints = {
+		.name = "WLAN-VBAT",
+		.min_uV = 3600000,
+		.max_uV = 3600000,
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies = ARRAY_SIZE(gpio_wlan_vbat_consumers),
+	.consumer_supplies = gpio_wlan_vbat_consumers,
+};
+
+/*
  * TPS61052 regulator
  */
 static struct regulator_consumer_supply tps61052_vaudio_consumers[] = {
