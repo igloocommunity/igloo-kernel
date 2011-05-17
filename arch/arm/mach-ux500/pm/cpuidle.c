@@ -16,7 +16,7 @@
 #include <linux/tick.h>
 #include <linux/clockchips.h>
 
-#include <plat/gpio.h>
+#include <linux/gpio.h>
 
 #include <mach/prcmu-fw-api.h>
 

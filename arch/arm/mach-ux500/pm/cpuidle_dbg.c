@@ -21,7 +21,7 @@
 #include <linux/seq_file.h>
 #include <linux/amba/serial.h>
 
-#include <plat/gpio.h>
+#include <linux/gpio.h>
 #include <asm/hardware/gic.h>
 
 #include "cpuidle.h"
