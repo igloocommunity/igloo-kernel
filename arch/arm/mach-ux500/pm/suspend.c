@@ -1,11 +1,12 @@
 /*
  * Copyright (C) STMicroelectronics 2009
- * Copyright (C) ST-Ericsson SA 2010
+ * Copyright (C) ST-Ericsson SA 2010-2011
  *
  * License Terms: GNU General Public License v2
  *
  * Authors: Rickard Andersson <rickard.andersson@stericsson.com>,
- *          Sundar Iyer <sundar.iyer@stericsson.com> for ST-Ericsson
+ *	    Jonas Aaberg <jonas.aberg@stericsson.com>,
+ *          Sundar Iyer for ST-Ericsson.
  *
  */
 
@@ -51,7 +52,6 @@ static int suspend(bool do_deepsleep)
 {
 	bool pins_force = pins_suspend_force_mux && pins_suspend_force;
 	int ret = 0;
-	u32 divps_rate;
 
 	if (sleep_is_blocked()) {
 		pr_info("suspend/resume: interrupted by modem.\n");
@@ -87,12 +87,9 @@ static int suspend(bool do_deepsleep)
 	/* TODO: decouple gic should look at status bit.*/
 	udelay(100);
 
-	divps_rate = ux500_pm_arm_on_ext_clk(false);
-
 	if (ux500_pm_gic_pending_interrupt()) {
 		pr_info("suspend/resume: pending interrupt\n");
 
-		ux500_pm_arm_on_arm_pll(divps_rate);
 		/* Recouple GIC with the interrupt bus */
 		ux500_pm_gic_recouple();
 		ret = -EBUSY;
@@ -198,11 +195,11 @@ static void ux500_suspend_wake(void)
 }
 
 static struct platform_suspend_ops ux500_suspend_ops = {
-	.enter        = ux500_suspend_enter,
-	.valid        = ux500_suspend_valid,
+	.enter	      = ux500_suspend_enter,
+	.valid	      = ux500_suspend_valid,
 	.prepare_late = ux500_suspend_prepare_late,
-	.wake         = ux500_suspend_wake,
-	.begin        = ux500_suspend_dbg_begin,
+	.wake	      = ux500_suspend_wake,
+	.begin	      = ux500_suspend_dbg_begin,
 };
 
 static __init int ux500_suspend_init(void)
