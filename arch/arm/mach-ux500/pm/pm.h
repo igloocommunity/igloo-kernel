@@ -20,25 +20,6 @@ enum prcmu_idle_stat {
 };
 
 /**
- * ux500_pm_arm_on_ext_clk()
- *
- * @leave_arm_pll_on: True, if leave the ARM PLL on.
- *
- * returns divps_rate, used as input for ux500_pm_arm_on_arm_pll
- * or -EINVAL if already running on external clock.
- */
-int ux500_pm_arm_on_ext_clk(bool leave_arm_pll_on);
-
-/**
- * ux500_pm_arm_on_arm_pll()
- *
- * @divps_rate: Rate provided by ux500_pm_arm_on_ext_clk
- *
- * Restores the previous arm pll settings.
- */
-void ux500_pm_arm_on_arm_pll(int divps_rate);
-
-/**
  * ux500_pm_gic_decouple()
  *
  * Decouple GIC from the interrupt bus.
