@@ -129,8 +129,7 @@ static int twd_cpufreq_notifier(struct notifier_block *nb,
 	if (event == CPUFREQ_RESUMECHANGE ||
 	    (event == CPUFREQ_PRECHANGE && freq->new > freq->old) ||
 	    (event == CPUFREQ_POSTCHANGE && freq->new < freq->old))
-		smp_call_function_single(freq->cpu,
-			twd_update_cpu_frequency_on_cpu, freq, 1);
+		on_each_cpu(twd_update_cpu_frequency_on_cpu, freq, 1);
 
 	return 0;
 }
