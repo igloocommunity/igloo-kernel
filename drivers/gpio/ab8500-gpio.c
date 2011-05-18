@@ -413,7 +413,7 @@ static int __devinit ab8500_gpio_probe(struct platform_device *pdev)
 	int i;
 
 	pdata = ab8500_pdata->gpio;
-	if (!pdata)	{
+	if (!pdata) {
 		dev_err(&pdev->dev, "gpio platform data missing\n");
 		return -ENODEV;
 	}
@@ -430,24 +430,40 @@ static int __devinit ab8500_gpio_probe(struct platform_device *pdev)
 	ab8500_gpio->chip.dev = &pdev->dev;
 	ab8500_gpio->chip.base = pdata->gpio_base;
 	ab8500_gpio->irq_base = pdata->irq_base;
+
 	/* initialize the lock */
 	mutex_init(&ab8500_gpio->lock);
+
 	/*
 	 * AB8500 core will handle and clear the IRQ
-	 * configre GPIO based on config-reg value.
-	 * These values are for selecting the PINs as
-	 * GPIO or alternate function
+	 * configure GPIO based on initial_pins_{config, direction, pullups}
+	 * value.
+	 * These values are for selecting the PINs as GPIO
+	 * or alternative function
 	 */
-	for (i = AB8500_GPIO_SEL1_REG; i <= AB8500_GPIO_SEL6_REG; i++)	{
+	for (i = AB8500_GPIO_SEL1_REG; i <= AB8500_GPIO_SEL6_REG; i++) {
 		ret = abx500_set_register_interruptible(ab8500_gpio->dev,
 				AB8500_MISC, i,
-				pdata->config_reg[i]);
+				pdata->initial_pin_config[i]);
+		if (ret < 0)
+			goto out_free;
+
+		ret = abx500_set_register_interruptible(ab8500_gpio->dev,
+				AB8500_MISC, i + AB8500_GPIO_DIR1_REG,
+				pdata->initial_pin_direction[i]);
+		if (ret < 0)
+			goto out_free;
+
+		ret = abx500_set_register_interruptible(ab8500_gpio->dev,
+				AB8500_MISC, i + AB8500_GPIO_PUD1_REG,
+				pdata->initial_pin_pullups[i]);
 		if (ret < 0)
 			goto out_free;
 	}
+
 	ret = abx500_set_register_interruptible(ab8500_gpio->dev, AB8500_MISC,
 				AB8500_GPIO_ALTFUN_REG,
-				pdata->config_reg[ALTFUN_REG_INDEX]);
+				pdata->initial_pin_config[ALTFUN_REG_INDEX]);
 	if (ret < 0)
 		goto out_free;
 
