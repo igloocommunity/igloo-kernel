@@ -483,13 +483,13 @@ fail:
 int prcmu_debug_init(void)
 {
 	ape_sh = kzalloc(sizeof(struct ape_state_history), GFP_KERNEL);
-	if (ape_sh < 0) {
+	if (ape_sh == NULL) {
 		pr_err("prcmu debug: kzalloc failed\n");
 		return -ENOMEM;
 	}
 
 	ddr_sh = kzalloc(sizeof(struct ddr_state_history), GFP_KERNEL);
-	if (ddr_sh < 0) {
+	if (ddr_sh == NULL) {
 		pr_err("prcmu debug: kzalloc failed\n");
 		return -ENOMEM;
 	}
