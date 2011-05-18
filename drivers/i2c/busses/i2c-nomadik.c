@@ -135,18 +135,19 @@ struct i2c_nmk_client {
 };
 
 /**
- * struct nmk_i2c_dev - private data structure of the controller
- * @pdev: parent platform device
- * @adap: corresponding I2C adapter
- * @irq: interrupt line for the controller
- * @virtbase: virtual io memory area
- * @clk: hardware i2c block clock
- * @cfg: machine provided controller configuration
- * @cli: holder of client specific data
- * @stop: stop condition
- * @xfer_complete: acknowledge completion for a I2C message
- * @result: controller propogated result
- * @busy: Busy doing transfer
+ * struct nmk_i2c_dev - private data structure of the controller.
+ * @pdev: parent platform device.
+ * @adap: corresponding I2C adapter.
+ * @irq: interrupt line for the controller.
+ * @virtbase: virtual io memory area.
+ * @clk: hardware i2c block clock.
+ * @cfg: machine provided controller configuration.
+ * @cli: holder of client specific data.
+ * @stop: stop condition.
+ * @xfer_complete: acknowledge completion for a I2C message.
+ * @result: controller propogated result.
+ * @regulator: pointer to i2c regulator.
+ * @busy: Busy doing transfer.
  */
 struct nmk_i2c_dev {
 	struct platform_device		*pdev;
@@ -683,7 +684,7 @@ out:
 /**
  * disable_interrupts() - disable the interrupts
  * @dev: private data of controller
- * @irq: interrupt number
+ * @irq: interrupt number.
  */
 static int disable_interrupts(struct nmk_i2c_dev *dev, u32 irq)
 {
