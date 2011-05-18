@@ -314,10 +314,10 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
 	 */
 	INIT_REGULATOR_REGISTER(AB8500_VSMPS1REGU,             0x06),
 	/*
-	 * Vsmps2Regu               = force HP
+	 * Vsmps2Regu               = HW control
 	 * Vsmps2SelCtrl            = Vsmps2 voltage defined by Vsmsp2Sel2
 	 */
-	INIT_REGULATOR_REGISTER(AB8500_VSMPS2REGU,             0x05),
+	INIT_REGULATOR_REGISTER(AB8500_VSMPS2REGU,             0x06),
 	/*
 	 * Vsmps3Sel2               = 1.2125 V
 	 * NOTE! PRCMU register
@@ -361,11 +361,11 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
 	 * Vrf1Regu                 = HW control
 	 * Vaux3Regu                = force off
 	 */
-	INIT_REGULATOR_REGISTER(AB8500_VRF1VAUX3REGU,          0x08),
+	INIT_REGULATOR_REGISTER(AB8500_VRF1VAUX3REGU, 0x08),
 	/*
-	 * Vsmps1                   = 1.15V
+	 * Vsmps1Sel1               = 1.2 V
 	 */
-	INIT_REGULATOR_REGISTER(AB8500_VSMPS1SEL1, 0x24),
+	INIT_REGULATOR_REGISTER(AB8500_VSMPS1SEL1, 0x28),
 	/*
 	 * Vaux1Sel                 = 2.5 V
 	 */
