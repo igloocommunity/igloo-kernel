@@ -160,6 +160,7 @@ struct ab8500_charger_usb_state {
 	bool usb_changed;
 	int usb_current;
 	enum ab8500_usb_state state;
+	spinlock_t usb_lock;
 };
 
 /**
@@ -1492,13 +1493,17 @@ static void ab8500_charger_usb_link_status_work(struct work_struct *work)
 static void ab8500_charger_usb_state_changed_work(struct work_struct *work)
 {
 	int ret;
+	unsigned long flags;
+
 	struct ab8500_charger *di = container_of(work,
 		struct ab8500_charger, usb_state_changed_work);
 
 	if (!di->vbus_detected)
 		return;
 
+	spin_lock_irqsave(&di->usb_state.usb_lock, flags);
 	di->usb_state.usb_changed = false;
+	spin_unlock_irqrestore(&di->usb_state.usb_lock, flags);
 
 	/*
 	 * wait for some time until you get updates from the usb stack
@@ -2198,7 +2203,10 @@ static int ab8500_charger_usb_notifier_call(struct notifier_block *nb,
 	dev_dbg(di->dev, "%s usb_state: 0x%02x mA: %d\n",
 		__func__, bm_usb_state, mA);
 
+	spin_lock(&di->usb_state.usb_lock);
 	di->usb_state.usb_changed = true;
+	spin_unlock(&di->usb_state.usb_lock);
+
 	di->usb_state.state = bm_usb_state;
 	di->usb_state.usb_current = mA;
 
@@ -2317,6 +2325,9 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 	di->dev = &pdev->dev;
 	di->parent = dev_get_drvdata(pdev->dev.parent);
 	di->gpadc = ab8500_gpadc_get();
+
+	/* initialize lock */
+	spin_lock_init(&di->usb_state.usb_lock);
 
 	plat = dev_get_platdata(di->parent->dev);
 
