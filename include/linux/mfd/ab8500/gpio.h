@@ -15,7 +15,9 @@
 struct ab8500_gpio_platform_data {
 	int gpio_base;
 	u32 irq_base;
-	u8  config_reg[7];
+	u8  initial_pin_config[7];
+	u8  initial_pin_direction[6];
+	u8  initial_pin_pullups[6];
 };
 
 int ab8500_config_pull_up_or_down(struct device *dev,
