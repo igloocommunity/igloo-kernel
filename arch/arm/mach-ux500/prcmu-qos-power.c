@@ -100,7 +100,7 @@ static DEFINE_SPINLOCK(prcmu_qos_lock);
 
 static unsigned long cpufreq_opp_delay = HZ / 5;
 
-unsigned long prcmu_qos_get_cpufreq_opp_delay()
+unsigned long prcmu_qos_get_cpufreq_opp_delay(void)
 {
 	return cpufreq_opp_delay;
 }
@@ -247,7 +247,7 @@ int prcmu_qos_add_requirement(int prcmu_qos_class, char *name, s32 value)
 	unsigned long flags;
 
 	dep = kzalloc(sizeof(struct requirement_list), GFP_KERNEL);
-	if (dep < 0)
+	if (dep == NULL)
 		return -ENOMEM;
 
 	if (value == PRCMU_QOS_DEFAULT_VALUE)
