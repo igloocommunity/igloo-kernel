@@ -14,7 +14,7 @@
 #include <linux/i2s/i2s.h>
 #include <linux/mfd/abx500.h>
 #include <linux/led-lm3530.h>
-#include <../../../drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h>
+#include <../drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h>
 #include <linux/input/matrix_keypad.h>
 #include <linux/lsm303dlh.h>
 #include <linux/leds-ab5500.h>
