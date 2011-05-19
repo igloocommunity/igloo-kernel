@@ -172,6 +172,10 @@ static struct regulator_consumer_supply db8500_b2r2_mcde_consumers[] = {
 	REGULATOR_SUPPLY("vsupply", "mcde"),
 };
 
+static struct regulator_consumer_supply db8500_sga_consumers[] = {
+	REGULATOR_SUPPLY("v-mali", NULL),
+};
+
 /* ESRAM3 and 4 regulator switch */
 static struct regulator_consumer_supply u8500_esram34_consumers[] = {
 	REGULATOR_SUPPLY("v-esram34", "mcde"),
@@ -278,6 +282,9 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 			.name = "db8500-sga",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.consumer_supplies = db8500_sga_consumers,
+		.num_consumer_supplies = ARRAY_SIZE(db8500_sga_consumers),
+
 	},
 	[DB8500_REGULATOR_SWITCH_B2R2_MCDE] = {
 		.supply_regulator = "db8500-vape",
