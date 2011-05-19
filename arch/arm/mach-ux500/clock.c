@@ -60,7 +60,7 @@ static void __clk_unlock(struct clk *clk, void *last_lock, unsigned long flags)
 	}
 }
 
-static void __clk_disable(struct clk *clk, void *current_lock)
+void __clk_disable(struct clk *clk, void *current_lock)
 {
 	unsigned long flags;
 
@@ -81,7 +81,7 @@ static void __clk_disable(struct clk *clk, void *current_lock)
 	return;
 }
 
-static int __clk_enable(struct clk *clk, void *current_lock)
+int __clk_enable(struct clk *clk, void *current_lock)
 {
 	int err;
 	unsigned long flags;

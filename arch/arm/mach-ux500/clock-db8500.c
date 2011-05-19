@@ -13,6 +13,7 @@
 #include <linux/clk.h>
 #include <linux/errno.h>
 #include <linux/mutex.h>
+#include <linux/delay.h>
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/debugfs.h>
@@ -41,7 +42,7 @@
 static DEFINE_MUTEX(soc1_pll_mutex);
 static DEFINE_MUTEX(sysclk_mutex);
 static DEFINE_MUTEX(ab_ulpclk_mutex);
-static DEFINE_MUTEX(audioclk_mutex);
+static DEFINE_MUTEX(ab_intclk_mutex);
 
 static struct delayed_work sysclk_disable_work;
 
@@ -139,26 +140,34 @@ static int ab_ulpclk_enable(struct clk *clk)
 		clk->regulator = reg;
 	}
 	err = regulator_enable(clk->regulator);
-	if (err)
-		return err;
+	if (unlikely(err))
+		goto regulator_enable_error;
 	err = ab8500_sysctrl_clear(AB8500_SYSULPCLKCONF,
 		AB8500_SYSULPCLKCONF_ULPCLKCONF_MASK);
-	if (err)
-		return err;
-	return ab8500_sysctrl_set(AB8500_SYSULPCLKCTRL1,
-		(AB8500_SYSULPCLKCTRL1_ULPCLKREQ |
-		 AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK));
+	if (unlikely(err))
+		goto enable_error;
+	err = ab8500_sysctrl_set(AB8500_SYSULPCLKCTRL1,
+		AB8500_SYSULPCLKCTRL1_ULPCLKREQ);
+	if (unlikely(err))
+		goto enable_error;
+	/* Unknown/undocumented PLL locking time => wait 1 ms. */
+	msleep(1);
+	return 0;
+
+enable_error:
+	(void)regulator_disable(clk->regulator);
+regulator_enable_error:
+	return err;
 }
 
 static void ab_ulpclk_disable(struct clk *clk)
 {
-	if (ab8500_sysctrl_clear(AB8500_SYSULPCLKCTRL1,
-		AB8500_SYSULPCLKCTRL1_ULPCLKREQ))
+	int err;
+
+	err = ab8500_sysctrl_clear(AB8500_SYSULPCLKCTRL1,
+		AB8500_SYSULPCLKCTRL1_ULPCLKREQ);
+	if (unlikely(regulator_disable(clk->regulator) || err))
 		goto out_err;
-	if (clk->regulator != NULL) {
-		if (regulator_disable(clk->regulator))
-			goto out_err;
-	}
 	return;
 
 out_err:
@@ -168,6 +177,41 @@ out_err:
 static struct clkops ab_ulpclk_ops = {
 	.enable = ab_ulpclk_enable,
 	.disable = ab_ulpclk_disable,
+};
+
+/* AB8500 intclk operations */
+
+static int ab_intclk_set_parent(struct clk *clk, struct clk *parent)
+{
+	int err;
+
+	if (clk->enabled) {
+		err = __clk_enable(parent, clk->mutex);
+		if (unlikely(err))
+			goto parent_enable_error;
+	}
+	if (parent->ops == &ab_ulpclk_ops) {
+		err = ab8500_sysctrl_write(AB8500_SYSULPCLKCTRL1,
+			AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK,
+			(1 << AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_SHIFT));
+	} else {
+		err = ab8500_sysctrl_clear(AB8500_SYSULPCLKCTRL1,
+			AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK);
+	}
+	if (unlikely(err))
+		goto config_error;
+	if (clk->enabled)
+		__clk_disable(clk->parent, clk->mutex);
+	return 0;
+
+config_error:
+	__clk_disable(parent, clk->mutex);
+parent_enable_error:
+	return err;
+}
+
+static struct clkops ab_intclk_ops = {
+	.set_parent = ab_intclk_set_parent,
 };
 
 /* AB8500 audio clock operations */
@@ -409,14 +453,21 @@ static struct clk ab_ulpclk = {
 	.mutex = &ab_ulpclk_mutex,
 };
 
-static struct clk *audioclk_parents[] = { &sysclk, &ab_ulpclk, NULL };
+static struct clk *ab_intclk_parents[] = { &sysclk, &ab_ulpclk, NULL };
+
+static struct clk ab_intclk = {
+	.name = "ab_intclk",
+	.ops = &ab_intclk_ops,
+	.mutex = &ab_intclk_mutex,
+	.parent = &sysclk,
+	.parents = ab_intclk_parents,
+};
 
 static struct clk audioclk = {
 	.name = "audioclk",
 	.ops = &audioclk_ops,
-	.mutex = &audioclk_mutex,
-	.parent = &sysclk,
-	.parents = audioclk_parents,
+	.mutex = &ab_intclk_mutex,
+	.parent = &ab_intclk,
 };
 
 static DEF_PRCMU_CLK(sgaclk, PRCMU_SGACLK, 320000000);
@@ -948,10 +999,11 @@ static struct clk_lookup u8500_common_clock_sources[] = {
 	CLK_LOOKUP(sysclk, "ab8500-usb.0", "sysclk"),
 	CLK_LOOKUP(sysclk, "ab8500-codec.0", "sysclk"),
 	CLK_LOOKUP(ab_ulpclk, "ab8500-codec.0", "ulpclk"),
+	CLK_LOOKUP(ab_intclk, "ab8500-codec.0", "intclk"),
 	CLK_LOOKUP(audioclk, "ab8500-codec.0", "audioclk"),
-	CLK_LOOKUP(ab_ulpclk, "ab8500-pwm.1", NULL),
-	CLK_LOOKUP(ab_ulpclk, "ab8500-pwm.2", NULL),
-	CLK_LOOKUP(ab_ulpclk, "ab8500-pwm.3", NULL),
+	CLK_LOOKUP(ab_intclk, "ab8500-pwm.1", NULL),
+	CLK_LOOKUP(ab_intclk, "ab8500-pwm.2", NULL),
+	CLK_LOOKUP(ab_intclk, "ab8500-pwm.3", NULL),
 };
 
 static struct clk_lookup u8500_v2_sysclks[] = {
