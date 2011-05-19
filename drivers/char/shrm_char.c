@@ -24,8 +24,8 @@
 
 
 #define NAME "IPC_ISA"
-/* L2 header for common loopback device is 0xc0 and hence 0xc0+1 = 193*/
-#define MAX_L2_HEADERS 193
+/* L2 header for ciq device is 0xc3 and hence 0xc3+1 = 196*/
+#define MAX_L2_HEADERS 196
 
 #define SIZE_OF_FIFO (512*1024)
 
@@ -48,6 +48,7 @@ static struct map_device map_dev[] = {
 	{SECURITY_MESSAGING, 3, "sec"},
 	{COMMON_LOOPBACK_MESSAGING, 4, "common_loopback"},
 	{AUDIO_LOOPBACK_MESSAGING, 5, "audio_loopback"},
+	{CIQ_MESSAGING, 6, "ciq"},
 };
 
 /*
@@ -482,6 +483,10 @@ ssize_t isa_write(struct file *filp, const char __user *buf,
 		dev_dbg(shrm->dev, "Audio loopback\n");
 		addr = isadev->addr;
 		break;
+	case CIQ_MESSAGING:
+		dev_dbg(shrm->dev, "CIQ\n");
+		addr = isadev->addr;
+		break;
 	default:
 		dev_dbg(shrm->dev, "Wrong device\n");
 		return -EFAULT;
@@ -636,6 +641,10 @@ static int isa_close(struct inode *inode, struct file *filp)
 		kfree(isadev->addr);
 		dev_info(shrm->dev, "Close AUDIO_LOOPBACK_MESSAGING Device\n");
 		break;
+	case CIQ_MESSAGING:
+		kfree(isadev->addr);
+		dev_info(shrm->dev, "Close CIQ_MESSAGING Device\n");
+		break;
 	default:
 		dev_info(shrm->dev, "No such device present\n");
 		mutex_unlock(&isa_lock);
@@ -682,7 +691,8 @@ static int isa_open(struct inode *inode, struct file *filp)
 				(m != AUDIO_LOOPBACK_MESSAGING) &&
 				(m != COMMON_LOOPBACK_MESSAGING) &&
 				(m != AUDIO_MESSAGING) &&
-				(m != SECURITY_MESSAGING)) {
+				(m != SECURITY_MESSAGING) &&
+				(m != CIQ_MESSAGING)) {
 		dev_err(shrm->dev, "No such device present\n");
 		mutex_unlock(&isa_lock);
 		return -ENODEV;
@@ -727,6 +737,14 @@ static int isa_open(struct inode *inode, struct file *filp)
 			return -ENOMEM;
 		}
 		dev_info(shrm->dev, "Open AUDIO_LOOPBACK_MESSAGING Device\n");
+		break;
+	case CIQ_MESSAGING:
+		isadev->addr = kzalloc(10 * 1024, GFP_KERNEL);
+		if (!isadev->addr) {
+			mutex_unlock(&isa_lock);
+			return -ENOMEM;
+		}
+		dev_info(shrm->dev, "Open CIQ_MESSAGING Device\n");
 		break;
 	};
 
