@@ -368,40 +368,41 @@ ENTRY(ux500_clean_l2_cache_all)
  * Last saves and WFI
  *
  * r0 = address to backup_sram_storage base adress
- * r1 = indicate whether L1 and L2 cache should be cleaned
+ * r1 = indicate whether L1 cache should be cleaned
+ * r2 = indicate whether L2 cache should be cleaned
  */
 	.align 4
 	.section ".text", "ax"
 ENTRY(context_save_to_sram_and_wfi_internal)
 
-	stmfd sp!, {r2-r12, lr}			@ save on stack.
+	stmfd sp!, {r3-r12, lr}			@ save on stack.
 
-	mrc p15, 0, r2, c1, c0, 0		@ read cp15 system control
+	mrc p15, 0, r3, c1, c0, 0		@ read cp15 system control
 	                                        @ register
-	str r2, [r0, #0x00]
-	mrc p15, 0, r2, c2, c0, 0		@ read cp15 ttb0 register
-	str r2, [r0, #0x04]
-	mrc p15, 0, r2, c2, c0, 1		@ read cp15 ttb1 register
-	str r2, [r0, #0x08]
-	mrc p15, 0, r2, c2, c0, 2		@ read cp15 ttb control register
-	str r2, [r0, #0x0C]
-	mrc p15, 0, r2, c3, c0, 0		@ read domain access control
+	str r3, [r0, #0x00]
+	mrc p15, 0, r3, c2, c0, 0		@ read cp15 ttb0 register
+	str r3, [r0, #0x04]
+	mrc p15, 0, r3, c2, c0, 1		@ read cp15 ttb1 register
+	str r3, [r0, #0x08]
+	mrc p15, 0, r3, c2, c0, 2		@ read cp15 ttb control register
+	str r3, [r0, #0x0C]
+	mrc p15, 0, r3, c3, c0, 0		@ read domain access control
 	                                        @ register
-	str r2, [r0, #0x10]
+	str r3, [r0, #0x10]
 
-	ldr r2, =return_here
-	str r2, [r0, #0x14]			@ save program counter restore
+	ldr r3, =return_here
+	str r3, [r0, #0x14]			@ save program counter restore
 	                                        @ value to backup_sram_storage
-	mrs r2, cpsr
-	str r2, [r0, #0x18]			@ save cpsr to
+	mrs r3, cpsr
+	str r3, [r0, #0x18]			@ save cpsr to
 	                                        @ backup_sram_storage
 	str sp, [r0, #0x1c]			@ save sp to backup_sram_storage
 
-	mov r4, r1				@ Set r4 = cleanL2cache, r2
+	mov r4, r2				@ Set r5 = cleanL2cache, r2
 	                                        @ will be destroyed by
 	                                        @ v7_clean_l1_cache_all
 	dsb
-	cmp r4, #0
+	cmp r1, #0
 
 	blne context_clean_l1_cache_all		@ Commit all dirty data in L1
 	                                        @ cache to L2 without
@@ -409,7 +410,7 @@ ENTRY(context_save_to_sram_and_wfi_internal)
 	dsb
 	cmp r4, #0
 
-	blne ux500_clean_l2_cache_all		@ If r2 != FALSE then clean all
+	blne ux500_clean_l2_cache_all		@ If r4 != FALSE then clean all
 	                                        @ dirty data in L2 cache, no
 	                                        @ invalidate
 
@@ -423,5 +424,5 @@ return_here:					@ both cores return here
 	                                        @ with all the context lost
 	                                        @ except pc, sp and cpsr
 
-	ldmfd sp!, {r2-r12, pc}			@ restore from stack
+	ldmfd sp!, {r3-r12, pc}			@ restore from stack
 

@@ -113,7 +113,7 @@ static int suspend(bool do_deepsleep)
 
 		(void) prcmu_set_power_state(PRCMU_AP_DEEP_SLEEP,
 					     false, false);
-		context_save_to_sram_and_wfi(true);
+		context_save_to_sram_and_wfi(true, true);
 
 		context_restore_cpu_registers();
 		context_varm_restore_core();
