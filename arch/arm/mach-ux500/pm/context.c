@@ -818,12 +818,14 @@ void context_restore_cpu_registers(void)
  * and return address for the PC in backup SRAM and
  * does wait for interrupt.
  */
-void context_save_to_sram_and_wfi(bool cleanL2cache)
+void context_save_to_sram_and_wfi(bool cleanL1cache,
+				  bool cleanL2cache)
 {
 	int cpu = smp_processor_id();
 
 	if (cpu_is_u8500())
 		context_save_to_sram_and_wfi_internal(backup_sram_storage[cpu],
+						      cleanL1cache,
 						      cleanL2cache);
 	else if (cpu_is_u5500())
 		__asm__ __volatile__("wfi\n" : : : "memory");
