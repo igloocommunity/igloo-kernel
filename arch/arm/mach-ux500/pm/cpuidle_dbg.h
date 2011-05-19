@@ -1,5 +1,5 @@
 /*
- * Copyright (C) ST-Ericsson SA 2010
+ * Copyright (C) ST-Ericsson SA 2010-2011
  *
  * License Terms: GNU General Public License v2
  * Author: Rickard Andersson <rickard.andersson@stericsson.com> for ST-Ericsson
@@ -14,7 +14,7 @@ void ux500_ci_dbg_init(void);
 void ux500_ci_dbg_remove(void);
 
 void ux500_ci_dbg_log(int ctarget, ktime_t enter_time);
-void ux500_ci_dbg_wake_latency(int ctarget);
+void ux500_ci_dbg_wake_latency(int ctarget, int sleep_time);
 void ux500_ci_dbg_exit_latency(int ctarget, ktime_t now, ktime_t exit,
 			       ktime_t enter, bool timed_out);
 void ux500_ci_dbg_wake_timer(bool timed);
@@ -44,7 +44,7 @@ static inline void ux500_ci_dbg_log(int ctarget,
 static inline void ux500_ci_dbg_exit_latency(int ctarget,
 					     ktime_t now, ktime_t exit,
 					     ktime_t enter, bool timed_out) { }
-static inline void ux500_ci_dbg_wake_latency(int ctarget) { }
+static inline void ux500_ci_dbg_wake_latency(int ctarget, int sleep_time) { }
 
 static inline bool ux500_ci_dbg_force_ape_on(void)
 {
