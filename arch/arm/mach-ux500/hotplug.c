@@ -34,7 +34,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
 		context_varm_save_core();
 		context_save_cpu_registers();
 
-		context_save_to_sram_and_wfi(false);
+		context_save_to_sram_and_wfi(true, false);
 
 		context_restore_cpu_registers();
 		context_varm_restore_core();
