@@ -127,6 +127,8 @@ extern struct clkops sga_clk_ops;
 /* Functions defined in clock.c */
 int __init clk_init(void);
 void clks_register(struct clk_lookup *clks, size_t num);
+int __clk_enable(struct clk *clk, void *current_lock);
+void __clk_disable(struct clk *clk, void *current_lock);
 unsigned long __clk_get_rate(struct clk *clk, void *current_lock);
 
 #ifdef CONFIG_DEBUG_FS
