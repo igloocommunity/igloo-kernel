@@ -307,19 +307,32 @@ void ux500_ci_dbg_exit_latency(int ctarget, ktime_t now, ktime_t exit,
 		      true);
 }
 
-void ux500_ci_dbg_wake_latency(int ctarget)
+void ux500_ci_dbg_wake_latency(int ctarget, int sleep_time)
 {
 	struct state_history *sh;
 	ktime_t l;
 	ktime_t zero_time;
 
-	if (!measure_latency || cstates[ctarget].state < CI_SLEEP)
+	if (!wake_latency || cstates[ctarget].state < CI_IDLE)
 		return;
 
 	zero_time = ktime_set(0, 0);
 	sh = per_cpu(state_history, smp_processor_id());
 
-	l = u8500_rtc_exit_latency_get();
+	if (cstates[ctarget].state == CI_SLEEP)
+		l = u8500_rtc_exit_latency_get();
+
+	if (cstates[ctarget].state == CI_IDLE) {
+		ktime_t d = ktime_set(0, sleep_time*1000);
+		ktime_t now = ktime_get();
+
+		d = ktime_add(d, sh->start);
+		if (ktime_to_us(now) > ktime_to_us(d))
+			l = ktime_sub(now, d);
+		else
+			l = zero_time;
+	}
+
 	if (!ktime_equal(zero_time, l))
 		store_latency(sh,
 			      ctarget,

@@ -276,10 +276,10 @@ static bool is_last_cpu_running(void)
 	return atomic_read(&idle_cpus_counter) == num_online_cpus();
 }
 
-static int determine_sleep_state(void)
+static int determine_sleep_state(u32 *sleep_time)
 {
 	int i;
-	int sleep_time;
+
 	int cpu;
 	int max_depth;
 	bool power_state_req;
@@ -303,9 +303,9 @@ static int determine_sleep_state(void)
 	power_state_req = power_state_active_is_enabled() ||
 		prcmu_is_ac_wake_requested();
 
-	sleep_time = get_remaining_sleep_time(NULL, NULL);
+	(*sleep_time) = get_remaining_sleep_time(NULL, NULL);
 
-	if (sleep_time == UINT_MAX)
+	if ((*sleep_time) == UINT_MAX)
 		return CI_WFI;
 	/*
 	 * Never go deeper than the governor recommends even though it might be
@@ -320,7 +320,7 @@ static int determine_sleep_state(void)
 
 	for (i = max_depth; i > 0; i--) {
 
-		if (sleep_time <= cstates[i].threshold)
+		if ((*sleep_time) <= cstates[i].threshold)
 			continue;
 
 		if (cstates[i].APE == APE_OFF) {
@@ -342,7 +342,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 {
 	ktime_t time_enter, time_exit, time_wake;
 	ktime_t wake_up;
-	u32 sleep_time;
+	int sleep_time = 0;
 	s64 diff;
 	int ret;
 	int target;
@@ -378,7 +378,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 	 * Determine sleep state considering both CPUs and
 	 * shared resources like e.g. VAPE
 	 */
-	target = determine_sleep_state();
+	target = determine_sleep_state(&sleep_time);
 
 	if (target < 0)
 		/* "target" will be last_state in the cpuidle framework */
@@ -505,7 +505,8 @@ static int enter_sleep(struct cpuidle_device *dev,
 		context_save_to_sram_and_wfi(cstates[state->gov_cstate].ARM == ARM_OFF,
 					     cstates[target].ARM == ARM_OFF);
 
-	ux500_ci_dbg_wake_latency(target);
+	if (is_last_cpu_running())
+		ux500_ci_dbg_wake_latency(target, sleep_time);
 
 	time_wake = ktime_get();
 
@@ -541,8 +542,6 @@ exit_fast:
 	state->sched_wake_up = wake_up;
 	spin_unlock(&cpuidle_lock);
 
-	atomic_dec(&idle_cpus_counter);
-
 	/*
 	 * We might have chosen another state than what the
 	 * governor recommended
@@ -574,6 +573,8 @@ exit_fast:
 	}
 
 	ux500_ci_dbg_log(CI_RUNNING, time_exit);
+
+	atomic_dec(&idle_cpus_counter);
 
 	local_irq_enable();
 
