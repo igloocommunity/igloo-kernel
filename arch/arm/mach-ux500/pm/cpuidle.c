@@ -27,11 +27,32 @@
 #include "timer.h"
 #include "../regulator-db8500.h"
 
+/*
+ * All measurements are with two cpus online (worst case) and at
+ * 200 MHz (worst case)
+ *
+ * Enter latency depends on cpu frequency, and is only depending on
+ * code executing on the ARM.
+ * Exit latency is both depending on "wake latency" which is the
+ * time between the PRCMU has gotten the interrupt and the ARM starts
+ * to execute and the time before everything is done on the ARM.
+ * The wake latency is more or less constant related to cpu frequency,
+ * but can differ depending on what the modem does.
+ * Wake latency is not included for plain WFI.
+ * For states that uses RTC (Sleep & DeepSleep), wake latency is reduced
+ * from clock programming timeout.
+ *
+ */
 #define DEEP_SLEEP_WAKE_UP_LATENCY 8500
 /* Exit latency from ApSleep is measured to be around 1.0 to 1.5 ms */
 #define MIN_SLEEP_WAKE_UP_LATENCY 1000
 #define MAX_SLEEP_WAKE_UP_LATENCY 1500
 #define UL_PLL_START_UP_LATENCY 8000 /* us */
+/*
+ * There must be at least 4 32 kHz cycles between each write to the RTC RTT
+ * CR register.
+ */
+#define RTC_LATENCY 120
 
 static struct cstate cstates[] = {
 	{
@@ -49,6 +70,7 @@ static struct cstate cstates[] = {
 		.desc = "Running                ",
 	},
 	{
+		/* These figures are not really true. There is a cost for WFI */
 		.enter_latency = 0,
 		.exit_latency = 0,
 		.threshold = 0,
@@ -64,8 +86,8 @@ static struct cstate cstates[] = {
 		.desc = "Wait for interrupt     ",
 	},
 	{
-		.enter_latency = 40,
-		.exit_latency = 50,
+		.enter_latency = 60,
+		.exit_latency = 60,
 		.threshold = 150,
 		.power_usage = 5,
 		.APE = APE_ON,
@@ -79,8 +101,8 @@ static struct cstate cstates[] = {
 		.desc = "ApIdle                 ",
 	},
 	{
-		.enter_latency = 45,
-		.exit_latency = 50,
+		.enter_latency = 70,
+		.exit_latency = 70,
 		.threshold = 160,
 		.power_usage = 4,
 		.APE = APE_ON,
@@ -94,13 +116,13 @@ static struct cstate cstates[] = {
 		.desc = "ApIdle, ARM PLL off    ",
 	},
 	{
-		.enter_latency = 120,
+		.enter_latency = 250,
 		.exit_latency = MAX_SLEEP_WAKE_UP_LATENCY,
 		/*
 		 * Note: Sleep time must be longer than 120 us or else
 		 * there might be issues with the RTC-RTT block.
 		 */
-		.threshold = MAX_SLEEP_WAKE_UP_LATENCY + 120 + 200,
+		.threshold = MAX_SLEEP_WAKE_UP_LATENCY + 250 + RTC_LATENCY,
 		.power_usage = 3,
 		.APE = APE_OFF,
 		.ARM = ARM_RET,
@@ -113,11 +135,11 @@ static struct cstate cstates[] = {
 		.desc = "ApSleep                ",
 	},
 	{
-		.enter_latency = 150,
+		.enter_latency = 250,
 		.exit_latency = (MAX_SLEEP_WAKE_UP_LATENCY +
-				   UL_PLL_START_UP_LATENCY),
-		.threshold = (2 * (MAX_SLEEP_WAKE_UP_LATENCY +
-				   UL_PLL_START_UP_LATENCY + 200)),
+				 UL_PLL_START_UP_LATENCY),
+		.threshold = (MAX_SLEEP_WAKE_UP_LATENCY +
+			      UL_PLL_START_UP_LATENCY + 250 + RTC_LATENCY),
 		.power_usage = 2,
 		.APE = APE_OFF,
 		.ARM = ARM_RET,
@@ -131,9 +153,9 @@ static struct cstate cstates[] = {
 	},
 #ifdef ENABLE_AP_DEEP_IDLE
 	{
-		.enter_latency = 160,
+		.enter_latency = 300,
 		.exit_latency = DEEP_SLEEP_WAKE_UP_LATENCY,
-		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 160 + 50,
+		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 300 + RTC_LATENCY,
 		.power_usage = 2,
 		.APE = APE_ON,
 		.ARM = ARM_OFF,
@@ -147,9 +169,9 @@ static struct cstate cstates[] = {
 	},
 #endif
 	{
-		.enter_latency = 200,
+		.enter_latency = 310,
 		.exit_latency = DEEP_SLEEP_WAKE_UP_LATENCY,
-		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 200 + 50,
+		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 310 + RTC_LATENCY,
 		.power_usage = 1,
 		.APE = APE_OFF,
 		.ARM = ARM_OFF,
