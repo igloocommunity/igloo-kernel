@@ -18,7 +18,7 @@
 
 #include <linux/gpio.h>
 
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 
 #include "cpuidle.h"
 #include "cpuidle_dbg.h"
@@ -65,7 +65,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_ON,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
-		.pwrst = NO_TRANSITION,
+		.pwrst = PRCMU_AP_NO_CHANGE,
 		.state = CI_RUNNING,
 		.desc = "Running                ",
 	},
@@ -80,7 +80,7 @@ static struct cstate cstates[] = {
 		.ARM_PLL = ARM_PLL_ON,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
-		.pwrst = NO_TRANSITION,
+		.pwrst = PRCMU_AP_NO_CHANGE,
 		.flags = CPUIDLE_FLAG_TIME_VALID,
 		.state = CI_WFI,
 		.desc = "Wait for interrupt     ",

@@ -24,7 +24,7 @@
 #include <mach/hardware.h>
 #include <mach/setup.h>
 #include <video/mcde.h>
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 #include <mach/prcmu-regs.h>
 #include <mach/hsi.h>
 #include <mach/ste-dma40-db8500.h>

@@ -12,7 +12,7 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 
 #include "regulator-ux500.h"
 #include "regulator-db8500.h"

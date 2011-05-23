@@ -16,7 +16,7 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 
 enum ape_opp_debug {
 	APE_50_OPP_DEBUG,
