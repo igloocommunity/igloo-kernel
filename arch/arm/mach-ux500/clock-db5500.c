@@ -24,11 +24,10 @@
 #include <plat/pincfg.h>
 
 #include <mach/hardware.h>
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 
 #include "clock.h"
 #include "pins-db5500.h"
-#include "prcmu-db5500.h"
 #include "prcmu-regs-db5500.h"
 
 static DEFINE_MUTEX(sysclk_mutex);
@@ -60,7 +59,7 @@ static int request_sysclk(bool enable)
 	static int requests;
 
 	if ((enable && (requests++ == 0)) || (!enable && (--requests == 0)))
-		return db5500_prcmu_request_clock(DB5500_PRCMU_SYSCLK, enable);
+		return prcmu_request_clock(DB5500_PRCMU_SYSCLK, enable);
 	return 0;
 }
 
@@ -799,12 +798,12 @@ static void __init db5500_boot_clk_enable(void)
 
 static int db5500_prcmu_clk_enable(struct clk *clk)
 {
-	return db5500_prcmu_request_clock(clk->cg_sel, true);
+	return prcmu_request_clock(clk->cg_sel, true);
 }
 
 static void db5500_prcmu_clk_disable(struct clk *clk)
 {
-	if (db5500_prcmu_request_clock(clk->cg_sel, false)) {
+	if (prcmu_request_clock(clk->cg_sel, false)) {
 		pr_err("clock: %s failed to disable %s.\n", __func__,
 			clk->name);
 	}

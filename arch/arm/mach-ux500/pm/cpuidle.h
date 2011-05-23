@@ -11,8 +11,6 @@
 
 #include <linux/cpuidle.h>
 
-#include <mach/prcmu-fw-defs_v1.h>
-
 enum ARM {
 	ARM_OFF,
 	ARM_RET,
@@ -62,7 +60,7 @@ struct cstate {
 	u32 power_usage;
 	u32 threshold;
 	u32 flags;
-	enum ap_pwrst_trans pwrst;
+	u8 pwrst;
 
 	/* Only used for debugging purpose */
 	enum ci_pwrst state;

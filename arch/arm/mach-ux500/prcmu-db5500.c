@@ -23,12 +23,10 @@
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
-#include <mach/prcmu-db5500.h>
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 #include <mach/db5500-regs.h>
 
 #include "prcmu-regs-db5500.h"
-#include "prcmu-db5500.h"
 
 #define _PRCM_MB_HEADER (tcdm_base + 0xFE8)
 #define PRCM_REQ_MB0_HEADER (_PRCM_MB_HEADER + 0x0)
