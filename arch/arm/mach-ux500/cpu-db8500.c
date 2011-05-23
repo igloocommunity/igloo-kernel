@@ -25,7 +25,7 @@
 #include <mach/hardware.h>
 #include <mach/setup.h>
 #include <mach/devices.h>
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 #include <mach/reboot_reasons.h>
 #include <mach/usb.h>
 #include <mach/ste-dma40-db8500.h>
