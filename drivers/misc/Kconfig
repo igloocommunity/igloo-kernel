@@ -519,6 +519,15 @@ config U5500_MBOX
 	help
 	  Add support for U5500 mailbox communication with modem side
 
+config U8500_SIM_DETECT
+	bool "Sim hot swap detection support"
+	depends on (MODEM && UX500_SOC_DB8500)
+	default y
+	help
+	  Add support for sim hot swap detection support in U8500.Driver
+	  basically wakes up the modem if its sleeping when sim hot plug
+	  in/out has happened.
+
 source "drivers/misc/Kconfig.stm"
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
