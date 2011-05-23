@@ -27,7 +27,6 @@
 #include "pm.h"
 #include "timer.h"
 
-#define DBG_BUF_SIZE 5000
 #define APE_ON_TIMER_INTERVAL 5 /* Seconds */
 
 #define UART_RX_GPIO_PIN_MASK (1 << (CONFIG_UX500_CONSOLE_UART_GPIO_PIN % 32))
@@ -82,44 +81,6 @@ static bool wake_latency;
 static struct cstate *cstates;
 static int cstates_len;
 static DEFINE_SPINLOCK(dbg_lock);
-
-#ifdef U8500_CPUIDLE_EXTRA_DBG
-void ux500_ci_dbg_msg(char *dbg_string)
-{
-	static char dbg_buf[DBG_BUF_SIZE];
-	static int index; /* protected by dbg_lock */
-	int str_len;
-	int smp_no_len;
-	int head_len;
-	unsigned long flags;
-	static const char * const smp_no_str = "\n  %d:";
-	static const char * const head_str = ":HEAD->";
-
-	spin_lock_irqsave(&dbg_lock, flags);
-
-	str_len = strlen(dbg_string);
-	smp_no_len = strlen(smp_no_str);
-	head_len = strlen(head_str);
-
-	if (index > head_len)
-		/* Remove last head printing */
-		index -= head_len;
-
-	if ((index + str_len + smp_no_len + head_len) > DBG_BUF_SIZE)
-		index = 0; /* Non perfect wrapping... */
-
-	sprintf(&dbg_buf[index], smp_no_str, smp_processor_id());
-	index += smp_no_len;
-
-	strcpy(&dbg_buf[index], dbg_string);
-	index += str_len;
-
-	strcpy(&dbg_buf[index], head_str);
-	index += head_len;
-
-	spin_unlock_irqrestore(&dbg_lock, flags);
-}
-#endif
 
 bool ux500_ci_dbg_force_ape_on(void)
 {
