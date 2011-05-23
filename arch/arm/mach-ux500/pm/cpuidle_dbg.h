@@ -27,12 +27,6 @@ void ux500_ci_dbg_console_check_uart(void);
 void ux500_ci_dbg_console_handle_ape_resume(void);
 void ux500_ci_dbg_console_handle_ape_suspend(void);
 
-#ifdef U8500_CPUIDLE_EXTRA_DBG
-void ux500_ci_dbg_msg(char *dbg_string);
-#else
-static inline void ux500_ci_dbg_msg(char *dbg_string) { }
-#endif
-
 #else
 
 static inline void ux500_ci_dbg_init(void) { }
@@ -61,7 +55,6 @@ static inline void ux500_ci_dbg_console(void) { }
 static inline void ux500_ci_dbg_console_check_uart(void) { }
 static inline void ux500_ci_dbg_console_handle_ape_resume(void) { }
 static inline void ux500_ci_dbg_console_handle_ape_suspend(void) { }
-static inline void ux500_ci_dbg_msg(char *dbg_string) { }
 
 #endif
 #endif
