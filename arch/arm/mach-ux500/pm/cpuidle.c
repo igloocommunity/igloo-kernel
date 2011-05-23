@@ -481,9 +481,6 @@ static int enter_sleep(struct cpuidle_device *dev,
 		spin_unlock(&cpuidle_lock);
 	}
 
-	/* TODO: To use desc as debug print might be a bad idea */
-	ux500_ci_dbg_msg(cstates[target].desc);
-
 	if (cstates[target].ARM == ARM_OFF) {
 		context_varm_save_common();
 		spin_lock(&cpuidle_lock);
