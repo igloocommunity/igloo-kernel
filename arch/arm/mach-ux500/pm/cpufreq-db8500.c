@@ -7,7 +7,7 @@
 #include <linux/kernel.h>
 #include <linux/cpufreq.h>
 
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 
 #include "cpufreq.h"
 

@@ -19,7 +19,7 @@
 #include <linux/kernel.h>
 #endif
 
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 
 #include "clock.h"
 

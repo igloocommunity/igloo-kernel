@@ -14,7 +14,7 @@
 #include <linux/slab.h>
 
 #include <mach/hardware.h>
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 #include <mach/prcmu-regs.h>
 
 static struct cpufreq_frequency_table *freq_table;

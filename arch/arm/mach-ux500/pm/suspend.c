@@ -15,7 +15,7 @@
 #include <linux/delay.h>
 #include <linux/regulator/ab8500-debug.h>
 
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 #include <mach/prcmu-regs.h>
 
 #include "context.h"

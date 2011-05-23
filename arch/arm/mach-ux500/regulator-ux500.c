@@ -18,7 +18,7 @@
 
 #include "regulator-ux500.h"
 
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 
 /*
  * power state reference count

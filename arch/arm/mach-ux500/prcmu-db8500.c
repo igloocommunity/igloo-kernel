@@ -37,8 +37,7 @@
 #include <mach/irqs.h>
 #include "prcmu-regs-db8500.h"
 #include "prcmu-debug.h"
-#include <mach/prcmu-fw-api.h>
-#include <mach/prcmu-fw-defs_v1.h>
+#include <mach/prcmu.h>
 #include <mach/db8500-regs.h>
 #include <mach/id.h>
 
@@ -1345,7 +1344,7 @@ static int request_sysclk(bool enable)
 	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(3))
 		cpu_relax();
 
-	writeb((enable ? ON : OFF), (tcdm_base + PRCM_REQ_MB3_SYSCLK_MGT));
+	writeb((enable ? 1 : 0), (tcdm_base + PRCM_REQ_MB3_SYSCLK_MGT));
 
 	writeb(MB3H_SYSCLK, (tcdm_base + PRCM_MBOX_HEADER_REQ_MB3));
 	writel(MBOX_BIT(3), (_PRCMU_BASE + PRCM_MBOX_CPU_SET));
