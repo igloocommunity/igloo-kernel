@@ -66,7 +66,10 @@ ab5500_regulator_init_data[AB5500_NUM_REGULATORS] = {
 			.min_uV		= 1200000,
 			.max_uV		= 2910000,
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-					  REGULATOR_CHANGE_STATUS,
+					  REGULATOR_CHANGE_STATUS |
+					  REGULATOR_CHANGE_MODE,
+			.valid_modes_mask = REGULATOR_MODE_NORMAL |
+					    REGULATOR_MODE_IDLE,
 		},
 		.consumer_supplies	= ab5500_ldo_g_consumers,
 		.num_consumer_supplies	= ARRAY_SIZE(ab5500_ldo_g_consumers),
