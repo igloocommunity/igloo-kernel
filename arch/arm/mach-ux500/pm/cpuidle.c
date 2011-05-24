@@ -480,6 +480,9 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 		sleep_time = get_remaining_sleep_time(&t, &c);
 
+		if (sleep_time == INT_MAX)
+			goto exit;
+
 		if (cstates[target].UL_PLL == UL_PLL_OFF)
 			/* Compensate for ULPLL start up time */
 			sleep_time -= UL_PLL_START_UP_LATENCY;
