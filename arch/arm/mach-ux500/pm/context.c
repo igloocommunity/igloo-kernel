@@ -404,7 +404,7 @@ static void save_gic_dist_common(void)
 			      GIC_DIST_SPI_TARGET_SPI32 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_CONFIG_COMMON_NUM; i++)
-		context_gic_dist_common.spi_target[i] =
+		context_gic_dist_common.config[i] =
 			readl(context_gic_dist_common.base +
 			      GIC_DIST_CONFIG_SPI32 +  i * 4);
 }
@@ -422,7 +422,7 @@ static void restore_gic_dist_common(void)
 	int i;
 
 	for (i = 0; i < GIC_DIST_CONFIG_COMMON_NUM; i++)
-		writel(context_gic_dist_common.spi_target[i],
+		writel(context_gic_dist_common.config[i],
 		       context_gic_dist_common.base +
 		       GIC_DIST_CONFIG_SPI32 +  i * 4);
 
@@ -474,7 +474,7 @@ static void save_gic_dist_cpu(struct context_gic_dist_cpu *c_gic)
 			      GIC_DIST_SPI_TARGET_SPI0 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_CONFIG_CPU_NUM; i++)
-		c_gic->spi_target[i] =
+		c_gic->config[i] =
 			readl(c_gic->base +
 			      GIC_DIST_CONFIG_SPI0 +  i * 4);
 }
@@ -492,7 +492,7 @@ static void restore_gic_dist_cpu(struct context_gic_dist_cpu *c_gic)
 	int i;
 
 	for (i = 0; i < GIC_DIST_CONFIG_CPU_NUM; i++)
-		writel(c_gic->spi_target[i],
+		writel(c_gic->config[i],
 		       c_gic->base +
 		       GIC_DIST_CONFIG_SPI0 +  i * 4);
 
