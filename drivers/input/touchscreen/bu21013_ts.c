@@ -825,7 +825,8 @@ static int __devexit bu21013_remove(struct i2c_client *client)
 	return 0;
 }
 
-#if !defined(CONFIG_HAS_EARLYSUSPEND) && defined(CONFIG_PM)
+#ifndef CONFIG_HAS_EARLYSUSPEND
+#ifdef CONFIG_PM
 /**
  * bu21013_suspend() - suspend the touch screen controller
  * @dev: pointer to device structure
@@ -860,7 +861,7 @@ static const struct dev_pm_ops bu21013_dev_pm_ops = {
 	.suspend = bu21013_suspend,
 	.resume  = bu21013_resume,
 };
-
+#endif
 #else
 static void bu21013_ts_early_suspend(struct early_suspend *data)
 {
