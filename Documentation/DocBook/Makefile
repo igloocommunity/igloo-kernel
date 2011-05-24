@@ -16,8 +16,8 @@ DOCBOOKS := z8530book.xml mcabook.xml device-drivers.xml \
 	    alsa-driver-api.xml writing-an-alsa-driver.xml \
 	    tracepoint.xml media.xml drm.xml \
 	    i2s.xml msp.xml shrm.xml stmpe.xml touchp.xml \
-	    tc_keypad.xml prcmu-fw-api.xml cg2900_fm_radio.xml
-
+	    tc_keypad.xml prcmu-fw-api.xml cg2900_fm_radio.xml \
+	    synaptics_rmi4_touchp.xml db5500_keypad.xml
 
 ###
 # The build process is as follows (targets):

@@ -1052,8 +1052,8 @@ static void synaptics_rmi4_resume_handler(struct work_struct *work)
 
 /**
  * synaptics_rmi4_probe() - Initialze the i2c-client touchscreen driver
- * @i2c: i2c client structure pointer
- * @id:i2c device id pointer
+ * @client: i2c client structure pointer
+ * @dev_id:i2c device id pointer
  *
  * This function will allocate and initialize the instance
  * data and request the irq and set the instance data as the clients
@@ -1216,7 +1216,7 @@ err_input:
  * synaptics_rmi4_remove() - Removes the i2c-client touchscreen driver
  * @client: i2c client structure pointer
  *
- * This funtion uses to remove the i2c-client
+ * This function uses to remove the i2c-client
  * touchscreen driver and returns integer.
  */
 static int __devexit synaptics_rmi4_remove(struct i2c_client *client)
@@ -1244,7 +1244,7 @@ static int __devexit synaptics_rmi4_remove(struct i2c_client *client)
  * synaptics_rmi4_suspend() - suspend the touch screen controller
  * @dev: pointer to device structure
  *
- * This funtion is used to suspend the
+ * This function is used to suspend the
  * touch panel controller and returns integer
  */
 static int synaptics_rmi4_suspend(struct device *dev)
@@ -1259,7 +1259,7 @@ static int synaptics_rmi4_suspend(struct device *dev)
  * synaptics_rmi4_resume() - resume the touch screen controller
  * @dev: pointer to device structure
  *
- * This funtion is used to resume the touch panel
+ * This function is used to resume the touch panel
  * controller and returns integer.
  */
 static int synaptics_rmi4_resume(struct device *dev)
@@ -1298,7 +1298,7 @@ static struct i2c_driver synaptics_rmi4_driver = {
 /**
  * synaptics_rmi4_init() - Initialize the touchscreen driver
  *
- * This funtion uses to initializes the synaptics
+ * This function uses to initializes the synaptics
  * touchscreen driver and returns integer.
  */
 static int __init synaptics_rmi4_init(void)
@@ -1308,7 +1308,7 @@ static int __init synaptics_rmi4_init(void)
 /**
  * synaptics_rmi4_exit() - De-initialize the touchscreen driver
  *
- * This funtion uses to de-initialize the synaptics
+ * This function uses to de-initialize the synaptics
  * touchscreen driver and returns none.
  */
 static void __exit synaptics_rmi4_exit(void)
