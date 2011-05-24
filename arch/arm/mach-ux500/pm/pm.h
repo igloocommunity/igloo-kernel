@@ -105,6 +105,16 @@ u32 ux500_pm_gpio_read_wake_up_status(unsigned int bank_number)
 {
 	return 0;
 }
+
+/**
+ * ux500_pm_prcmu_set_ioforce()
+ *
+ * @enable: Enable/disable
+ *
+ * Enable/disable the gpio-ring
+ */
+static inline void ux500_pm_prcmu_set_ioforce(bool enable) { }
+
 #endif
 
 #endif
