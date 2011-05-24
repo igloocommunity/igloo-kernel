@@ -151,7 +151,7 @@ static struct cstate cstates[] = {
 		.state = CI_SLEEP,
 		.desc = "ApSleep, UL PLL off    ",
 	},
-#ifdef ENABLE_AP_DEEP_IDLE
+#ifdef CONFIG_U8500_CPUIDLE_APDEEPIDLE
 	{
 		.enter_latency = 300,
 		.exit_latency = DEEP_SLEEP_WAKE_UP_LATENCY,
