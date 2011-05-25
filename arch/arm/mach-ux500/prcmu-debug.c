@@ -49,6 +49,7 @@ struct ddr_state_history {
 
 static struct ape_state_history *ape_sh;
 static struct ddr_state_history *ddr_sh;
+static int ape_voltage_count;
 
 void prcmu_debug_ape_opp_log(u8 opp)
 {
@@ -323,6 +324,57 @@ static int cpufreq_delay_read(struct seq_file *s, void *p)
 	return seq_printf(s, "%lu\n", prcmu_qos_get_cpufreq_opp_delay());
 }
 
+static int ape_voltage_read(struct seq_file *s, void *p)
+{
+	return seq_printf(s, "This reference count only includes "
+			  "requests via debugfs.\nCount: %d\n",
+			  ape_voltage_count);
+}
+
+static ssize_t ape_voltage_write(struct file *file,
+				   const char __user *user_buf,
+				   size_t count, loff_t *ppos)
+{
+
+	char buf[32];
+	ssize_t buf_size;
+	long unsigned int i;
+	int err;
+
+	/* Get userspace string and assure termination */
+	buf_size = min(count, (sizeof(buf)-1));
+	if (copy_from_user(buf, user_buf, buf_size))
+		return -EFAULT;
+	buf[buf_size] = 0;
+
+	if (strict_strtoul(buf, 0, &i) != 0)
+		return buf_size;
+
+	switch (i) {
+	case 0:
+		if (ape_voltage_count == 0)
+			pr_info("prcmu debug: reference count is already 0\n");
+		else {
+			err = prcmu_request_ape_opp_100_voltage(false);
+			if (err)
+				pr_err("prcmu debug: drop request failed\n");
+			else
+				ape_voltage_count--;
+		}
+		break;
+	case 1:
+		err = prcmu_request_ape_opp_100_voltage(true);
+		if (err)
+			pr_err("prcmu debug: request failed\n");
+		else
+			ape_voltage_count++;
+		break;
+	default:
+		pr_info("prcmu debug: value not equal to 0 or 1\n");
+	}
+	return buf_size;
+}
+
 static ssize_t cpufreq_delay_write(struct file *file,
 				   const char __user *user_buf,
 				   size_t count, loff_t *ppos)
@@ -379,6 +431,11 @@ static int cpufreq_delay_open_file(struct inode *inode, struct file *file)
 	return single_open(file, cpufreq_delay_read, inode->i_private);
 }
 
+static int ape_voltage_open_file(struct inode *inode, struct file *file)
+{
+	return single_open(file, ape_voltage_read, inode->i_private);
+}
+
 static const struct file_operations arm_opp_fops = {
 	.open = arm_opp_open_file,
 	.read = seq_read,
@@ -432,6 +489,15 @@ static const struct file_operations cpufreq_delay_fops = {
 	.owner = THIS_MODULE,
 };
 
+static const struct file_operations ape_voltage_fops = {
+	.open = ape_voltage_open_file,
+	.write = ape_voltage_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.owner = THIS_MODULE,
+};
+
 static int setup_debugfs(void)
 {
 	struct dentry *dir;
@@ -468,6 +534,11 @@ static int setup_debugfs(void)
 
 	file = debugfs_create_file("opp_cpufreq_delay", (S_IRUGO),
 				   dir, NULL, &cpufreq_delay_fops);
+	if (IS_ERR_OR_NULL(file))
+		goto fail;
+
+	file = debugfs_create_file("ape_voltage", (S_IRUGO),
+				   dir, NULL, &ape_voltage_fops);
 	if (IS_ERR_OR_NULL(file))
 		goto fail;
 
