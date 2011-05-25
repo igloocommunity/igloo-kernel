@@ -1045,6 +1045,24 @@ static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
 			value);
 	}
 
+	/*
+	 * Remove below when ab8500v2.0 is no longer important.
+	 * Below only affects power consumption and is depending on the
+	 * HREF OTP configuration.
+	 * It changes the default setting for VextSupply3Regu to Low Power.
+	 * Active high or low is depending on OTP which is changed from ab8500v3.0.
+	 */
+	if (abx500_get_chip_id(&pdev->dev) < 0x30) {
+		err = abx500_mask_and_set_register_interruptible(&pdev->dev,
+			AB8500_REGU_CTRL2, 0x08, 0x30, 0x30);
+		if (err < 0) {
+			dev_err(&pdev->dev,
+				"Failed to override 0x%02x, 0x%02x.\n",
+				AB8500_REGU_CTRL2, 0x08);
+			return err;
+		}
+	}
+
 	/* register all regulators */
 	for (i = 0; i < ARRAY_SIZE(ab8500_regulator_info); i++) {
 		struct ab8500_regulator_info *info = NULL;
