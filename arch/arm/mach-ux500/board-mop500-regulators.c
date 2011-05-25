@@ -347,11 +347,11 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
 	/*
 	 * VextSupply1Regu          = HW control
 	 * VextSupply2Regu          = HW control
-	 * VextSupply3Regu          = HW control
+	 * VextSupply3Regu          = Low Power mode
 	 * ExtSupply2Bypass         = ExtSupply12LPn ball is 0 when Ena is 0
 	 * ExtSupply3Bypass         = ExtSupply3LPn ball is 0 when Ena is 0
 	 */
-	INIT_REGULATOR_REGISTER(AB8500_EXTSUPPLYREGU, 0x2a),
+	INIT_REGULATOR_REGISTER(AB8500_EXTSUPPLYREGU, 0x1a),
 	/*
 	 * Vaux1Regu                = force HP
 	 * Vaux2Regu                = force off
