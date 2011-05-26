@@ -208,7 +208,7 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 					{
 						.first = 0x1F,
 						.last = 0x22,
-						.perm = AB5500_PERM_RO,
+						.perm = AB5500_PERM_RW,
 					},
 					{
 						.first = 0x23,
@@ -446,15 +446,15 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 		},
 	},
 	[AB5500_DEVID_CHARGER] =   {
-		.nbanks = 1,
-		.bank = (struct ab5500_i2c_ranges []) {
+		.nbanks = 4,
+		.bank = (struct ab5500_i2c_ranges[]) {
 			{
 				.bankid = AB5500_BANK_CHG,
 				.nranges = 2,
 				.range = (struct ab5500_reg_range[]) {
 					{
 						.first = 0x11,
-						.last = 0x11,
+						.last = 0x12,
 						.perm = AB5500_PERM_RO,
 					},
 					{
@@ -464,9 +464,107 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 					},
 				},
 			},
+			{
+				.bankid = AB5500_BANK_USB,
+				.nranges = 13,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x01,
+						.last = 0x01,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x80,
+						.last = 0x83,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x87,
+						.last = 0x8B,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0x91,
+						.last = 0x94,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xA8,
+						.last = 0xB0,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xB2,
+						.last = 0xB2,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xB4,
+						.last = 0xBC,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xBF,
+						.last = 0xBF,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xC1,
+						.last = 0xC6,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xCD,
+						.last = 0xCD,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xD6,
+						.last = 0xDA,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xDC,
+						.last = 0xDC,
+						.perm = AB5500_PERM_RW,
+					},
+					{
+						.first = 0xE0,
+						.last = 0xE4,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+			{
+				.bankid = AB5500_BANK_IT,
+				.nranges = 2,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x00,
+						.last = 0x02,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0x20,
+						.last = 0x36,
+						.perm = AB5500_PERM_RO,
+					},
+				},
+			},
+			{
+				.bankid = AB5500_BANK_STARTUP,
+				.nranges = 1,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x2F,
+						.last = 0x30,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
 		},
 	},
-	[AB5500_DEVID_FUELGAUGE] =   {
+	[AB5500_DEVID_BTEMP] =   {
 		.nbanks = 1,
 		.bank = (struct ab5500_i2c_ranges []) {
 			{
@@ -480,7 +578,28 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 					},
 					{
 						.first = 0x0C,
-						.last = 0x10,
+						.last = 0x24,
+						.perm = AB5500_PERM_RW,
+					},
+				},
+			},
+		},
+	},
+	[AB5500_DEVID_FG] =   {
+		.nbanks = 1,
+		.bank = (struct ab5500_i2c_ranges []) {
+			{
+				.bankid = AB5500_BANK_FG_BATTCOM_ACC,
+				.nranges = 2,
+				.range = (struct ab5500_reg_range[]) {
+					{
+						.first = 0x00,
+						.last = 0x0B,
+						.perm = AB5500_PERM_RO,
+					},
+					{
+						.first = 0x0C,
+						.last = 0x24,
 						.perm = AB5500_PERM_RW,
 					},
 				},
@@ -604,6 +723,206 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 	[AB5500_DEVID_CHARGER] = {
 		.name = "ab5500-charger",
 		.id = AB5500_DEVID_CHARGER,
+		.num_resources = 29,
+		.resources = (struct resource[]) {
+			{
+				.name = "VBAT_INSERT",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(2, 4),
+				.end = AB5500_IRQ(2, 4),
+			},
+			{
+				.name = "TEMP_ASIC_ALARM",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(2, 2),
+				.end = AB5500_IRQ(2, 2),
+			},
+			{
+				.name = "BATT_REMOVAL",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(7, 6),
+				.end = AB5500_IRQ(7, 6),
+			},
+			{
+				.name = "BATT_ATTACH",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(7, 5),
+				.end = AB5500_IRQ(7, 5),
+			},
+			{
+				.name = "CGSTATE_10_PCVBUS_CHG",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(8, 7),
+				.end = AB5500_IRQ(8, 7),
+			},
+			{
+				.name = "VBUS_FALLING",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(8, 6),
+				.end = AB5500_IRQ(8, 6),
+			},
+			{
+				.name = "VBUS_RISING",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(8, 5),
+				.end = AB5500_IRQ(8, 5),
+			},
+			{
+				.name = "UART_RDY_TX",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(8, 2),
+				.end = AB5500_IRQ(8, 2),
+			},
+			{
+				.name = "UART_RDY_RX",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(8, 1),
+				.end = AB5500_IRQ(8, 1),
+			},
+			{
+				.name = "UART_OVERRUN",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(8, 0),
+				.end = AB5500_IRQ(8, 0),
+			},
+			{
+				.name = "VBUS_IMEAS_MAX_CHANGE_RISING",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(9, 7),
+				.end = AB5500_IRQ(9, 7),
+			},
+			{
+				.name = "USB_SUSPEND",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(9, 3),
+				.end = AB5500_IRQ(9, 3),
+			},
+			{
+				.name = "USB_CHAR_DET_DONE",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(9, 1),
+				.end = AB5500_IRQ(9, 1),
+			},
+			{
+				.name = "VBUS_IMEAS_MAX_CHANGE_FALLING",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(10, 0),
+				.end = AB5500_IRQ(10, 0),
+			},
+			{
+				.name = "OVV",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(14, 5),
+				.end = AB5500_IRQ(14, 5),
+			},
+			{
+				.name = "BSI_INDICATOR",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(14, 4),
+				.end = AB5500_IRQ(14, 4),
+			},
+			{
+				.name = "USB_CH_TH_PROTECTION",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(15, 4),
+				.end = AB5500_IRQ(15, 4),
+			},
+			{
+				.name = "USB_CH_NOT_OK",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(15, 3),
+				.end = AB5500_IRQ(15, 3),
+			},
+			{
+				.name = "CHAR_TEMP_WINDOW_OK_RISING",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(17, 7),
+				.end = AB5500_IRQ(17, 7),
+			},
+			{
+				.name = "CHARGING_STOPPED_BY_TEMP",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(18, 6),
+				.end = AB5500_IRQ(18, 6),
+			},
+			{
+				.name = "VBUS_DROP_FALLING",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(18, 4),
+				.end = AB5500_IRQ(18, 4),
+			},
+			{
+				.name = "VBUS_DROP_RISING",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(18, 3),
+				.end = AB5500_IRQ(18, 3),
+			},
+			{
+				.name = "CHAR_TEMP_WINDOW_OK_FALLING",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(18, 0),
+				.end = AB5500_IRQ(18, 0),
+			},
+			{
+				.name = "CHG_STATE_13_COMP_VBUS",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(21, 3),
+				.end = AB5500_IRQ(21, 3),
+			},
+			{
+				.name = "CHG_STATE_12_COMP_VBUS",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(21, 2),
+				.end = AB5500_IRQ(21, 2),
+			},
+			{
+				.name = "CHG_STATE_11_SAFE_MODE_VBUS",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(21, 1),
+				.end = AB5500_IRQ(21, 1),
+			},
+			{
+				.name = "USB_LINK_UPDATE",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(22, 1),
+				.end = AB5500_IRQ(22, 1),
+			},
+			{
+				.name = "CHG_SW_TIMER_OUT",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(23, 7),
+				.end = AB5500_IRQ(23, 7),
+			},
+			{
+				.name = "CHG_HW_TIMER_OUT",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(23, 6),
+				.end = AB5500_IRQ(23, 6),
+			},
+		},
+	},
+	[AB5500_DEVID_CHARGALG] = {
+		.name = "abx500-chargalg",
+		.id = AB5500_DEVID_CHARGALG,
+	},
+	[AB5500_DEVID_BTEMP] = {
+		.name = "ab5500-btemp",
+		.id = AB5500_DEVID_BTEMP,
+		.num_resources = 2,
+		.resources = (struct resource[]) {
+			{
+				.name = "BATT_ATTACH",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(7, 5),
+				.end = AB5500_IRQ(7, 5),
+			},
+			{
+				.name = "BATT_REMOVAL",
+				.flags = IORESOURCE_IRQ,
+				.start = AB5500_IRQ(7, 6),
+				.end = AB5500_IRQ(7, 6),
+			},
+		},
 	},
 	[AB5500_DEVID_ADC] = {
 		.name = "ab5500-adc",
@@ -672,9 +991,9 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			},
 		},
 	},
-	[AB5500_DEVID_FUELGAUGE] = {
-		.name = "ab5500-fuelgauge",
-		.id = AB5500_DEVID_FUELGAUGE,
+	[AB5500_DEVID_FG] = {
+		.name = "ab5500-fg",
+		.id = AB5500_DEVID_FG,
 		.num_resources = 6,
 		.resources = (struct resource[]) {
 			{
@@ -1395,7 +1714,7 @@ static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
 			{
 				.first = 0x1F,
 				.last = 0x22,
-				.perm = AB5500_PERM_RO,
+				.perm = AB5500_PERM_RW,
 			},
 			{
 				.first = 0x23,
@@ -1554,7 +1873,7 @@ static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
 			},
 			{
 				.first = 0x0C,
-				.last = 0x10,
+				.last = 0x24,
 				.perm = AB5500_PERM_RW,
 			},
 		},
