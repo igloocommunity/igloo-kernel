@@ -44,3 +44,4 @@ obj-$(CONFIG_UX500_PRCMU_QOS_POWER)	+= prcmu-qos-power.o
 obj-$(CONFIG_UX500_DEBUG_HWREG) 	+= hwreg.o
 obj-$(CONFIG_HWMEM)			+= hwmem-int.o
 obj-$(CONFIG_UX500_L2X0_PREFETCH_CTRL)	+= l2x0-prefetch.o
+obj-$(CONFIG_AB5500_BM)			+= board-u5500-bm.o
