@@ -9,7 +9,7 @@
 void suspend_block_sleep(void);
 void suspend_unblock_sleep(void);
 
-#ifdef UX500_SUSPEND
+#ifdef CONFIG_UX500_SUSPEND
 void suspend_set_pins_force_fn(void (*force)(void), void (*force_mux)(void));
 #else
 static inline void suspend_set_pins_force_fn(void (*force)(void),
