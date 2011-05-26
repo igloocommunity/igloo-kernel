@@ -280,11 +280,11 @@ void ux500_ci_dbg_wake_latency(int ctarget, int sleep_time)
 	zero_time = ktime_set(0, 0);
 	sh = per_cpu(state_history, smp_processor_id());
 
-	if (cstates[ctarget].state == CI_SLEEP)
+	if (cstates[ctarget].state >= CI_SLEEP)
 		l = u8500_rtc_exit_latency_get();
 
 	if (cstates[ctarget].state == CI_IDLE) {
-		ktime_t d = ktime_set(0, sleep_time*1000);
+		ktime_t d = ktime_set(0, sleep_time * 1000);
 		ktime_t now = ktime_get();
 
 		d = ktime_add(d, sh->start);
@@ -447,7 +447,7 @@ static ssize_t set_deepest_state(struct file *file,
 		i = cstates_len - 1;
 
 	if (i == 0)
-		i = 1;
+		i = CI_WFI;
 
 	deepest_allowed_state = i;
 
@@ -502,10 +502,8 @@ static void stats_disp_one(struct seq_file *s, struct state_history *sh,
 
 	memset(&avg, 0, sizeof(s64) * NUM_LATENCY);
 
-	if (measure_latency) {
-		for (j = 0; j < NUM_LATENCY; j++)
-			avg[j] = ktime_to_us(sh->states[i].latency_sum[j]);
-	}
+	for (j = 0; j < NUM_LATENCY; j++)
+		avg[j] = ktime_to_us(sh->states[i].latency_sum[j]);
 
 	t_us = ktime_to_us(sh->states[i].time);
 	perc = ktime_to_us(sh->states[i].time);
@@ -514,11 +512,9 @@ static void stats_disp_one(struct seq_file *s, struct state_history *sh,
 	if (total_us)
 		do_div(perc, total_us);
 
-	if (measure_latency) {
-		for (j = 0; j < NUM_LATENCY; j++) {
-			if (sh->states[i].latency_count[j])
-				do_div(avg[j], sh->states[i].latency_count[j]);
-		}
+	for (j = 0; j < NUM_LATENCY; j++) {
+		if (sh->states[i].latency_count[j])
+			do_div(avg[j], sh->states[i].latency_count[j]);
 	}
 
 	seq_printf(s, "\n%d - %s: %u",
@@ -542,27 +538,39 @@ static void stats_disp_one(struct seq_file *s, struct state_history *sh,
 			   100 * sh->states[i].hit_rate /
 			   sh->states[i].counter);
 
-	if (i == CI_RUNNING || !measure_latency)
+	if (i == CI_RUNNING || !(measure_latency || wake_latency))
 		return;
 
 	for (j = 0; j < NUM_LATENCY; j++) {
-
+		bool show = false;
 		if (!ktime_equal(sh->states[i].latency_min[j], init_time)) {
 			seq_printf(s, "\n\t\t\t\t");
 			switch (j) {
 			case LATENCY_ENTER:
-				seq_printf(s, "enter: ");
+				if (measure_latency) {
+					seq_printf(s, "enter: ");
+					show = true;
+				}
 				break;
 			case LATENCY_EXIT:
-				seq_printf(s, "exit: ");
+				if (measure_latency) {
+					seq_printf(s, "exit:	 ");
+					show = true;
+				}
 				break;
 			case LATENCY_WAKE:
-				seq_printf(s, "wake: ");
+				if (wake_latency) {
+					seq_printf(s, "wake:	 ");
+					show = true;
+				}
 				break;
 			default:
 				seq_printf(s, "unknown!: ");
 				break;
 			}
+
+			if (!show)
+				continue;
 
 			if (ktime_equal(sh->states[i].latency_min[j],
 					zero_time))
@@ -777,6 +785,9 @@ void ux500_ci_dbg_init(void)
 	struct state_history *sh;
 
 	cstates = ux500_ci_get_cstates(&cstates_len);
+
+	if (deepest_allowed_state > cstates_len)
+		deepest_allowed_state = cstates_len;
 
 	for_each_possible_cpu(cpu) {
 		per_cpu(state_history, cpu) = kzalloc(sizeof(struct state_history),
