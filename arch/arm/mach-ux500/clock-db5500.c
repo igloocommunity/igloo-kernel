@@ -565,7 +565,7 @@ static DEF_PER_CLK(p6_mtu0_clk, &p6_pclk6, &timclk);
 /* MTU1 */
 static DEF_PER_CLK(p6_mtu1_clk, &p6_pclk7, &timclk);
 
-static struct clk *db5500_dbg_clks[] = {
+static struct clk *db5500_dbg_clks[] __initdata = {
 	/* Clock sources */
 	&soc0_pll,
 	&soc1_pll,
@@ -598,10 +598,53 @@ static struct clk *db5500_dbg_clks[] = {
 	&rngclk,
 	&pwmclk,
 
+	/* PRCC clocks */
+	&p1_pclk0,
+	&p1_pclk1,
+	&p1_pclk2,
+	&p1_pclk3,
+	&p1_pclk4,
+	&p1_pclk5,
+	&p1_pclk6,
+
+	&p2_pclk0,
+	&p2_pclk1,
+
+	&p3_pclk0,
+	&p3_pclk1,
+	&p3_pclk2,
+
+	&p5_pclk0,
+	&p5_pclk1,
+	&p5_pclk2,
+	&p5_pclk3,
+	&p5_pclk4,
+	&p5_pclk5,
+	&p5_pclk6,
+	&p5_pclk7,
+	&p5_pclk8,
+	&p5_pclk9,
+	&p5_pclk10,
+	&p5_pclk11,
+	&p5_pclk12,
+	&p5_pclk13,
+	&p5_pclk14,
+	&p5_pclk15,
+
+	&p6_pclk0,
+	&p6_pclk1,
+	&p6_pclk2,
+	&p6_pclk3,
+	&p6_pclk4,
+	&p6_pclk5,
+	&p6_pclk6,
+	&p6_pclk7,
+
 	/* Clock sources */
 	&sysclk2,
 	&clkout0,
 	&clkout1,
+	&rtc_clk1,
 };
 
 #define CLK_LOOKUP(_clk, _dev_id, _con_id) \
