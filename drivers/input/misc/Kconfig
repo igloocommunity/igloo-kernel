@@ -216,6 +216,13 @@ config INPUT_KEYSPAN_REMOTE
 	  To compile this driver as a module, choose M here: the module will
 	  be called keyspan_remote.
 
+config INPUT_LPS001WP
+	tristate "LPS0001WP pressure sensor from ST Micro"
+	default y if MACH_U8500
+	help
+	  This is a pressure sensor connected to I2C, mounted on the
+	  snowball and other ST-E boards
+
 config INPUT_POWERMATE
 	tristate "Griffin PowerMate and Contour Jog support"
 	depends on USB_ARCH_HAS_HCD
