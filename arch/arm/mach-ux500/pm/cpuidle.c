@@ -44,15 +44,11 @@
  *
  */
 #define DEEP_SLEEP_WAKE_UP_LATENCY 8500
-/* Exit latency from ApSleep is measured to be around 1.0 to 1.5 ms */
+/* Wake latency from ApSleep is measured to be around 1.0 to 1.5 ms */
 #define MIN_SLEEP_WAKE_UP_LATENCY 1000
 #define MAX_SLEEP_WAKE_UP_LATENCY 1500
+
 #define UL_PLL_START_UP_LATENCY 8000 /* us */
-/*
- * There must be at least 4 32 kHz cycles between each write to the RTC RTT
- * CR register.
- */
-#define RTC_LATENCY 120
 
 static struct cstate cstates[] = {
 	{
@@ -117,12 +113,12 @@ static struct cstate cstates[] = {
 	},
 	{
 		.enter_latency = 250,
-		.exit_latency = MAX_SLEEP_WAKE_UP_LATENCY,
+		.exit_latency = MAX_SLEEP_WAKE_UP_LATENCY + 200,
 		/*
 		 * Note: Sleep time must be longer than 120 us or else
 		 * there might be issues with the RTC-RTT block.
 		 */
-		.threshold = MAX_SLEEP_WAKE_UP_LATENCY + 250 + RTC_LATENCY,
+		.threshold = MAX_SLEEP_WAKE_UP_LATENCY + 250 + 200,
 		.power_usage = 3,
 		.APE = APE_OFF,
 		.ARM = ARM_RET,
@@ -137,9 +133,9 @@ static struct cstate cstates[] = {
 	{
 		.enter_latency = 250,
 		.exit_latency = (MAX_SLEEP_WAKE_UP_LATENCY +
-				 UL_PLL_START_UP_LATENCY),
+				 UL_PLL_START_UP_LATENCY + 200),
 		.threshold = (MAX_SLEEP_WAKE_UP_LATENCY +
-			      UL_PLL_START_UP_LATENCY + 250 + RTC_LATENCY),
+			      UL_PLL_START_UP_LATENCY + 250 + 200),
 		.power_usage = 2,
 		.APE = APE_OFF,
 		.ARM = ARM_RET,
@@ -154,8 +150,8 @@ static struct cstate cstates[] = {
 #ifdef CONFIG_U8500_CPUIDLE_APDEEPIDLE
 	{
 		.enter_latency = 300,
-		.exit_latency = DEEP_SLEEP_WAKE_UP_LATENCY,
-		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 300 + RTC_LATENCY,
+		.exit_latency = DEEP_SLEEP_WAKE_UP_LATENCY + 400,
+		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 300 + 400,
 		.power_usage = 2,
 		.APE = APE_ON,
 		.ARM = ARM_OFF,
@@ -170,8 +166,8 @@ static struct cstate cstates[] = {
 #endif
 	{
 		.enter_latency = 310,
-		.exit_latency = DEEP_SLEEP_WAKE_UP_LATENCY,
-		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 310 + RTC_LATENCY,
+		.exit_latency = DEEP_SLEEP_WAKE_UP_LATENCY + 420,
+		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 310 + 420,
 		.power_usage = 1,
 		.APE = APE_OFF,
 		.ARM = ARM_OFF,
