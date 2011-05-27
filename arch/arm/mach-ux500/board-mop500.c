@@ -49,12 +49,14 @@
 #include <mach/ste_audio.h>
 #include <mach/ste-dma40-db8500.h>
 #include <video/av8100.h>
+#include <plat/pincfg.h>
 
 #include "devices-db8500.h"
 #include "board-mop500.h"
 #include "board-mop500-regulators.h"
 #include "board-mop500-bm.h"
 #include "board-mop500-wlan.h"
+#include "pins.h"
 
 #ifdef CONFIG_AB8500_DENC
 static struct ab8500_denc_platform_data ab8500_denc_pdata = {
@@ -748,12 +750,45 @@ static struct stedma40_chan_cfg uart2_dma_cfg_tx = {
 };
 #endif
 
+static struct ux500_pins *uart0_pins;
+static void ux500_pl011_init(void)
+{
+	int ret;
+
+	if (!uart0_pins) {
+		uart0_pins = ux500_pins_get("uart0");
+		if (!uart0_pins) {
+			pr_err("pl011: uart0 pins_get failed\n");
+			return;
+		}
+	}
+
+	ret = ux500_pins_enable(uart0_pins);
+	if (ret)
+		pr_err("pl011: uart0 pins_enable failed\n");
+}
+
+static void ux500_pl011_exit(void)
+{
+	int ret;
+
+	if (uart0_pins) {
+		ret = ux500_pins_disable(uart0_pins);
+		if (ret)
+			pr_err("pl011: uart0 pins_disable failed\n");
+		ux500_pins_put(uart0_pins);
+		uart0_pins = NULL;
+	}
+}
+
 static struct amba_pl011_data uart0_plat = {
 #ifdef CONFIG_STE_DMA40_REMOVE
 	.dma_filter = stedma40_filter,
 	.dma_rx_param = &uart0_dma_cfg_rx,
 	.dma_tx_param = &uart0_dma_cfg_tx,
 #endif
+	.init = ux500_pl011_init,
+	.exit = ux500_pl011_exit,
 };
 
 static struct amba_pl011_data uart1_plat = {
