@@ -62,6 +62,10 @@ struct state_history {
 	u32 exit_counter;
 	u32 timed_out;
 	ktime_t measure_begin;
+	int ape_blocked;
+	int time_blocked;
+	int both_blocked;
+	int gov_blocked;
 	struct state_history_state *states;
 };
 static DEFINE_PER_CPU(struct state_history, *state_history);
@@ -77,6 +81,11 @@ static bool reset_timer;
 static int deepest_allowed_state = CONFIG_U8500_CPUIDLE_DEEPEST_STATE;
 static u32 measure_latency;
 static bool wake_latency;
+
+static bool apidle_both_blocked;
+static bool apidle_ape_blocked;
+static bool apidle_time_blocked;
+static bool apidle_gov_blocked;
 
 static struct cstate *cstates;
 static int cstates_len;
@@ -324,11 +333,23 @@ static void state_record_time(struct state_history *sh, int ctarget,
 	sh->states[sh->state].counter++;
 }
 
+void ux500_ci_dbg_register_reason(int idx, bool power_state_req,
+				  u32 time, u32 max_depth)
+{
+
+
+	if (cstates[idx].state == CI_IDLE) {
+		apidle_ape_blocked = power_state_req;
+		apidle_time_blocked = time < cstates[idx + 1].threshold;
+		apidle_both_blocked = power_state_req && apidle_time_blocked;
+		apidle_gov_blocked = cstates[max_depth].state == CI_IDLE;
+	}
+}
+
 void ux500_ci_dbg_log(int ctarget, ktime_t enter_time)
 {
 	int i;
 	ktime_t now;
-
 	unsigned long flags;
 	struct state_history *sh;
 	struct state_history *sh_other;
@@ -341,6 +362,17 @@ void ux500_ci_dbg_log(int ctarget, ktime_t enter_time)
 	sh = per_cpu(state_history, this_cpu);
 
 	spin_lock_irqsave(&dbg_lock, flags);
+
+	if (cstates[ctarget].state == CI_IDLE) {
+		if (apidle_both_blocked)
+			sh->both_blocked++;
+		if (apidle_ape_blocked)
+			sh->ape_blocked++;
+		if (apidle_time_blocked)
+			sh->time_blocked++;
+		if (apidle_gov_blocked)
+			sh->gov_blocked++;
+	}
 
 	/*
 	 * Check if current state is just a repeat of
@@ -419,9 +451,14 @@ static void state_history_reset(void)
 
 		sh->start = ktime_get();
 		sh->measure_begin = sh->start;
-		sh->state = cstates_len; /* CI_RUNNING */
+		/* Don't touch sh->state, since that is where we are now */
+
 		sh->exit_counter = 0;
 		sh->timed_out = 0;
+		sh->ape_blocked = 0;
+		sh->time_blocked = 0;
+		sh->both_blocked = 0;
+		sh->gov_blocked = 0;
 	}
 	spin_unlock_irqrestore(&dbg_lock, flags);
 }
@@ -532,6 +569,11 @@ static void stats_disp_one(struct seq_file *s, struct state_history *sh,
 
 	seq_printf(s, " in %d ms %d%%",
 		   (u32) t_us, (u32)perc);
+
+	if (cstates[i].state == CI_IDLE)
+		seq_printf(s, ", reg:%d time:%d both:%d gov:%d",
+			   sh->ape_blocked, sh->time_blocked,
+			   sh->both_blocked, sh->gov_blocked);
 
 	if (sh->states[i].counter)
 		seq_printf(s, ", hit rate: %u%% ",
