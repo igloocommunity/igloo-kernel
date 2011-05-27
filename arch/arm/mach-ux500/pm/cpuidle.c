@@ -352,6 +352,10 @@ static int determine_sleep_state(u32 *sleep_time)
 		break;
 	}
 
+	ux500_ci_dbg_register_reason(i, power_state_req,
+				     (*sleep_time),
+				     max_depth);
+
 	return max(CI_WFI, i);
 }
 
