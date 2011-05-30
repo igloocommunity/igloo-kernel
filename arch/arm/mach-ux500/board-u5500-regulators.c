@@ -164,6 +164,37 @@ static struct regulator_consumer_supply u5500_vape_consumers[] = {
 	REGULATOR_SUPPLY("v-uart", "uart3"),
 };
 
+static struct regulator_consumer_supply u5500_sga_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.0"),
+};
+
+static struct regulator_consumer_supply u5500_hva_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.1"),
+};
+
+static struct regulator_consumer_supply u5500_sia_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.2"),
+};
+
+static struct regulator_consumer_supply u5500_disp_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.3"),
+};
+
+static struct regulator_consumer_supply u5500_esram12_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.6"),
+};
+
+#define U5500_REGULATOR_SWITCH(lower, upper)                           \
+[U5500_REGULATOR_SWITCH_##upper] = (struct regulator_init_data []) {   \
+{                                                                      \
+	.constraints = {                                                \
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,              \
+	},                                                              \
+	.consumer_supplies      = u5500_##lower##_consumers,            \
+	.num_consumer_supplies  = ARRAY_SIZE(u5500_##lower##_consumers),\
+}                                                                      \
+}
+
 static struct regulator_init_data *
 u5500_regulator_init_data[U5500_NUM_REGULATORS] __initdata = {
 	[U5500_REGULATOR_VAPE] = (struct regulator_init_data []) {
@@ -175,11 +206,28 @@ u5500_regulator_init_data[U5500_NUM_REGULATORS] __initdata = {
 			.num_consumer_supplies	= ARRAY_SIZE(u5500_vape_consumers),
 		}
 	},
+	U5500_REGULATOR_SWITCH(sga, SGA),
+	U5500_REGULATOR_SWITCH(hva, HVA),
+	U5500_REGULATOR_SWITCH(sia, SIA),
+	U5500_REGULATOR_SWITCH(disp, DISP),
+	U5500_REGULATOR_SWITCH(esram12, ESRAM12),
 };
+
+static void __init u5500_regulators_init_debug(void)
+{
+	const char data[] = "debug";
+	int i;
+
+	for (i = 0; i < 10; i++)
+		platform_device_register_data(NULL, "reg-virt-consumer", i,
+			data, sizeof(data));
+}
 
 void __init u5500_regulators_init(void)
 {
+	u5500_regulators_init_debug();
+
 	platform_device_register_data(NULL, "u5500-regulators", -1,
-				      u5500_regulator_init_data,
-				      sizeof(u5500_regulator_init_data));
+			u5500_regulator_init_data,
+			sizeof(u5500_regulator_init_data));
 }

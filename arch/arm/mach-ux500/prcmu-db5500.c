@@ -66,6 +66,19 @@
 #define PRCM_ACK_MB6 (tcdm_base + 0xF0C)
 #define PRCM_ACK_MB7 (tcdm_base + 0xF08)
 
+/* Mailbox 2 REQs */
+#define PRCM_REQ_MB2_EPOD_CLIENT (PRCM_REQ_MB2 + 0x0)
+#define PRCM_REQ_MB2_EPOD_STATE  (PRCM_REQ_MB2 + 0x1)
+#define PRCM_REQ_MB2_CLK_CLIENT  (PRCM_REQ_MB2 + 0x2)
+#define PRCM_REQ_MB2_CLK_STATE   (PRCM_REQ_MB2 + 0x3)
+#define PRCM_REQ_MB2_PLL_CLIENT  (PRCM_REQ_MB2 + 0x4)
+#define PRCM_REQ_MB2_PLL_STATE   (PRCM_REQ_MB2 + 0x5)
+
+/* Mailbox 2 ACKs */
+#define PRCM_ACK_MB2_EPOD_STATUS (PRCM_ACK_MB2 + 0x2)
+#define PRCM_ACK_MB2_CLK_STATUS  (PRCM_ACK_MB2 + 0x6)
+#define PRCM_ACK_MB2_PLL_STATUS  (PRCM_ACK_MB2 + 0xA)
+
 enum mb_return_code {
 	RC_SUCCESS,
 	RC_FAIL,
@@ -81,10 +94,28 @@ enum mb0_header {
 	AMB0H_WAKE_UP = 1,
 };
 
+/* Mailbox 2 headers. */
+enum mb2_header {
+	MB2H_EPOD_REQUEST = 1,
+	MB2H_CLK_REQUEST,
+	MB2H_PLL_REQUEST,
+};
+
 /* Mailbox 5 headers. */
 enum mb5_header {
 	MB5H_I2C_WRITE = 1,
 	MB5H_I2C_READ,
+};
+
+enum epod_state {
+	EPOD_OFF,
+	EPOD_ON,
+};
+enum db5500_prcmu_pll {
+	DB5500_PLL_SOC0,
+	DB5500_PLL_SOC1,
+	DB5500_PLL_DDR,
+	DB5500_NUM_PLL_ID,
 };
 
 /* Request mailbox 5 fields. */
@@ -135,6 +166,26 @@ static struct {
 } mb0_transfer;
 
 /*
+ * mb2_transfer - state needed for mailbox 2 communication.
+ * @lock:      The transaction lock.
+ * @work:      The transaction completion structure.
+ * @req:       Request data that need to persist between requests.
+ * @ack:       Reply ("acknowledge") data.
+ */
+static struct {
+	struct mutex lock;
+	struct completion work;
+	struct {
+		u8 epod_states[DB5500_NUM_EPOD_ID];
+		u8 pll_states[DB5500_NUM_PLL_ID];
+	} req;
+	struct {
+		u8 header;
+		u8 status;
+	} ack;
+} mb2_transfer;
+
+/*
  * mb5_transfer - state needed for mailbox 5 communication.
  * @lock:	The transaction lock.
  * @work:	The transaction completion structure.
@@ -160,10 +211,10 @@ struct clk_mgt {
 
 static DEFINE_SPINLOCK(clk_mgt_lock);
 
-#define CLK_MGT_ENTRY(_name)[DB5500_PRCMU_##_name] = {	\
+#define CLK_MGT_ENTRY(_name)[PRCMU_##_name] = {	\
 	(DB5500_PRCM_##_name##_MGT), 0			\
 }
-static struct clk_mgt clk_mgt[DB5500_PRCMU_NUM_REG_CLOCKS] = {
+static struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
 	CLK_MGT_ENTRY(SGACLK),
 	CLK_MGT_ENTRY(UARTCLK),
 	CLK_MGT_ENTRY(MSP02CLK),
@@ -229,21 +280,72 @@ static int request_reg_clock(u8 clock, bool enable)
 	return 0;
 }
 
+/*
+ * request_pll() - Request for a pll to be enabled or disabled.
+ * @pll:        The pll for which the request is made.
+ * @enable:     Whether the clock should be enabled (true) or disabled (false).
+ *
+ * This function should only be used by the clock implementation.
+ * Do not use it from any other place!
+ */
+static int request_pll(u8 pll, bool enable)
+{
+	int r = 0;
+
+	BUG_ON(pll >= DB5500_NUM_PLL_ID);
+	mutex_lock(&mb2_transfer.lock);
+
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(2))
+		cpu_relax();
+
+	mb2_transfer.req.pll_states[pll] = enable;
+
+	/* fill in mailbox */
+	writeb(pll, PRCM_REQ_MB2_PLL_CLIENT);
+	writeb(mb2_transfer.req.pll_states[pll], PRCM_REQ_MB2_PLL_STATE);
+
+	writeb(MB2H_PLL_REQUEST, PRCM_REQ_MB2_HEADER);
+
+	writel(MBOX_BIT(2), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
+	if (!wait_for_completion_timeout(&mb2_transfer.work,
+		msecs_to_jiffies(500))) {
+		pr_err("prcmu: set_pll() failed.\n"
+			"prcmu: Please check your firmware version.\n");
+		r = -EIO;
+		WARN(1, "Failed to set pll");
+		goto unlock_and_return;
+	}
+	if (mb2_transfer.ack.status != RC_SUCCESS ||
+		mb2_transfer.ack.header != MB2H_PLL_REQUEST)
+		r = -EIO;
+
+unlock_and_return:
+	mutex_unlock(&mb2_transfer.lock);
+
+	return r;
+}
+
 /**
- * db5500_prcmu_request_clock() - Request for a clock to be enabled or disabled.
+ * prcmu_request_clock() - Request for a clock to be enabled or disabled.
  * @clock:      The clock for which the request is made.
  * @enable:     Whether the clock should be enabled (true) or disabled (false).
  *
  * This function should only be used by the clock implementation.
  * Do not use it from any other place!
  */
-int db5500_prcmu_request_clock(u8 clock, bool enable)
+int prcmu_request_clock(u8 clock, bool enable)
 {
-	if (clock < DB5500_PRCMU_NUM_REG_CLOCKS)
+	if (clock < PRCMU_NUM_REG_CLOCKS)
 		return request_reg_clock(clock, enable);
-	else if (clock == DB5500_PRCMU_TIMCLK)
+	else if (clock == PRCMU_TIMCLK)
 		return request_timclk(enable);
-	else if (clock == DB5500_PRCMU_SYSCLK)
+	else if (clock == PRCMU_PLLSOC0)
+		return request_pll(DB5500_PLL_SOC0, enable);
+	else if (clock == PRCMU_PLLSOC1)
+		return request_pll(DB5500_PLL_SOC1, enable);
+	else if (clock == PRCMU_PLLDDR)
+		return request_pll(DB5500_PLL_DDR, enable);
+	else if (clock == PRCMU_SYSCLK)
 		return -EINVAL;
 	else
 		return -EINVAL;
@@ -395,7 +497,7 @@ int db5500_prcmu_disable_dsipll(void)
 	writel(PRCMU_DISABLE_PLLDSI, _PRCMU_BASE + PRCM_PLLDSI_ENABLE);
 	/* Disable  escapeclock */
 	writel(PRCMU_DISABLE_ESCAPE_CLOCK_DIV,
-	       _PRCMU_BASE + PRCM_DSITVCLK_DIV);
+		_PRCMU_BASE + PRCM_DSITVCLK_DIV);
 	return 0;
 }
 
@@ -419,6 +521,72 @@ static void ack_dbb_wakeup(void)
 	writel(MBOX_BIT(0), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
+}
+
+int prcmu_set_epod(u16 epod_id, u8 epod_state)
+{
+	int r = 0;
+	bool ram_retention = false;
+
+	/* check argument */
+	BUG_ON(epod_id < DB5500_EPOD_ID_BASE);
+	BUG_ON(epod_state > EPOD_STATE_ON);
+
+	epod_id &= 0xFF;
+	BUG_ON(epod_id > DB5500_NUM_EPOD_ID);
+
+	/* TODO: FW does not take retention for ESRAM12?
+	   set flag if retention is possible */
+	switch (epod_id) {
+	case DB5500_EPOD_ID_ESRAM12:
+		ram_retention = true;
+		break;
+	}
+
+	/* check argument */
+	/* BUG_ON(epod_state == EPOD_STATE_RAMRET && !ram_retention); */
+
+	/* get lock */
+	mutex_lock(&mb2_transfer.lock);
+
+	/* wait for mailbox */
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(2))
+		cpu_relax();
+
+	/* PRCMU FW can only handle on or off */
+	if (epod_state == EPOD_STATE_ON)
+		mb2_transfer.req.epod_states[epod_id] = EPOD_ON;
+	else if (epod_state == EPOD_STATE_OFF)
+		mb2_transfer.req.epod_states[epod_id] = EPOD_OFF;
+	else {
+		r = -EINVAL;
+		goto unlock_and_return;
+	}
+
+	/* fill in mailbox */
+	writeb(epod_id, PRCM_REQ_MB2_EPOD_CLIENT);
+	writeb(mb2_transfer.req.epod_states[epod_id], PRCM_REQ_MB2_EPOD_STATE);
+
+	writeb(MB2H_EPOD_REQUEST, PRCM_REQ_MB2_HEADER);
+
+	writel(MBOX_BIT(2), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
+
+	if (!wait_for_completion_timeout(&mb2_transfer.work,
+		msecs_to_jiffies(500))) {
+		pr_err("prcmu: set_epod() failed.\n"
+			"prcmu: Please check your firmware version.\n");
+		r = -EIO;
+		WARN(1, "Failed to set epod");
+		goto unlock_and_return;
+	}
+
+	if (mb2_transfer.ack.status != RC_SUCCESS ||
+		mb2_transfer.ack.header != MB2H_EPOD_REQUEST)
+		r = -EIO;
+
+unlock_and_return:
+	mutex_unlock(&mb2_transfer.lock);
+	return r;
 }
 
 static inline void print_unknown_header_warning(u8 n, u8 header)
@@ -454,7 +622,28 @@ static bool read_mailbox_1(void)
 
 static bool read_mailbox_2(void)
 {
+	u8 header;
+
+	header = readb(PRCM_ACK_MB2_HEADER);
+	mb2_transfer.ack.header = header;
+	switch (header) {
+	case MB2H_EPOD_REQUEST:
+		mb2_transfer.ack.status = readb(PRCM_ACK_MB2_EPOD_STATUS);
+		break;
+	case MB2H_CLK_REQUEST:
+		mb2_transfer.ack.status = readb(PRCM_ACK_MB2_CLK_STATUS);
+		break;
+	case MB2H_PLL_REQUEST:
+		mb2_transfer.ack.status = readb(PRCM_ACK_MB2_PLL_STATUS);
+		break;
+	default:
+		writel(MBOX_BIT(2), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
+		pr_err("prcmu: Wrong ACK received for MB2 request \n");
+		return false;
+		break;
+	}
 	writel(MBOX_BIT(2), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
+	complete(&mb2_transfer.work);
 	return false;
 }
 
@@ -481,13 +670,14 @@ static bool read_mailbox_5(void)
 	case MB5H_I2C_WRITE:
 		mb5_transfer.ack.header = header;
 		mb5_transfer.ack.status = readb(PRCM_ACK_MB5_RETURN_CODE);
+		writel(MBOX_BIT(5), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 		complete(&mb5_transfer.work);
 		break;
 	default:
+		writel(MBOX_BIT(5), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 		print_unknown_header_warning(5, header);
 		break;
 	}
-	writel(MBOX_BIT(5), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
@@ -545,7 +735,9 @@ void __init db5500_prcmu_early_init(void)
 {
 	tcdm_base = __io_address(U5500_PRCMU_TCDM_BASE);
 	spin_lock_init(&mb0_transfer.lock);
+	mutex_init(&mb2_transfer.lock);
 	mutex_init(&mb5_transfer.lock);
+	init_completion(&mb2_transfer.work);
 	init_completion(&mb5_transfer.work);
 }
 
