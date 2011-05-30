@@ -101,6 +101,16 @@ enum mb2_header {
 	MB2H_PLL_REQUEST,
 };
 
+/* Mailbox 3 headers */
+enum mb3_header {
+	MB3H_REFCLK_REQUEST = 1,
+};
+
+enum sysclk_state {
+	SYSCLK_OFF,
+	SYSCLK_ON,
+};
+
 /* Mailbox 5 headers. */
 enum mb5_header {
 	MB5H_I2C_WRITE = 1,
@@ -117,6 +127,12 @@ enum db5500_prcmu_pll {
 	DB5500_PLL_DDR,
 	DB5500_NUM_PLL_ID,
 };
+
+/* Request mailbox 3 fields */
+#define PRCM_REQ_MB3_REFCLK_MGT		(PRCM_REQ_MB3 + 0x0)
+
+/* Ack. mailbox 3 fields */
+#define PRCM_ACK_MB3_REFCLK_REQ		(PRCM_ACK_MB3 + 0x0)
 
 /* Request mailbox 5 fields. */
 #define PRCM_REQ_MB5_I2C_SLAVE (PRCM_REQ_MB5 + 0)
@@ -186,6 +202,23 @@ static struct {
 } mb2_transfer;
 
 /*
+ * mb3_transfer - state needed for mailbox 3 communication.
+ * @sysclk_lock:	A lock used to handle concurrent sysclk requests.
+ * @sysclk_work:	Work structure used for sysclk requests.
+ * @req_st:		Requested clock state.
+ * @ack:		Acknowledgement data
+ */
+static struct {
+	struct mutex sysclk_lock;
+	struct completion sysclk_work;
+	enum sysclk_state req_st;
+	struct {
+		u8 header;
+		u8 status;
+	} ack;
+} mb3_transfer;
+
+/*
  * mb5_transfer - state needed for mailbox 5 communication.
  * @lock:	The transaction lock.
  * @work:	The transaction completion structure.
@@ -240,6 +273,50 @@ static struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
 	CLK_MGT_ENTRY(SIACLK),
 	CLK_MGT_ENTRY(SVACLK),
 };
+
+static int request_sysclk(bool enable)
+{
+	int r;
+
+	r = 0;
+	mutex_lock(&mb3_transfer.sysclk_lock);
+
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(3))
+		cpu_relax();
+
+	if (enable)
+		mb3_transfer.req_st = SYSCLK_ON;
+	else
+		mb3_transfer.req_st = SYSCLK_OFF;
+
+	writeb(mb3_transfer.req_st, (PRCM_REQ_MB3_REFCLK_MGT));
+
+	writeb(MB3H_REFCLK_REQUEST, (PRCM_REQ_MB3_HEADER));
+	writel(MBOX_BIT(3), (_PRCMU_BASE + PRCM_MBOX_CPU_SET));
+
+	/*
+	 * The firmware only sends an ACK if we want to enable the
+	 * SysClk, and it succeeds.
+	 */
+	if (!wait_for_completion_timeout(&mb3_transfer.sysclk_work,
+			msecs_to_jiffies(20000))) {
+		pr_err("prcmu: %s timed out (20 s) waiting for a reply.\n",
+			__func__);
+		r = -EIO;
+		WARN(1, "Failed to set sysclk");
+		goto unlock_and_return;
+	}
+
+	if ((mb3_transfer.ack.header != MB3H_REFCLK_REQUEST) ||
+			(mb3_transfer.ack.status != mb3_transfer.req_st)) {
+		r = -EIO;
+	}
+
+unlock_and_return:
+	mutex_unlock(&mb3_transfer.sysclk_lock);
+
+	return r;
+}
 
 static int request_timclk(bool enable)
 {
@@ -352,7 +429,7 @@ int db5500_prcmu_request_clock(u8 clock, bool enable)
 	else if (clock == PRCMU_PLLDDR)
 		return request_pll(DB5500_PLL_DDR, enable);
 	else if (clock == PRCMU_SYSCLK)
-		return -EINVAL;
+		return request_sysclk(enable);
 	else
 		return -EINVAL;
 }
@@ -655,7 +732,22 @@ static bool read_mailbox_2(void)
 
 static bool read_mailbox_3(void)
 {
-	writel(MBOX_BIT(3), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
+	u8 header;
+
+	header = readb(PRCM_ACK_MB3_HEADER);
+	mb3_transfer.ack.header = header;
+	switch (header) {
+	case MB3H_REFCLK_REQUEST:
+		mb3_transfer.ack.status = readb(PRCM_ACK_MB3_REFCLK_REQ);
+		writel(MBOX_BIT(3), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
+		complete(&mb3_transfer.sysclk_work);
+		break;
+	default:
+		writel(MBOX_BIT(3), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
+		pr_err("prcmu: wrong MB3 header\n");
+		break;
+	}
+
 	return false;
 }
 
@@ -742,8 +834,10 @@ void __init db5500_prcmu_early_init(void)
 	tcdm_base = __io_address(U5500_PRCMU_TCDM_BASE);
 	spin_lock_init(&mb0_transfer.lock);
 	mutex_init(&mb2_transfer.lock);
-	mutex_init(&mb5_transfer.lock);
 	init_completion(&mb2_transfer.work);
+	mutex_init(&mb3_transfer.sysclk_lock);
+	init_completion(&mb3_transfer.sysclk_work);
+	mutex_init(&mb5_transfer.lock);
 	init_completion(&mb5_transfer.work);
 }
 
