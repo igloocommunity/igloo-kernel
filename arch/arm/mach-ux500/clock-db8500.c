@@ -1304,6 +1304,53 @@ static void u8500_amba_clk_enable(void)
 	}
 }
 
+static int __init init_clock_states(void)
+{
+	/*
+	 * The following clks are shared with secure world.
+	 * Currently this leads to a limitation where we need to
+	 * enable them at all times.
+	 */
+	clk_enable(&p6_pclk1);
+	clk_enable(&p6_pclk2);
+	clk_enable(&p6_pclk3);
+	if (cpu_is_u8500() && !ux500_is_svp())
+		clk_enable(&p6_rng_clk);
+	/*
+	 * Disable clocks that are on at boot, but should be off.
+	 */
+	if (!clk_enable(&bmlclk))
+		clk_disable(&bmlclk);
+	if (!clk_enable(&dsialtclk))
+		clk_disable(&dsialtclk);
+	if (!clk_enable(&hsirxclk))
+		clk_disable(&hsirxclk);
+	if (!clk_enable(&hsitxclk))
+		clk_disable(&hsitxclk);
+	if (!clk_enable(&ipi2cclk))
+		clk_disable(&ipi2cclk);
+	if (!clk_enable(&lcdclk))
+		clk_disable(&lcdclk);
+	if (!clk_enable(&per7clk))
+		clk_disable(&per7clk);
+	/*
+	 * APEATCLK and APETRACECLK are enabled at boot and needed
+	 * in order to debug with lauterbach
+	 */
+	if (!clk_enable(&apeatclk)) {
+#ifdef CONFIG_UX500_DEBUG_NO_LAUTERBACH
+		clk_disable(&apeatclk);
+#endif
+	}
+	if (!clk_enable(&apetraceclk)) {
+#ifdef CONFIG_UX500_DEBUG_NO_LAUTERBACH
+		clk_disable(&apetraceclk);
+#endif
+	}
+	return 0;
+}
+late_initcall(init_clock_states);
+
 int __init db8500_clk_init(void)
 {
 	if (cpu_is_u8500ed()) {
@@ -1356,35 +1403,6 @@ int __init db8500_clk_init(void)
 
 	if (cpu_is_u8500())
 		u8500_amba_clk_enable();
-
-	/*
-	 * The following clks are shared with secure world.
-	 * Currently this leads to a limitation where we need to
-	 * enable them at all times.
-	 */
-	clk_enable(&p6_pclk1);
-	clk_enable(&p6_pclk2);
-	clk_enable(&p6_pclk3);
-	if (cpu_is_u8500() && !ux500_is_svp())
-		clk_enable(&p6_rng_clk);
-
-	/*
-	 * APEATCLK and APETRACECLK are enabled at boot and needed
-	 * in order to debug with lauterbach
-	 */
-	clk_enable(&apeatclk);
-	clk_enable(&apetraceclk);
-#ifdef CONFIG_UX500_DEBUG_NO_LAUTERBACH
-	clk_disable(&apeatclk);
-	clk_disable(&apetraceclk);
-#endif
-	/* periph 7's clock is enabled at boot, but should be off */
-	clk_enable(&per7clk);
-	clk_disable(&per7clk);
-
-	/* the hsirx clock is enabled at boot, but should be off */
-	clk_enable(&hsirxclk);
-	clk_disable(&hsirxclk);
 
 	return 0;
 }
