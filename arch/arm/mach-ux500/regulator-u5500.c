@@ -16,6 +16,18 @@
 #include "regulator-ux500.h"
 #include "regulator-u5500.h"
 
+#define U5500_REGULATOR_SWITCH(_name, reg)                               \
+	[U5500_REGULATOR_SWITCH_##reg] = {                               \
+		.desc = {                                               \
+			.name   = _name,                                \
+			.id     = U5500_REGULATOR_SWITCH_##reg,          \
+			.ops    = &ux500_regulator_switch_ops,          \
+			.type   = REGULATOR_VOLTAGE,                    \
+			.owner  = THIS_MODULE,                          \
+		},                                                      \
+		.epod_id = DB5500_EPOD_ID_##reg,                         \
+}
+
 static struct u8500_regulator_info
 u5500_regulator_info[U5500_NUM_REGULATORS] = {
 	[U5500_REGULATOR_VAPE] = {
@@ -27,6 +39,11 @@ u5500_regulator_info[U5500_NUM_REGULATORS] = {
 			.owner	= THIS_MODULE,
 		},
 	},
+	U5500_REGULATOR_SWITCH("u5500-sga", SGA),
+	U5500_REGULATOR_SWITCH("u5500-hva", HVA),
+	U5500_REGULATOR_SWITCH("u5500-sia", SIA),
+	U5500_REGULATOR_SWITCH("u5500-disp", DISP),
+	U5500_REGULATOR_SWITCH("u5500-esram12", ESRAM12),
 };
 
 static int __devinit u5500_regulator_probe(struct platform_device *pdev)

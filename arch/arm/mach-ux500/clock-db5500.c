@@ -31,26 +31,9 @@
 #include "prcmu-regs-db5500.h"
 
 static DEFINE_MUTEX(sysclk_mutex);
+static DEFINE_MUTEX(pll_mutex);
 static DEFINE_MUTEX(ab_ulpclk_mutex);
 static DEFINE_MUTEX(audioclk_mutex);
-
-/* PLL operations. */
-
-static int clk_pllsrc_enable(struct clk *clk)
-{
-	/* To enable pll */
-	return 0;
-}
-
-static void clk_pllsrc_disable(struct clk *clk)
-{
-	/* To disable pll */
-}
-
-static struct clkops pll_clk_ops = {
-	.enable = clk_pllsrc_enable,
-	.disable = clk_pllsrc_disable,
-};
 
 /* SysClk operations. */
 
@@ -59,7 +42,7 @@ static int request_sysclk(bool enable)
 	static int requests;
 
 	if ((enable && (requests++ == 0)) || (!enable && (--requests == 0)))
-		return prcmu_request_clock(DB5500_PRCMU_SYSCLK, enable);
+		return prcmu_request_clock(PRCMU_SYSCLK, enable);
 	return 0;
 }
 
@@ -311,17 +294,23 @@ static struct clkops clkout1_ops = {
 
 static struct clk soc0_pll = {
 	.name = "soc0_pll",
-	.ops = &pll_clk_ops,
+	.ops = &prcmu_clk_ops,
+	.mutex = &pll_mutex,
+	.cg_sel = PRCMU_PLLSOC0,
 };
 
 static struct clk soc1_pll = {
 	.name = "soc1_pll",
-	.ops = &pll_clk_ops,
+	.ops = &prcmu_clk_ops,
+	.mutex = &pll_mutex,
+	.cg_sel = PRCMU_PLLSOC1,
 };
 
 static struct clk ddr_pll = {
 	.name = "ddr_pll",
-	.ops = &pll_clk_ops,
+	.ops = &prcmu_clk_ops,
+	.mutex = &pll_mutex,
+	.cg_sel = PRCMU_PLLDDR,
 };
 
 static struct clk ulp38m4 = {
@@ -413,29 +402,29 @@ static struct clk audioclk = {
 	.parents = audioclk_parents,
 };
 
-static DEF_PRCMU_CLK(dmaclk, DB5500_PRCMU_DMACLK, 200000000);
-static DEF_PRCMU_CLK(b2r2clk, DB5500_PRCMU_B2R2CLK, 200000000);
-static DEF_PRCMU_CLK(sgaclk, DB5500_PRCMU_SGACLK, 199900000);
-static DEF_PRCMU_CLK(uartclk, DB5500_PRCMU_UARTCLK, 36360000);
-static DEF_PRCMU_CLK(msp02clk, DB5500_PRCMU_MSP02CLK, 13000000);
-static DEF_PRCMU_CLK(i2cclk, DB5500_PRCMU_I2CCLK, 24000000);
-static DEF_PRCMU_CLK(irdaclk, DB5500_PRCMU_IRDACLK, 48000000);
-static DEF_PRCMU_CLK(irrcclk, DB5500_PRCMU_IRRCCLK, 48000000);
-static DEF_PRCMU_CLK(rngclk, DB5500_PRCMU_RNGCLK, 26000000);
-static DEF_PRCMU_CLK(pwmclk, DB5500_PRCMU_PWMCLK, 26000000);
-static DEF_PRCMU_CLK(sdmmcclk, DB5500_PRCMU_SDMMCCLK, 100000000);
-static DEF_PRCMU_CLK(per1clk, DB5500_PRCMU_PER1CLK, 133330000);
-static DEF_PRCMU_CLK(per2clk, DB5500_PRCMU_PER2CLK, 133330000);
-static DEF_PRCMU_CLK(per3clk, DB5500_PRCMU_PER3CLK, 133330000);
-static DEF_PRCMU_CLK(per5clk, DB5500_PRCMU_PER5CLK, 133330000);
-static DEF_PRCMU_CLK(per6clk, DB5500_PRCMU_PER6CLK, 133330000);
-static DEF_PRCMU_CLK(hdmiclk, DB5500_PRCMU_HDMICLK, 26000000);
-static DEF_PRCMU_CLK(apeatclk, DB5500_PRCMU_APEATCLK, 200000000);
-static DEF_PRCMU_CLK(apetraceclk, DB5500_PRCMU_APETRACECLK, 266000000);
-static DEF_PRCMU_CLK(mcdeclk, DB5500_PRCMU_MCDECLK, 160000000);
-static DEF_PRCMU_CLK(tvclk, DB5500_PRCMU_TVCLK, 40000000);
-static DEF_PRCMU_CLK(dsialtclk, DB5500_PRCMU_DSIALTCLK, 400000000);
-static DEF_PRCMU_CLK(timclk, DB5500_PRCMU_TIMCLK, 3250000);
+static DEF_PRCMU_CLK(dmaclk, PRCMU_DMACLK, 200000000);
+static DEF_PRCMU_CLK(b2r2clk, PRCMU_B2R2CLK, 200000000);
+static DEF_PRCMU_CLK(sgaclk, PRCMU_SGACLK, 199900000);
+static DEF_PRCMU_CLK(uartclk, PRCMU_UARTCLK, 36360000);
+static DEF_PRCMU_CLK(msp02clk, PRCMU_MSP02CLK, 13000000);
+static DEF_PRCMU_CLK(i2cclk, PRCMU_I2CCLK, 24000000);
+static DEF_PRCMU_CLK(irdaclk, PRCMU_IRDACLK, 48000000);
+static DEF_PRCMU_CLK(irrcclk, PRCMU_IRRCCLK, 48000000);
+static DEF_PRCMU_CLK(rngclk, PRCMU_RNGCLK, 26000000);
+static DEF_PRCMU_CLK(pwmclk, PRCMU_PWMCLK, 26000000);
+static DEF_PRCMU_CLK(sdmmcclk, PRCMU_SDMMCCLK, 100000000);
+static DEF_PRCMU_CLK(per1clk, PRCMU_PER1CLK, 133330000);
+static DEF_PRCMU_CLK(per2clk, PRCMU_PER2CLK, 133330000);
+static DEF_PRCMU_CLK(per3clk, PRCMU_PER3CLK, 133330000);
+static DEF_PRCMU_CLK(per5clk, PRCMU_PER5CLK, 133330000);
+static DEF_PRCMU_CLK(per6clk, PRCMU_PER6CLK, 133330000);
+static DEF_PRCMU_CLK(hdmiclk, PRCMU_HDMICLK, 26000000);
+static DEF_PRCMU_CLK(apeatclk, PRCMU_APEATCLK, 200000000);
+static DEF_PRCMU_CLK(apetraceclk, PRCMU_APETRACECLK, 266000000);
+static DEF_PRCMU_CLK(mcdeclk, PRCMU_MCDECLK, 160000000);
+static DEF_PRCMU_CLK(tvclk, PRCMU_TVCLK, 40000000);
+static DEF_PRCMU_CLK(dsialtclk, PRCMU_DSIALTCLK, 400000000);
+static DEF_PRCMU_CLK(timclk, PRCMU_TIMCLK, 3250000);
 
 /* PRCC PClocks */
 
@@ -796,26 +785,10 @@ static void __init db5500_boot_clk_enable(void)
 	}
 }
 
-static int db5500_prcmu_clk_enable(struct clk *clk)
-{
-	return prcmu_request_clock(clk->cg_sel, true);
-}
-
-static void db5500_prcmu_clk_disable(struct clk *clk)
-{
-	if (prcmu_request_clock(clk->cg_sel, false)) {
-		pr_err("clock: %s failed to disable %s.\n", __func__,
-			clk->name);
-	}
-}
-
 int __init db5500_clk_init(void)
 {
 	sysclk_ops.enable = NULL;
 	sysclk_ops.disable = NULL;
-
-	prcmu_clk_ops.enable = db5500_prcmu_clk_enable;
-	prcmu_clk_ops.disable = db5500_prcmu_clk_disable;
 
 	if (ux500_is_svp()) {
 		prcmu_clk_ops.enable = NULL;
