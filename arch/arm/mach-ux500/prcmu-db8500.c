@@ -2059,6 +2059,16 @@ void __init prcmu_early_init(void)
 	}
 }
 
+static void __init init_prcm_registers(void)
+{
+	u32 val;
+
+	val = readl(_PRCMU_BASE + PRCM_A9PL_FORCE_CLKEN);
+	val &= ~(PRCM_A9PL_FORCE_CLKEN_PRCM_A9PL_FORCE_CLKEN |
+		PRCM_A9PL_FORCE_CLKEN_PRCM_A9AXI_FORCE_CLKEN);
+	writel(val, (_PRCMU_BASE + PRCM_A9PL_FORCE_CLKEN));
+}
+
 /**
  * prcmu_fw_init - arch init call for the Linux PRCMU fw init logic
  *
@@ -2069,6 +2079,8 @@ int __init prcmu_init(void)
 
 	if (ux500_is_svp())
 		return -ENODEV;
+
+	init_prcm_registers();
 
 	/* Clean up the mailbox interrupts after pre-kernel code. */
 	writel(ALL_MBOX_BITS, (_PRCMU_BASE + PRCM_ARM_IT1_CLR));
