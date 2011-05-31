@@ -501,7 +501,7 @@ static const struct file_operations ape_voltage_fops = {
 static int setup_debugfs(void)
 {
 	struct dentry *dir;
-	struct dentry *file;
+	struct dentry *file = NULL;
 
 	dir = debugfs_create_dir("prcmu", NULL);
 	if (IS_ERR_OR_NULL(dir))
