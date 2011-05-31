@@ -189,7 +189,7 @@ static void store_latency(struct state_history *sh,
 			  ktime_t d,
 			  bool lock)
 {
-	unsigned long flags;
+	unsigned long flags = 0;
 
 	if (lock)
 		spin_lock_irqsave(&dbg_lock, flags);
