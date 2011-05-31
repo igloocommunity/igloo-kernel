@@ -385,7 +385,7 @@ int cpufreq_update_freq(int cpu, unsigned int min, unsigned int max)
 	policy->user_policy.min = policy->min;
 	policy->user_policy.max = policy->max;
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(cpufreq_update_freq);
 
