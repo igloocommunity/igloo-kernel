@@ -820,29 +820,22 @@ static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
 	/* initialize registers */
 	for (i = 0; i < pdata->num_regulator_reg_init; i++) {
 		int id;
-		u8 value;
+		u8 mask, value;
 
 		id = pdata->regulator_reg_init[i].id;
+		mask = pdata->regulator_reg_init[i].mask;
 		value = pdata->regulator_reg_init[i].value;
 
 		/* check for configuration errors */
-		if (id >= AB8500_NUM_REGULATOR_REGISTERS) {
-			dev_err(&pdev->dev,
-				"Configuration error: id outside range.\n");
-			return -EINVAL;
-		}
-		if (value & ~ab8500_reg_init[id].mask) {
-			dev_err(&pdev->dev,
-				"Configuration error: value outside mask.\n");
-			return -EINVAL;
-		}
+		BUG_ON(id >= AB8500_NUM_REGULATOR_REGISTERS);
+		BUG_ON(value & ~mask);
+		BUG_ON(mask & ~ab8500_reg_init[id].mask);
 
 		/* initialize register */
 		err = abx500_mask_and_set_register_interruptible(&pdev->dev,
 			ab8500_reg_init[id].bank,
 			ab8500_reg_init[id].addr,
-			ab8500_reg_init[id].mask,
-			value);
+			mask, value);
 		if (err < 0) {
 			dev_err(&pdev->dev,
 				"Failed to initialize 0x%02x, 0x%02x.\n",
@@ -854,8 +847,7 @@ static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
 			"  init: 0x%02x, 0x%02x, 0x%02x, 0x%02x\n",
 			ab8500_reg_init[id].bank,
 			ab8500_reg_init[id].addr,
-			ab8500_reg_init[id].mask,
-			value);
+			mask, value);
 	}
 
 	/* register all regulators */
