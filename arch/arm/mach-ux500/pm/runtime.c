@@ -63,20 +63,18 @@ static struct pm_runtime_data *__to_prd(struct device *dev)
 static void platform_pm_runtime_init(struct device *dev,
 				     struct pm_runtime_data *prd)
 {
-	if (prd && !test_and_set_bit(BIT_ONCE, &prd->flags)) {
-		prd->pins = ux500_pins_get(dev_name(dev));
+	prd->pins = ux500_pins_get(dev_name(dev));
 
-		prd->regulator = ux500_regulator_get(dev);
-		if (IS_ERR(prd->regulator))
-			prd->regulator = NULL;
+	prd->regulator = ux500_regulator_get(dev);
+	if (IS_ERR(prd->regulator))
+		prd->regulator = NULL;
 
-		if (prd->pins || prd->regulator) {
-			dev_info(dev, "managed by runtime pm: %s%s\n",
-				 prd->pins ? "pins " : "",
-				 prd->regulator ? "regulator " : "");
+	if (prd->pins || prd->regulator) {
+		dev_info(dev, "managed by runtime pm: %s%s\n",
+			 prd->pins ? "pins " : "",
+			 prd->regulator ? "regulator " : "");
 
-			set_bit(BIT_ACTIVE, &prd->flags);
-		}
+		set_bit(BIT_ACTIVE, &prd->flags);
 	}
 }
 
@@ -85,6 +83,13 @@ static void platform_pm_runtime_bug(struct device *dev,
 {
 	if (prd && !test_and_set_bit(BIT_ONCE, &prd->flags))
 		dev_err(dev, "runtime pm suspend before resume\n");
+}
+
+static void platform_pm_runtime_used(struct device *dev,
+				       struct pm_runtime_data *prd)
+{
+	if (prd)
+		set_bit(BIT_ONCE, &prd->flags);
 }
 
 static int ux500_pd_runtime_suspend(struct device *dev)
@@ -114,7 +119,7 @@ static int ux500_pd_runtime_resume(struct device *dev)
 
 	dev_vdbg(dev, "%s()\n", __func__);
 
-	platform_pm_runtime_init(dev, prd);
+	platform_pm_runtime_used(dev, prd);
 
 	if (prd && test_bit(BIT_ACTIVE, &prd->flags)) {
 		if (prd->pins)
@@ -186,9 +191,10 @@ static int ux500_pd_bus_notify(struct notifier_block *nb,
 
 	if (action == BUS_NOTIFY_BIND_DRIVER) {
 		prd = devres_alloc(__devres_release, sizeof(*prd), GFP_KERNEL);
-		if (prd)
+		if (prd) {
 			devres_add(dev, prd);
-		else
+			platform_pm_runtime_init(dev, prd);
+		} else
 			dev_err(dev, "unable to alloc memory for runtime pm\n");
 	}
 
