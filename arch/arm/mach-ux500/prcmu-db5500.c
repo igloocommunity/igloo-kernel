@@ -325,6 +325,10 @@ unlock_and_return:
 	return r;
 }
 
+void prcmu_enable_wakeups(u32 wakeups)
+{
+}
+
 /**
  * prcmu_request_clock() - Request for a clock to be enabled or disabled.
  * @clock:      The clock for which the request is made.
