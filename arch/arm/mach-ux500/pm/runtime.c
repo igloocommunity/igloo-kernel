@@ -137,6 +137,7 @@ static int ux500_pd_runtime_resume(struct device *dev)
 static int ux500_pd_suspend_noirq(struct device *dev)
 {
 	struct pm_runtime_data *prd = __to_prd(dev);
+	int ret;
 
 	dev_vdbg(dev, "%s()\n", __func__);
 
@@ -153,6 +154,10 @@ static int ux500_pd_suspend_noirq(struct device *dev)
 	 * reason.  We still need to do the power save stuff when going into
 	 * suspend, so force it here.
 	 */
+	ret = pm_generic_runtime_suspend(dev);
+	if (ret)
+		return ret;
+
 	return ux500_pd_runtime_suspend(dev);
 }
 
@@ -178,7 +183,9 @@ static int ux500_pd_resume_noirq(struct device *dev)
 	 * but we forced it down in suspend_noirq above.  Bring it
 	 * up since pm-runtime thinks it is not suspended.
 	 */
-	return ux500_pd_runtime_resume(dev);
+	ux500_pd_runtime_resume(dev);
+
+	return pm_generic_runtime_resume(dev);
 }
 
 static int ux500_pd_bus_notify(struct notifier_block *nb,
