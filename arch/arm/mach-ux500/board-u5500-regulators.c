@@ -166,22 +166,29 @@ static struct regulator_consumer_supply u5500_vape_consumers[] = {
 
 static struct regulator_consumer_supply u5500_sga_consumers[] = {
 	REGULATOR_SUPPLY("debug", "reg-virt-consumer.0"),
+	REGULATOR_SUPPLY("v-mali", NULL),
 };
 
 static struct regulator_consumer_supply u5500_hva_consumers[] = {
 	REGULATOR_SUPPLY("debug", "reg-virt-consumer.1"),
+	REGULATOR_SUPPLY("sva-pipe", "cm_control"),
 };
 
 static struct regulator_consumer_supply u5500_sia_consumers[] = {
 	REGULATOR_SUPPLY("debug", "reg-virt-consumer.2"),
+	REGULATOR_SUPPLY("sia-pipe", "cm_control"),
 };
 
 static struct regulator_consumer_supply u5500_disp_consumers[] = {
 	REGULATOR_SUPPLY("debug", "reg-virt-consumer.3"),
+	REGULATOR_SUPPLY("vsupply", "b2r2_bus"),
+	REGULATOR_SUPPLY("vsupply", "mcde"),
 };
 
 static struct regulator_consumer_supply u5500_esram12_consumers[] = {
-	REGULATOR_SUPPLY("debug", "reg-virt-consumer.6"),
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.4"),
+	REGULATOR_SUPPLY("v-esram12", "mcde"),
+	REGULATOR_SUPPLY("esram12", "cm_control"),
 };
 
 #define U5500_REGULATOR_SWITCH(lower, upper)                           \
@@ -218,7 +225,7 @@ static void __init u5500_regulators_init_debug(void)
 	const char data[] = "debug";
 	int i;
 
-	for (i = 0; i < 10; i++)
+	for (i = 0; i < 4; i++)
 		platform_device_register_data(NULL, "reg-virt-consumer", i,
 			data, sizeof(data));
 }
