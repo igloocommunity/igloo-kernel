@@ -181,16 +181,48 @@ static struct clkops ab_ulpclk_ops = {
 
 /* AB8500 intclk operations */
 
+enum ab_intclk_parent {
+	AB_INTCLK_PARENT_SYSCLK,
+	AB_INTCLK_PARENT_ULPCLK,
+	AB_INTCLK_PARENTS_END,
+	NUM_AB_INTCLK_PARENTS
+};
+
+static int ab_intclk_enable(struct clk *clk)
+{
+	if (clk->parent == clk->parents[AB_INTCLK_PARENT_ULPCLK]) {
+		return ab8500_sysctrl_write(AB8500_SYSULPCLKCTRL1,
+			AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK,
+			(1 << AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_SHIFT));
+	}
+	return 0;
+}
+
+static void ab_intclk_disable(struct clk *clk)
+{
+	if (clk->parent == clk->parents[AB_INTCLK_PARENT_SYSCLK])
+		return;
+
+	if (ab8500_sysctrl_clear(AB8500_SYSULPCLKCTRL1,
+		AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK)) {
+		pr_err("clock: %s failed to disable %s.\n", __func__,
+			clk->name);
+	}
+}
+
 static int ab_intclk_set_parent(struct clk *clk, struct clk *parent)
 {
 	int err;
 
-	if (clk->enabled) {
-		err = __clk_enable(parent, clk->mutex);
-		if (unlikely(err))
-			goto parent_enable_error;
-	}
-	if (parent->ops == &ab_ulpclk_ops) {
+	if (!clk->enabled)
+		return 0;
+
+	err = __clk_enable(parent, clk->mutex);
+
+	if (unlikely(err))
+		goto parent_enable_error;
+
+	if (parent == clk->parents[AB_INTCLK_PARENT_ULPCLK]) {
 		err = ab8500_sysctrl_write(AB8500_SYSULPCLKCTRL1,
 			AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK,
 			(1 << AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_SHIFT));
@@ -200,8 +232,9 @@ static int ab_intclk_set_parent(struct clk *clk, struct clk *parent)
 	}
 	if (unlikely(err))
 		goto config_error;
-	if (clk->enabled)
-		__clk_disable(clk->parent, clk->mutex);
+
+	__clk_disable(clk->parent, clk->mutex);
+
 	return 0;
 
 config_error:
@@ -211,6 +244,8 @@ parent_enable_error:
 }
 
 static struct clkops ab_intclk_ops = {
+	.enable = ab_intclk_enable,
+	.disable = ab_intclk_disable,
 	.set_parent = ab_intclk_set_parent,
 };
 
@@ -453,7 +488,11 @@ static struct clk ab_ulpclk = {
 	.mutex = &ab_ulpclk_mutex,
 };
 
-static struct clk *ab_intclk_parents[] = { &sysclk, &ab_ulpclk, NULL };
+static struct clk *ab_intclk_parents[NUM_AB_INTCLK_PARENTS] = {
+	[AB_INTCLK_PARENT_SYSCLK] = &sysclk,
+	[AB_INTCLK_PARENT_ULPCLK] = &ab_ulpclk,
+	[AB_INTCLK_PARENTS_END] = NULL,
+};
 
 static struct clk ab_intclk = {
 	.name = "ab_intclk",
