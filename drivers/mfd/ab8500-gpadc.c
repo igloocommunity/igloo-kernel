@@ -139,7 +139,10 @@ struct ab8500_gpadc *ab8500_gpadc_get(void)
 }
 EXPORT_SYMBOL(ab8500_gpadc_get);
 
-static int ab8500_gpadc_ad_to_voltage(struct ab8500_gpadc *gpadc, u8 input,
+/**
+ * ab8500_gpadc_ad_to_voltage() - Convert a raw ADC value to a voltage
+ */
+int ab8500_gpadc_ad_to_voltage(struct ab8500_gpadc *gpadc, u8 input,
 	int ad_value)
 {
 	int res;
@@ -237,6 +240,23 @@ static int ab8500_gpadc_ad_to_voltage(struct ab8500_gpadc *gpadc, u8 input,
  * data.
  */
 int ab8500_gpadc_convert(struct ab8500_gpadc *gpadc, u8 input)
+{
+	int data;
+	int ret;
+
+	data = ab8500_gpadc_read_raw(gpadc, input);
+	ret = ab8500_gpadc_ad_to_voltage(gpadc, input, data);
+	return ret;
+}
+
+/**
+ * ab8500_gpadc_read_raw() - gpadc read
+ * @input:	analog input to be read
+ *
+ * This function obtains the raw ADC value, this then needs
+ * to be converted by calling ab8500_gpadc_ad_to_voltage()
+ */
+int ab8500_gpadc_read_raw(struct ab8500_gpadc *gpadc, u8 input)
 {
 	int ret;
 	u16 data = 0;
@@ -384,7 +404,6 @@ out:
 		"gpadc_conversion: Failed to AD convert channel %d\n", input);
 	return ret;
 }
-EXPORT_SYMBOL(ab8500_gpadc_convert);
 
 /**
  * ab8500_bm_gpswadcconvend_handler() - isr for s/w gpadc conversion completion
