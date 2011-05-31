@@ -29,13 +29,15 @@ enum ab8500_regulator_id {
 /* AB8500 register initialization */
 struct ab8500_regulator_reg_init {
 	int id;
+	u8 mask;
 	u8 value;
 };
 
-#define INIT_REGULATOR_REGISTER(_id, _value)	\
-	{					\
-		.id = _id,			\
-		.value = _value,		\
+#define INIT_REGULATOR_REGISTER(_id, _mask, _value)	\
+	{						\
+		.id = _id,				\
+		.mask = _mask,				\
+		.value = _value,			\
 	}
 
 /* AB8500 registers */
