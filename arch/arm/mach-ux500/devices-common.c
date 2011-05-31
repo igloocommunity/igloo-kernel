@@ -19,10 +19,9 @@
 #include <video/mcde_display-av8100.h>
 #include <video/mcde_fb.h>
 
-extern struct dev_power_domain ux500_dev_power_domain;
-
 #include <mach/hardware.h>
 
+#include "pm/pm.h"
 #include "devices-common.h"
 
 struct amba_device *
