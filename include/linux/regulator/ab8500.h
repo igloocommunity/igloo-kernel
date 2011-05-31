@@ -44,6 +44,7 @@ struct ab8500_regulator_reg_init {
 
 /* AB8500 registers */
 enum ab8500_regulator_reg {
+	AB8500_REGUREQUESTCTRL1,
 	AB8500_REGUREQUESTCTRL2,
 	AB8500_REGUREQUESTCTRL3,
 	AB8500_REGUREQUESTCTRL4,
