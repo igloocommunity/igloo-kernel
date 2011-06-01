@@ -202,8 +202,6 @@ void __init u8500_init_devices(void)
 	/* Early init for STM tracing */
 	platform_device_register(&ux500_stm_device);
 #endif
-	if (cpu_is_u8500ed())
-		dma40_u8500ed_fixup();
 
 	db8500_add_rtc();
 	db8500_add_gpios();
