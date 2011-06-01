@@ -200,8 +200,8 @@ static const dma_addr_t dma40_rx_map[DB8500_DMA_NR_DEV] = {
 	[DB8500_DMA_DEV27_SRC_SXA3_RX_TX] = -1,
 	[DB8500_DMA_DEV28_SD_MM2_RX] = -1,
 	[DB8500_DMA_DEV29_SD_MM0_RX] = -1,
-	[DB8500_DMA_DEV30_MSP1_RX]
-		= U8500_MSP1_BASE + MSP_TX_RX_REG_OFFSET,
+	[DB8500_DMA_DEV30_MSP3_RX]
+		= U8500_MSP3_BASE + MSP_TX_RX_REG_OFFSET,
 	[DB8500_DMA_DEV31_MSP0_RX_SLIM0_CH0_RX]
 		= U8500_MSP0_BASE + MSP_TX_RX_REG_OFFSET,
 	[DB8500_DMA_DEV32_SD_MM1_RX] = -1,
@@ -585,16 +585,6 @@ struct platform_device u8500_thsens_device = {
 	.resource       = u8500_thsens_resources,
 	.num_resources  = ARRAY_SIZE(u8500_thsens_resources),
 };
-
-void dma40_u8500ed_fixup(void)
-{
-	dma40_plat_data.memcpy = NULL;
-	dma40_plat_data.memcpy_len = 0;
-	dma40_resources[0].start = U8500_DMA_BASE_ED;
-	dma40_resources[0].end = U8500_DMA_BASE_ED + SZ_4K - 1;
-	dma40_resources[1].start = U8500_DMA_LCPA_BASE_ED;
-	dma40_resources[1].end = U8500_DMA_LCPA_BASE_ED + 2 * SZ_1K - 1;
-}
 
 struct resource keypad_resources[] = {
 	[0] = {
