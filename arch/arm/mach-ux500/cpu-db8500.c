@@ -196,9 +196,6 @@ static int usb_db8500_tx_dma_cfg[] = {
  */
 void __init u8500_init_devices(void)
 {
-	if (cpu_is_u8500ed())
-		dma40_u8500ed_fixup();
-
 	db8500_add_rtc();
 	db8500_add_gpios();
 	db8500_add_usb(usb_db8500_rx_dma_cfg, usb_db8500_tx_dma_cfg);

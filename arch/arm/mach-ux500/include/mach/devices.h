@@ -31,6 +31,4 @@ extern struct platform_device ux500_ske_keypad_device;
 extern struct platform_device ux500_mmio_device;
 extern struct platform_device u5500_mmio_device;
 
-void dma40_u8500ed_fixup(void);
-
 #endif
