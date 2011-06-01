@@ -2103,29 +2103,22 @@ void __init db8500_prcmu_early_init(void)
 {
 	unsigned int i;
 
-	if (cpu_is_u8500v1()) {
-		tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE_V1);
-	} else if (cpu_is_u8500v2()) {
-		void *tcpm_base = ioremap_nocache(U8500_PRCMU_TCPM_BASE, SZ_4K);
+	void *tcpm_base = ioremap_nocache(U8500_PRCMU_TCPM_BASE, SZ_4K);
 
-		if (tcpm_base != NULL) {
-			int version;
-			version = readl(tcpm_base + PRCMU_FW_VERSION_OFFSET);
-			prcmu_version.project_number = version & 0xFF;
-			prcmu_version.api_version = (version >> 8) & 0xFF;
-			prcmu_version.func_version = (version >> 16) & 0xFF;
-			prcmu_version.errata = (version >> 24) & 0xFF;
-			pr_info("PRCMU firmware version %d.%d.%d\n",
-				(version >> 8) & 0xFF, (version >> 16) & 0xFF,
-				(version >> 24) & 0xFF);
-			iounmap(tcpm_base);
-		}
-
-		tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE);
-	} else {
-		pr_err("prcmu: Unsupported chip version\n");
-		BUG();
+	if (tcpm_base != NULL) {
+		int version;
+		version = readl(tcpm_base + PRCMU_FW_VERSION_OFFSET);
+		prcmu_version.project_number = version & 0xFF;
+		prcmu_version.api_version = (version >> 8) & 0xFF;
+		prcmu_version.func_version = (version >> 16) & 0xFF;
+		prcmu_version.errata = (version >> 24) & 0xFF;
+		pr_info("PRCMU firmware version %d.%d.%d\n",
+			(version >> 8) & 0xFF, (version >> 16) & 0xFF,
+			(version >> 24) & 0xFF);
+		iounmap(tcpm_base);
 	}
+
+	tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE);
 
 	spin_lock_init(&mb0_transfer.lock);
 	spin_lock_init(&mb0_transfer.dbb_irqs_lock);
