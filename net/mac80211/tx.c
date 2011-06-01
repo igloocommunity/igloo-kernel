@@ -30,6 +30,7 @@
 #include "mesh.h"
 #include "wep.h"
 #include "wpa.h"
+#include "wapi.h"
 #include "wme.h"
 #include "rate.h"
 
@@ -585,6 +586,11 @@ ieee80211_tx_h_select_key(struct ieee80211_tx_data *tx)
 			break;
 		case WLAN_CIPHER_SUITE_AES_CMAC:
 			if (!ieee80211_is_mgmt(hdr->frame_control))
+				tx->key = NULL;
+			break;
+
+		case WLAN_CIPHER_SUITE_SMS4:
+			if (tx->ethertype == ETH_P_WAPI)
 				tx->key = NULL;
 			break;
 		}

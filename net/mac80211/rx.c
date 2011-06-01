@@ -27,6 +27,7 @@
 #include "wpa.h"
 #include "tkip.h"
 #include "wme.h"
+#include "wapi.h"
 
 /*
  * monitor mode reception
@@ -1052,6 +1053,9 @@ ieee80211_rx_h_decrypt(struct ieee80211_rx_data *rx)
 		break;
 	case WLAN_CIPHER_SUITE_AES_CMAC:
 		result = ieee80211_crypto_aes_cmac_decrypt(rx);
+		break;
+	case WLAN_CIPHER_SUITE_SMS4:
+		result = ieee80211_crypto_wapi_decrypt(rx);
 		break;
 	default:
 		/*
