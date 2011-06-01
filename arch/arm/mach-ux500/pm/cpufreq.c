@@ -141,7 +141,7 @@ ux500_cpufreq_register(struct cpufreq_frequency_table *table,
 	freq_table = table;
 	idx2opp = idx2opplist;
 
-	if (cpu_is_u8500v1() || ux500_is_svp())
+	if (ux500_is_svp())
 		return -ENODEV;
 
 	pr_info("cpufreq for ux500 started\n");
