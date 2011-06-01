@@ -214,6 +214,11 @@ int cfg80211_wext_giwrange(struct net_device *dev,
 			range->encoding_size[range->num_encoding_sizes++] =
 				WLAN_KEY_LEN_WEP104;
 			break;
+
+		case WLAN_CIPHER_SUITE_SMS4:
+			range->enc_capa |= (IW_ENC_CAPA_CIPHER_SMS4 |
+					    IW_ENC_CAPA_WAPI);
+			break;
 		}
 	}
 
@@ -699,6 +704,9 @@ int cfg80211_wext_siwencodeext(struct net_device *dev,
 	case IW_ENCODE_ALG_AES_CMAC:
 		cipher = WLAN_CIPHER_SUITE_AES_CMAC;
 		break;
+	case IW_ENCODE_ALG_SMS4:
+		cipher = WLAN_CIPHER_SUITE_SMS4;
+		break;
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -959,17 +967,21 @@ static int cfg80211_set_wpa_version(struct wireless_dev *wdev, u32 wpa_versions)
 {
 	if (wpa_versions & ~(IW_AUTH_WPA_VERSION_WPA |
 			     IW_AUTH_WPA_VERSION_WPA2|
+			     IW_AUTH_WPA_VERSION_WAPI|
 		             IW_AUTH_WPA_VERSION_DISABLED))
 		return -EINVAL;
 
 	if ((wpa_versions & IW_AUTH_WPA_VERSION_DISABLED) &&
 	    (wpa_versions & (IW_AUTH_WPA_VERSION_WPA|
-			     IW_AUTH_WPA_VERSION_WPA2)))
+			     IW_AUTH_WPA_VERSION_WPA2|
+			     IW_AUTH_WPA_VERSION_WAPI)))
 		return -EINVAL;
 
 	if (wpa_versions & IW_AUTH_WPA_VERSION_DISABLED)
 		wdev->wext.connect.crypto.wpa_versions &=
-			~(NL80211_WPA_VERSION_1|NL80211_WPA_VERSION_2);
+			~(NL80211_WPA_VERSION_1|
+			  NL80211_WPA_VERSION_2|
+			  NL80211_WAPI_VERSION_1);
 
 	if (wpa_versions & IW_AUTH_WPA_VERSION_WPA)
 		wdev->wext.connect.crypto.wpa_versions |=
@@ -978,6 +990,10 @@ static int cfg80211_set_wpa_version(struct wireless_dev *wdev, u32 wpa_versions)
 	if (wpa_versions & IW_AUTH_WPA_VERSION_WPA2)
 		wdev->wext.connect.crypto.wpa_versions |=
 			NL80211_WPA_VERSION_2;
+
+	if (wpa_versions & IW_AUTH_WPA_VERSION_WAPI)
+		wdev->wext.connect.crypto.wpa_versions |=
+			NL80211_WAPI_VERSION_1;
 
 	return 0;
 }
@@ -1001,6 +1017,9 @@ static int cfg80211_set_cipher_group(struct wireless_dev *wdev, u32 cipher)
 			WLAN_CIPHER_SUITE_AES_CMAC;
 	else if (cipher & IW_AUTH_CIPHER_NONE)
 		wdev->wext.connect.crypto.cipher_group = 0;
+	else if (cipher & IW_AUTH_CIPHER_SMS4)
+		wdev->wext.connect.crypto.cipher_group =
+			WLAN_CIPHER_SUITE_SMS4;
 	else
 		return -EINVAL;
 
@@ -1037,7 +1056,12 @@ static int cfg80211_set_cipher_pairwise(struct wireless_dev *wdev, u32 cipher)
 		nr_ciphers++;
 	}
 
-	BUILD_BUG_ON(NL80211_MAX_NR_CIPHER_SUITES < 5);
+	if (cipher & IW_AUTH_CIPHER_SMS4) {
+		ciphers_pairwise[nr_ciphers] = WLAN_CIPHER_SUITE_SMS4;
+		nr_ciphers++;
+	}
+
+	BUILD_BUG_ON(NL80211_MAX_NR_CIPHER_SUITES < 6);
 
 	wdev->wext.connect.crypto.n_ciphers_pairwise = nr_ciphers;
 
@@ -1050,7 +1074,8 @@ static int cfg80211_set_key_mgt(struct wireless_dev *wdev, u32 key_mgt)
 	int nr_akm_suites = 0;
 
 	if (key_mgt & ~(IW_AUTH_KEY_MGMT_802_1X |
-			IW_AUTH_KEY_MGMT_PSK))
+			IW_AUTH_KEY_MGMT_PSK |
+			IW_AUTH_KEY_MGMT_WAPI_PSK))
 		return -EINVAL;
 
 	if (key_mgt & IW_AUTH_KEY_MGMT_802_1X) {
@@ -1062,6 +1087,12 @@ static int cfg80211_set_key_mgt(struct wireless_dev *wdev, u32 key_mgt)
 	if (key_mgt & IW_AUTH_KEY_MGMT_PSK) {
 		wdev->wext.connect.crypto.akm_suites[nr_akm_suites] =
 			WLAN_AKM_SUITE_PSK;
+		nr_akm_suites++;
+	}
+
+	if (key_mgt & IW_AUTH_KEY_MGMT_WAPI_PSK) {
+		wdev->wext.connect.crypto.akm_suites[nr_akm_suites] =
+			WLAN_AKM_SUITE_WAPI_PSK;
 		nr_akm_suites++;
 	}
 

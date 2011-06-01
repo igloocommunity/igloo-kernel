@@ -29,6 +29,8 @@
 #define TKIP_IV_LEN		8
 #define TKIP_ICV_LEN		4
 #define CMAC_PN_LEN		6
+#define WAPI_IV_LEN		18
+#define WAPI_ICV_LEN		16
 
 #define NUM_RX_DATA_QUEUES	16
 
