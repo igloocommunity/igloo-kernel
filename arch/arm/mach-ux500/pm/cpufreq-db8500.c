@@ -86,7 +86,7 @@ static int __init u8500_cpufreq_register(void)
 
 	BUILD_BUG_ON(ARRAY_SIZE(idx2opp) + 1 != ARRAY_SIZE(freq_table));
 
-	if (cpu_is_u8500v2() && !prcmu_is_u8400()) {
+	if (!prcmu_is_u8400()) {
 		freq_table[1].frequency = 400000;
 		freq_table[2].frequency = 800000;
 		if (prcmu_has_arm_maxopp())
