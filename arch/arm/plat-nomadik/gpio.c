@@ -623,7 +623,7 @@ static void __nmk_gpio_set_wake(struct nmk_gpio_chip *nmk_chip,
 	 * disabled, since setting SLPM to 1 increases power consumption, and
 	 * wakeup is anyhow controlled by the RIMSC and FIMSC registers.
 	 */
-	if (cpu_is_u8500v2() && on)
+	if (on)
 		__nmk_gpio_set_slpm(nmk_chip, gpio - nmk_chip->chip.base,
 				    NMK_GPIO_SLPM_WAKEUP_ENABLE);
 #endif
