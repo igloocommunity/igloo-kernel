@@ -202,7 +202,9 @@ static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
 static struct mmci_platform_data mop500_sdi2_data = {
 	.ocr_mask	= MMC_VDD_165_195,
 	.f_max		= 50000000,
-	.capabilities	= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+	.capabilities	= MMC_CAP_4_BIT_DATA |
+				MMC_CAP_8_BIT_DATA |
+				MMC_CAP_MMC_HIGHSPEED,
 	.gpio_cd	= -1,
 	.gpio_wp	= -1,
 #ifdef CONFIG_STE_DMA40
@@ -257,9 +259,6 @@ void __init mop500_sdi_init(void)
 	/* v2 has a new version of this block that need to be forced */
 	if (cpu_is_u8500v2())
 		periphid = 0x10480180;
-	/* PoP:ed eMMC on top of DB8500 v1.0 has problems with high speed */
-	if (!cpu_is_u8500v10())
-		mop500_sdi2_data.capabilities |= MMC_CAP_MMC_HIGHSPEED;
 	/* sdi2 on snowball is in ATL_B mode for FSMC (LAN) */
 	if (!machine_is_snowball())
 		db8500_add_sdi2(&mop500_sdi2_data, periphid);
