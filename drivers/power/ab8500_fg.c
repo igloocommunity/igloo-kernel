@@ -19,6 +19,7 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
+#include <linux/kobject.h>
 #include <linux/mfd/ab8500.h>
 #include <linux/mfd/abx500.h>
 #include <linux/slab.h>
@@ -154,6 +155,7 @@ struct ab8500_fg_flags {
  * @fg_work:		Work to run the FG algorithm instantly
  * @fg_acc_cur_work:	Work to read the FG accumulator
  * @cc_lock:		Mutex for locking the CC
+ * @fg_kobject:		Structure of type kobject
  */
 struct ab8500_fg {
 	struct device *dev;
@@ -186,6 +188,7 @@ struct ab8500_fg {
 	struct work_struct fg_work;
 	struct work_struct fg_acc_cur_work;
 	struct mutex cc_lock;
+	struct kobject fg_kobject;
 };
 
 /* Main battery properties */
@@ -1617,6 +1620,8 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
 					di->flags.fully_charged = true;
 					/* Save current capacity as maximum */
 					di->bat_cap.max_mah = di->bat_cap.mah;
+					sysfs_notify(&di->fg_kobject,
+						NULL, "charge_full");
 					queue_work(di->fg_wq, &di->fg_work);
 					break;
 				case POWER_SUPPLY_STATUS_CHARGING:
@@ -1703,6 +1708,116 @@ static void ab8500_fg_external_power_changed(struct power_supply *psy)
 		&di->fg_psy, ab8500_fg_get_ext_psy_data);
 }
 
+/* Exposure to the sysfs interface */
+
+struct ab8500_fg_sysfs_entry {
+	struct attribute attr;
+	ssize_t (*show)(struct ab8500_fg *, char *);
+	ssize_t (*store)(struct ab8500_fg *, const char *, size_t);
+};
+
+static ssize_t charge_full_show(struct ab8500_fg *di, char *buf)
+{
+	return sprintf(buf, "%d\n", di->bat_cap.max_mah);
+}
+
+static ssize_t charge_full_store(struct ab8500_fg *di, const char *buf,
+				 size_t count)
+{
+	unsigned long charge_full;
+	ssize_t ret = -EINVAL;
+
+	ret = strict_strtoul(buf, 10, &charge_full);
+
+	dev_dbg(di->dev, "Ret %d charge_full %d", ret, charge_full);
+	if (!ret) {
+		di->bat_cap.max_mah = (int) charge_full;
+		ret = count;
+	}
+
+	return ret;
+}
+static struct ab8500_fg_sysfs_entry charge_full_attr =
+	__ATTR(charge_full, 0644, charge_full_show, charge_full_store);
+
+static ssize_t
+ab8500_fg_show(struct kobject *kobj, struct attribute *attr, char *buf)
+{
+	struct ab8500_fg_sysfs_entry *entry;
+	struct ab8500_fg *di;
+
+	entry = container_of(attr, struct ab8500_fg_sysfs_entry, attr);
+	di = container_of(kobj, struct ab8500_fg, fg_kobject);
+
+	if (!entry->show)
+		return -EIO;
+
+	return entry->show(di, buf);
+}
+
+static ssize_t
+ab8500_fg_store(struct kobject *kobj, struct attribute *attr, const char *buf,
+		size_t count)
+{
+	struct ab8500_fg_sysfs_entry *entry;
+	struct ab8500_fg *di;
+
+	entry = container_of(attr, struct ab8500_fg_sysfs_entry, attr);
+	di = container_of(kobj, struct ab8500_fg, fg_kobject);
+
+	if (!entry->store)
+		return -EIO;
+
+	return entry->store(di, buf, count);
+}
+
+const struct sysfs_ops ab8500_fg_sysfs_ops = {
+	.show = ab8500_fg_show,
+	.store = ab8500_fg_store,
+};
+
+static struct attribute *ab8500_fg_attrs[] = {
+	&charge_full_attr.attr,
+	NULL,
+};
+
+static struct kobj_type ab8500_fg_ktype = {
+	.sysfs_ops = &ab8500_fg_sysfs_ops,
+	.default_attrs = ab8500_fg_attrs,
+};
+
+/**
+ * ab8500_chargalg_sysfs_exit() - de-init of sysfs entry
+ * @di:                pointer to the struct ab8500_chargalg
+ *
+ * This function removes the entry in sysfs.
+ */
+static void ab8500_fg_sysfs_exit(struct ab8500_fg *di)
+{
+	kobject_del(&di->fg_kobject);
+}
+
+/**
+ * ab8500_chargalg_sysfs_init() - init of sysfs entry
+ * @di:                pointer to the struct ab8500_chargalg
+ *
+ * This function adds an entry in sysfs.
+ * Returns error code in case of failure else 0(on success)
+ */
+static int ab8500_fg_sysfs_init(struct ab8500_fg *di)
+{
+	int ret = 0;
+
+	ret = kobject_init_and_add(&di->fg_kobject,
+		&ab8500_fg_ktype,
+		NULL, "ab8500_fg");
+	if (ret < 0)
+		dev_err(di->dev, "failed to create sysfs entry\n");
+
+	return ret;
+}
+/* Exposure to the sysfs interface <<END>> */
+
 #if defined(CONFIG_PM)
 static int ab8500_fg_resume(struct platform_device *pdev)
 {
@@ -1752,6 +1867,7 @@ static int __devexit ab8500_fg_remove(struct platform_device *pdev)
 		dev_err(di->dev, "failed to disable coulomb counter\n");
 
 	destroy_workqueue(di->fg_wq);
+	ab8500_fg_sysfs_exit(di);
 
 	flush_scheduled_work();
 	power_supply_unregister(&di->fg_psy);
@@ -1883,6 +1999,12 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, di);
+
+	ret = ab8500_fg_sysfs_init(di);
+	if (ret) {
+		dev_err(di->dev, "failed to create sysfs entry\n");
+		goto free_irq;
+	}
 
 	/* Calibrate the fg first time */
 	di->flags.calibrate = true;
