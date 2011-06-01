@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2009 ST-Ericsson SA
+ *  Copyright (C) 2009-2011 ST-Ericsson SA
  *  Copyright (C) 2009 STMicroelectronics
  *
  * This program is free software; you can redistribute it and/or modify
@@ -385,8 +385,6 @@ static struct clkops clkout1_ops = {
 	DEF_PRCC_PCLK(_name, U8500_CLKRST5_BASE, _cg_bit, &per5clk)
 #define DEF_PER6_PCLK(_cg_bit, _name) \
 	DEF_PRCC_PCLK(_name, U8500_CLKRST6_BASE, _cg_bit, &per6clk)
-#define DEF_PER7_PCLK(_cg_bit, _name) \
-	DEF_PRCC_PCLK(_name, U8500_CLKRST7_BASE_ED, _cg_bit, &per7clk)
 
 #define DEF_PER1_KCLK(_cg_bit, _name, _parent) \
 	DEF_PRCC_KCLK(_name, U8500_CLKRST1_BASE, _cg_bit, _parent)
@@ -398,8 +396,6 @@ static struct clkops clkout1_ops = {
 	DEF_PRCC_KCLK(_name, U8500_CLKRST5_BASE, _cg_bit, _parent)
 #define DEF_PER6_KCLK(_cg_bit, _name, _parent) \
 	DEF_PRCC_KCLK(_name, U8500_CLKRST6_BASE, _cg_bit, _parent)
-#define DEF_PER7_KCLK(_cg_bit, _name, _parent) \
-	DEF_PRCC_KCLK(_name, U8500_CLKRST7_BASE_ED, _cg_bit, _parent)
 
 #define DEF_MTU_CLK(_cg_sel, _name, _bus_parent) \
 	struct clk _name = { \
@@ -569,7 +565,6 @@ static DEF_PER2_PCLK(8, p2_pclk8);
 static DEF_PER2_PCLK(9, p2_pclk9);
 static DEF_PER2_PCLK(10, p2_pclk10);
 static DEF_PER2_PCLK(11, p2_pclk11);
-static DEF_PER2_PCLK(12, p2_pclk12);
 
 static DEF_PER3_PCLK(0, p3_pclk0);
 static DEF_PER3_PCLK(1, p3_pclk1);
@@ -593,12 +588,6 @@ static DEF_PER6_PCLK(5, p6_pclk5);
 static DEF_PER6_PCLK(6, p6_pclk6);
 static DEF_PER6_PCLK(7, p6_pclk7);
 
-static DEF_PER7_PCLK(0, p7_pclk0);
-static DEF_PER7_PCLK(1, p7_pclk1);
-static DEF_PER7_PCLK(2, p7_pclk2);
-static DEF_PER7_PCLK(3, p7_pclk3);
-static DEF_PER7_PCLK(4, p7_pclk4);
-
 /* UART0 */
 static DEF_PER1_KCLK(0, p1_uart0_kclk, &uartclk);
 static DEF_PER_CLK(p1_uart0_clk, &p1_pclk0, &p1_uart0_kclk);
@@ -618,9 +607,6 @@ static DEF_PER_CLK(p1_msp0_clk, &p1_pclk3, &p1_msp0_kclk);
 /* MSP1 */
 static DEF_PER1_KCLK(4, p1_msp1_kclk, &msp1clk);
 static DEF_PER_CLK(p1_msp1_clk, &p1_pclk4, &p1_msp1_kclk);
-
-static DEF_PER1_KCLK(4, p1_msp1_ed_kclk, &msp02clk);
-static DEF_PER_CLK(p1_msp1_ed_clk, &p1_pclk4, &p1_msp1_ed_kclk);
 
 /* SDI0 */
 static DEF_PER1_KCLK(5, p1_sdi0_kclk, &sdmmcclk);
@@ -654,24 +640,13 @@ static DEF_PER_CLK(p2_sdi4_clk, &p2_pclk4, &p2_sdi4_kclk);
 static DEF_PER2_KCLK(3, p2_msp2_kclk, &msp02clk);
 static DEF_PER_CLK(p2_msp2_clk, &p2_pclk5, &p2_msp2_kclk);
 
-static DEF_PER2_KCLK(4, p2_msp2_ed_kclk, &msp02clk);
-static DEF_PER_CLK(p2_msp2_ed_clk, &p2_pclk6, &p2_msp2_ed_kclk);
-
 /* SDI1 */
 static DEF_PER2_KCLK(4, p2_sdi1_kclk, &sdmmcclk);
 static DEF_PER_CLK(p2_sdi1_clk, &p2_pclk6, &p2_sdi1_kclk);
 
-/* These are probably broken now. */
-static DEF_PER2_KCLK(5, p2_sdi1_ed_kclk, &sdmmcclk);
-static DEF_PER_CLK(p2_sdi1_ed_clk, &p2_pclk7, &p2_sdi1_ed_kclk);
-
 /* SDI3 */
 static DEF_PER2_KCLK(5, p2_sdi3_kclk, &sdmmcclk);
 static DEF_PER_CLK(p2_sdi3_clk, &p2_pclk7, &p2_sdi3_kclk);
-
-/* These are probably broken now. */
-static DEF_PER2_KCLK(6, p2_sdi3_ed_kclk, &sdmmcclk);
-static DEF_PER_CLK(p2_sdi3_ed_clk, &p2_pclk8, &p2_sdi3_ed_kclk);
 
 /* HSIR */
 static DEF_PER2_KCLK(6, p2_ssirx_kclk, &hsirxclk);
@@ -683,15 +658,9 @@ static DEF_PER2_KCLK(7, p2_ssitx_kclk, &hsitxclk);
 static DEF_PER3_KCLK(1, p3_ssp0_kclk, &sspclk);
 static DEF_PER_CLK(p3_ssp0_clk, &p3_pclk1, &p3_ssp0_kclk);
 
-static DEF_PER3_KCLK(1, p3_ssp0_ed_kclk, &i2cclk);
-static DEF_PER_CLK(p3_ssp0_ed_clk, &p3_pclk1, &p3_ssp0_ed_kclk);
-
 /* SSP1 */
 static DEF_PER3_KCLK(2, p3_ssp1_kclk, &sspclk);
 static DEF_PER_CLK(p3_ssp1_clk, &p3_pclk2, &p3_ssp1_kclk);
-
-static DEF_PER3_KCLK(2, p3_ssp1_ed_kclk, &i2cclk);
-static DEF_PER_CLK(p3_ssp1_ed_clk, &p3_pclk2, &p3_ssp1_ed_kclk);
 
 /* I2C0 */
 static DEF_PER3_KCLK(3, p3_i2c0_kclk, &i2cclk);
@@ -713,27 +682,17 @@ static DEF_PER_CLK(p3_uart2_clk, &p3_pclk6, &p3_uart2_kclk);
 static DEF_PER3_KCLK(7, p3_sdi5_kclk, &sdmmcclk);
 static DEF_PER_CLK(p3_sdi5_clk, &p3_pclk7, &p3_sdi5_kclk);
 
-/* USB */
-static DEF_PER5_KCLK(0, p5_usb_ed_kclk, &i2cclk);
-static DEF_PER_CLK(p5_usb_ed_clk, &p5_pclk0, &p5_usb_ed_kclk);
-
 /* RNG */
 static DEF_PER6_KCLK(0, p6_rng_kclk, &rngclk);
 static DEF_PER_CLK(p6_rng_clk, &p6_pclk0, &p6_rng_kclk);
-
-static DEF_PER6_KCLK(0, p6_rng_ed_kclk, &i2cclk);
-static DEF_PER_CLK(p6_rng_ed_clk, &p6_pclk0, &p6_rng_ed_kclk);
-
 
 /* MTU:S */
 
 /* MTU0 */
 static DEF_PER_CLK(p6_mtu0_clk, &p6_pclk6, &timclk);
-static DEF_PER_CLK(p7_mtu0_ed_clk, &p7_pclk2, &timclk);
 
 /* MTU1 */
 static DEF_PER_CLK(p6_mtu1_clk, &p6_pclk7, &timclk);
-static DEF_PER_CLK(p7_mtu1_ed_clk, &p7_pclk3, &timclk);
 
 #ifdef CONFIG_DEBUG_FS
 
@@ -787,10 +746,6 @@ static struct clk_debug_info dbg_clks[] = {
 	{ .clk = &sspclk, },
 	{ .clk = &rngclk, },
 	{ .clk = &uiccclk, },
-};
-
-static struct clk_debug_info dbg_clks_v2[] = {
-	/* Clock sources */
 	{ .clk = &sysclk2, },
 	{ .clk = &clkout0, },
 	{ .clk = &clkout1, },
@@ -810,18 +765,6 @@ static int clk_show_print(struct seq_file *s, void *p)
 			   dbg_clks[i].clk->name,
 			   dbg_clks[i].clk->enabled - dbg_clks[i].enabled,
 			   dbg_clks[i].enabled);
-	}
-	if (cpu_is_u8500v2()) {
-		for (i = 0; i < ARRAY_SIZE(dbg_clks_v2); i++) {
-			if (enabled_only && !dbg_clks_v2[i].clk->enabled)
-				continue;
-			seq_printf(s,
-				   "%-20s %5d + %d\n",
-				   dbg_clks_v2[i].clk->name,
-				   (dbg_clks_v2[i].clk->enabled -
-				    dbg_clks_v2[i].enabled),
-				   dbg_clks_v2[i].enabled);
-		}
 	}
 
 	return 0;
@@ -987,14 +930,7 @@ static int __init clk_debug_init(void)
 	if (create_clk_dirs(&dbg_clks[0], ARRAY_SIZE(dbg_clks)))
 		goto no_clks;
 
-	if (cpu_is_u8500v2()) {
-		if (create_clk_dirs(&dbg_clks_v2[0], ARRAY_SIZE(dbg_clks_v2)))
-			goto common_clks;
-	}
 	return 0;
-
-common_clks:
-	remove_clk_dirs(&dbg_clks[0], ARRAY_SIZE(dbg_clks));
 no_clks:
 	debugfs_remove(clk_show_enabled_only);
 no_enabled_only:
@@ -1008,8 +944,6 @@ no_dir:
 static void __exit clk_debug_exit(void)
 {
 	remove_clk_dirs(&dbg_clks[0], ARRAY_SIZE(dbg_clks));
-	if (cpu_is_u8500v2())
-		remove_clk_dirs(&dbg_clks_v2[0], ARRAY_SIZE(dbg_clks_v2));
 
 	debugfs_remove(clk_show);
 	debugfs_remove(clk_show_enabled_only);
@@ -1028,7 +962,7 @@ module_exit(clk_debug_exit);
 #define CLK_LOOKUP(_clk, _dev_id, _con_id) \
 	{ .dev_id = _dev_id, .con_id = _con_id, .clk = &_clk }
 
-static struct clk_lookup u8500_common_clock_sources[] = {
+static struct clk_lookup u8500_clocks[] = {
 	CLK_LOOKUP(soc0_pll, NULL, "soc0_pll"),
 	CLK_LOOKUP(soc1_pll, NULL, "soc1_pll"),
 	CLK_LOOKUP(ddr_pll, NULL, "ddr_pll"),
@@ -1043,15 +977,13 @@ static struct clk_lookup u8500_common_clock_sources[] = {
 	CLK_LOOKUP(ab_intclk, "ab8500-pwm.1", NULL),
 	CLK_LOOKUP(ab_intclk, "ab8500-pwm.2", NULL),
 	CLK_LOOKUP(ab_intclk, "ab8500-pwm.3", NULL),
-};
 
-static struct clk_lookup u8500_v2_sysclks[] = {
-	CLK_LOOKUP(sysclk2, NULL, "sysclk2"),
-	CLK_LOOKUP(sysclk3, NULL, "sysclk3"),
-	CLK_LOOKUP(sysclk4, NULL, "sysclk4"),
-};
+	CLK_LOOKUP(clkout0, "pri-cam", NULL),
+	CLK_LOOKUP(clkout1, "3-005c", NULL),
+	CLK_LOOKUP(clkout1, "3-005d", NULL),
+	CLK_LOOKUP(clkout1, "sec-cam", NULL),
 
-static struct clk_lookup u8500_common_prcmu_clocks[] = {
+	/* prcmu */
 	CLK_LOOKUP(sgaclk, "mali", NULL),
 	CLK_LOOKUP(uartclk, "UART", NULL),
 	CLK_LOOKUP(msp02clk, "MSP02", NULL),
@@ -1082,10 +1014,17 @@ static struct clk_lookup u8500_common_prcmu_clocks[] = {
 	CLK_LOOKUP(b2r2clk, "U8500-B2R2.0", NULL),
 	CLK_LOOKUP(tvclk, "tv", NULL),
 	CLK_LOOKUP(tvclk, "mcde", "tv"),
-};
+	CLK_LOOKUP(msp1clk, "MSP1", NULL),
+	CLK_LOOKUP(dsialtclk, "dsialt", NULL),
+	CLK_LOOKUP(sspclk, "SSP", NULL),
+	CLK_LOOKUP(rngclk, "rngclk", NULL),
+	CLK_LOOKUP(uiccclk, "uicc", NULL),
 
-static struct clk_lookup u8500_common_prcc_clocks[] = {
 	/* PERIPH 1 */
+	CLK_LOOKUP(p1_msp3_clk, "msp3", NULL),
+	CLK_LOOKUP(p1_msp3_clk, "MSP_I2S.3", NULL),
+	CLK_LOOKUP(p1_msp3_kclk, "ab8500-codec.0", "msp3-kernel"),
+	CLK_LOOKUP(p1_pclk11, "ab8500-codec.0", "msp3-bus"),
 	CLK_LOOKUP(p1_uart0_clk, "uart0", NULL),
 	CLK_LOOKUP(p1_uart1_clk, "uart1", NULL),
 	CLK_LOOKUP(p1_i2c1_clk, "nmk-i2c.1", NULL),
@@ -1097,6 +1036,12 @@ static struct clk_lookup u8500_common_prcc_clocks[] = {
 	CLK_LOOKUP(p1_pclk9, "gpio.0", NULL),
 	CLK_LOOKUP(p1_pclk9, "gpio.1", NULL),
 	CLK_LOOKUP(p1_pclk9, "gpioblock0", NULL),
+	CLK_LOOKUP(p1_msp1_clk, "msp1", NULL),
+	CLK_LOOKUP(p1_msp1_clk, "MSP_I2S.1", NULL),
+	CLK_LOOKUP(p1_msp1_kclk, "ab8500-codec.0", "msp1-kernel"),
+	CLK_LOOKUP(p1_pclk4, "ab8500-codec.0", "msp1-bus"),
+	CLK_LOOKUP(p1_pclk7, "spi3", NULL),
+	CLK_LOOKUP(p1_i2c4_clk, "nmk-i2c.4", NULL),
 
 	/* PERIPH 2 */
 	CLK_LOOKUP(p2_i2c3_clk, "nmk-i2c.3", NULL),
@@ -1104,6 +1049,16 @@ static struct clk_lookup u8500_common_prcc_clocks[] = {
 	CLK_LOOKUP(p2_pclk2, "spi1", NULL),
 	CLK_LOOKUP(p2_pclk3, "pwl", NULL),
 	CLK_LOOKUP(p2_sdi4_clk, "sdi4", NULL),
+	CLK_LOOKUP(p2_msp2_clk, "msp2", NULL),
+	CLK_LOOKUP(p2_msp2_clk, "MSP_I2S.2", NULL),
+	CLK_LOOKUP(p2_sdi1_clk, "sdi1", NULL),
+	CLK_LOOKUP(p2_sdi3_clk, "sdi3", NULL),
+	CLK_LOOKUP(p2_pclk8, "spi0", NULL),
+	CLK_LOOKUP(p2_pclk9, "ste_hsi.0", "hsir_hclk"),
+	CLK_LOOKUP(p2_pclk10, "ste_hsi.0", "hsit_hclk"),
+	CLK_LOOKUP(p2_pclk11, "gpio.6", NULL),
+	CLK_LOOKUP(p2_pclk11, "gpio.7", NULL),
+	CLK_LOOKUP(p2_pclk11, "gpioblock1", NULL),
 
 	/* PERIPH 3 */
 	CLK_LOOKUP(p3_pclk0, "fsmc", NULL),
@@ -1118,115 +1073,31 @@ static struct clk_lookup u8500_common_prcc_clocks[] = {
 	CLK_LOOKUP(p3_pclk8, "gpio.4", NULL),
 	CLK_LOOKUP(p3_pclk8, "gpio.5", NULL),
 	CLK_LOOKUP(p3_pclk8, "gpioblock2", NULL),
+	CLK_LOOKUP(p3_ssp0_clk, "ssp0", NULL),
+	CLK_LOOKUP(p3_ssp1_clk, "ssp1", NULL),
 
 	/* PERIPH 5 */
 	CLK_LOOKUP(p5_pclk1, "gpio.8", NULL),
 	CLK_LOOKUP(p5_pclk1, "gpioblock3", NULL),
+	CLK_LOOKUP(p5_pclk0, "musb-ux500.0", "usb"),
 
 	/* PERIPH 6 */
 	CLK_LOOKUP(p6_pclk1, "cryp0", NULL),
 	CLK_LOOKUP(p6_pclk2, "hash0", NULL),
 	CLK_LOOKUP(p6_pclk3, "pka", NULL),
-};
-
-static struct clk_lookup u8500_ed_prcc_clocks[] = {
-	/* PERIPH 1 */
-	CLK_LOOKUP(p1_msp1_ed_clk, "msp1", NULL),
-	CLK_LOOKUP(p1_msp1_ed_clk, "MSP_I2S.1", NULL),
-	CLK_LOOKUP(p1_pclk7, "spi3", NULL),
-
-	/* PERIPH 2 */
-	CLK_LOOKUP(p2_msp2_ed_clk, "msp2", NULL),
-	CLK_LOOKUP(p2_msp2_ed_clk, "MSP_I2S.2", NULL),
-	CLK_LOOKUP(p2_sdi1_ed_clk, "sdi1", NULL),
-	CLK_LOOKUP(p2_sdi3_ed_clk, "sdi3", NULL),
-	CLK_LOOKUP(p2_pclk9, "spi0", NULL),
-	CLK_LOOKUP(p2_pclk12, "gpio.6", NULL),
-	CLK_LOOKUP(p2_pclk12, "gpio.7", NULL),
-	CLK_LOOKUP(p2_pclk12, "gpioblock1", NULL),
-
-	/* PERIPH 3 */
-	CLK_LOOKUP(p3_ssp0_ed_clk, "ssp0", NULL),
-	CLK_LOOKUP(p3_ssp1_ed_clk, "ssp1", NULL),
-
-	/* PERIPH 5 */
-	CLK_LOOKUP(p5_usb_ed_clk, "musb-ux500.0", "usb"),
-
-	/* PERIPH 6 */
-	CLK_LOOKUP(p6_rng_ed_clk, "rng", NULL),
-	CLK_LOOKUP(p6_pclk4, "cryp1", NULL),
-	CLK_LOOKUP(p6_pclk5, "hash1", NULL),
-	CLK_LOOKUP(p6_pclk6, "dmc", NULL),
-
-	/* PERIPH 7 */
-	CLK_LOOKUP(p7_pclk0, "cfgreg", NULL),
-	CLK_LOOKUP(p7_pclk1, "wdg", NULL),
-	CLK_LOOKUP(p7_mtu0_ed_clk, "mtu0", NULL),
-	CLK_LOOKUP(p7_mtu1_ed_clk, "mtu1", NULL),
-	CLK_LOOKUP(p7_pclk4, "tzpc0", NULL),
-};
-
-static struct clk_lookup u8500_v1_v2_prcmu_clocks[] = {
-	CLK_LOOKUP(msp1clk, "MSP1", NULL),
-	CLK_LOOKUP(dsialtclk, "dsialt", NULL),
-	CLK_LOOKUP(sspclk, "SSP", NULL),
-	CLK_LOOKUP(rngclk, "rngclk", NULL),
-	CLK_LOOKUP(uiccclk, "uicc", NULL),
-};
-
-static struct clk_lookup u8500_v1_v2_prcc_clocks[] = {
-	/* PERIPH 1 */
-	CLK_LOOKUP(p1_msp1_clk, "msp1", NULL),
-	CLK_LOOKUP(p1_msp1_clk, "MSP_I2S.1", NULL),
-	CLK_LOOKUP(p1_msp1_kclk, "ab8500-codec.0", "msp1-kernel"),
-	CLK_LOOKUP(p1_pclk4, "ab8500-codec.0", "msp1-bus"),
-	CLK_LOOKUP(p1_pclk7, "spi3", NULL),
-	CLK_LOOKUP(p1_i2c4_clk, "nmk-i2c.4", NULL),
-
-	/* PERIPH 2 */
-	CLK_LOOKUP(p2_msp2_clk, "msp2", NULL),
-	CLK_LOOKUP(p2_msp2_clk, "MSP_I2S.2", NULL),
-	CLK_LOOKUP(p2_sdi1_clk, "sdi1", NULL),
-	CLK_LOOKUP(p2_sdi3_clk, "sdi3", NULL),
-	CLK_LOOKUP(p2_pclk8, "spi0", NULL),
-	CLK_LOOKUP(p2_pclk9, "ste_hsi.0", "hsir_hclk"),
-	CLK_LOOKUP(p2_pclk10, "ste_hsi.0", "hsit_hclk"),
-	CLK_LOOKUP(p2_pclk11, "gpio.6", NULL),
-	CLK_LOOKUP(p2_pclk11, "gpio.7", NULL),
-	CLK_LOOKUP(p2_pclk11, "gpioblock1", NULL),
-
-	/* PERIPH 3 */
-	CLK_LOOKUP(p3_ssp0_clk, "ssp0", NULL),
-	CLK_LOOKUP(p3_ssp1_clk, "ssp1", NULL),
-
-	/* PERIPH 5 */
-	CLK_LOOKUP(p5_pclk0, "musb-ux500.0", "usb"),
-
-	/* PERIPH 6 */
-	CLK_LOOKUP(p6_pclk4, "hash1", NULL),
-	CLK_LOOKUP(p6_pclk1, "cryp1", NULL),
-	CLK_LOOKUP(p6_rng_clk, "rng", NULL),
-};
-
-static struct clk_lookup u8500_v2_prcmu_clocks[] = {
-	CLK_LOOKUP(clkout0, "pri-cam", NULL),
-	CLK_LOOKUP(clkout1, "3-005c", NULL),
-	CLK_LOOKUP(clkout1, "3-005d", NULL),
-	CLK_LOOKUP(clkout1, "sec-cam", NULL),
-};
-
-static struct clk_lookup u8500_v2_prcc_clocks[] = {
-	/* PERIPH 1 */
-	CLK_LOOKUP(p1_msp3_clk, "msp3", NULL),
-	CLK_LOOKUP(p1_msp3_clk, "MSP_I2S.3", NULL),
-	CLK_LOOKUP(p1_msp3_kclk, "ab8500-codec.0", "msp3-kernel"),
-	CLK_LOOKUP(p1_pclk11, "ab8500-codec.0", "msp3-bus"),
-
-	/* PERIPH 6 */
-	/* cryp1 and hash1 already included in u8500_v1_v2_prcc_clocks. */
 	CLK_LOOKUP(p6_pclk5, "cfgreg", NULL),
 	CLK_LOOKUP(p6_mtu0_clk, "mtu0", NULL),
 	CLK_LOOKUP(p6_mtu1_clk, "mtu1", NULL),
+	CLK_LOOKUP(p6_pclk4, "hash1", NULL),
+	CLK_LOOKUP(p6_pclk1, "cryp1", NULL),
+	CLK_LOOKUP(p6_rng_clk, "rng", NULL),
+
+};
+
+static struct clk_lookup u8500_v2_sysclks[] = {
+	CLK_LOOKUP(sysclk2, NULL, "sysclk2"),
+	CLK_LOOKUP(sysclk3, NULL, "sysclk3"),
+	CLK_LOOKUP(sysclk4, NULL, "sysclk4"),
 };
 
 /* these are the clocks which are default from the bootloader */
@@ -1392,15 +1263,8 @@ late_initcall(init_clock_states);
 
 int __init db8500_clk_init(void)
 {
-	if (cpu_is_u8500ed()) {
-		pr_err("clock: U8500 ED is no longer supported.\n");
-		return -ENOSYS;
-	} else if (cpu_is_u5500()) {
-		per6clk.rate = 26000000;
-		uartclk.rate = 36360000;
-	}
 
-	if (cpu_is_u5500() || ux500_is_svp()) {
+	if (ux500_is_svp()) {
 		sysclk_ops.enable = NULL;
 		sysclk_ops.disable = NULL;
 		prcmu_clk_ops.enable = NULL;
@@ -1417,31 +1281,12 @@ int __init db8500_clk_init(void)
 		clkout1_ops.disable = NULL;
 	}
 
-	clks_register(u8500_common_clock_sources,
-		ARRAY_SIZE(u8500_common_clock_sources));
-	clks_register(u8500_common_prcmu_clocks,
-		ARRAY_SIZE(u8500_common_prcmu_clocks));
-	clks_register(u8500_common_prcc_clocks,
-		ARRAY_SIZE(u8500_common_prcc_clocks));
+	clks_register(u8500_v2_sysclks,
+		      ARRAY_SIZE(u8500_v2_sysclks));
+	clks_register(u8500_clocks,
+		      ARRAY_SIZE(u8500_clocks));
 
-	if (cpu_is_u5500()) {
-		clks_register(u8500_ed_prcc_clocks,
-			ARRAY_SIZE(u8500_ed_prcc_clocks));
-	} else if (cpu_is_u8500v1() || cpu_is_u8500v2()) {
-		clks_register(u8500_v2_sysclks,
-			ARRAY_SIZE(u8500_v2_sysclks));
-		clks_register(u8500_v1_v2_prcmu_clocks,
-			ARRAY_SIZE(u8500_v1_v2_prcmu_clocks));
-		clks_register(u8500_v2_prcmu_clocks,
-			ARRAY_SIZE(u8500_v2_prcmu_clocks));
-		clks_register(u8500_v1_v2_prcc_clocks,
-			ARRAY_SIZE(u8500_v1_v2_prcc_clocks));
-		clks_register(u8500_v2_prcc_clocks,
-			ARRAY_SIZE(u8500_v2_prcc_clocks));
-	}
-
-	if (cpu_is_u8500())
-		u8500_amba_clk_enable();
+	u8500_amba_clk_enable();
 
 	return 0;
 }
