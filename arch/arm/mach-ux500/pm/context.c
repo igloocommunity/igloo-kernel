@@ -855,20 +855,6 @@ static int __init context_init(void)
 	writel(virt_to_phys(ux500_backup_ptr),
 	       IO_ADDRESS(U8500_EXT_RAM_LOC_BACKUPRAM_ADDR));
 
-	/* Give logical address to backup RAM. For both CPUs */
-	if (cpu_is_u8500v20_or_later()) {
-		writel(IO_ADDRESS(U8500_PUBLIC_BOOT_ROM_BASE),
-		       IO_ADDRESS(U8500_CPU0_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR));
-
-		writel(IO_ADDRESS(U8500_PUBLIC_BOOT_ROM_BASE),
-		       IO_ADDRESS(U8500_CPU1_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR));
-	} else {
-		writel(IO_ADDRESS(U8500_BACKUPRAM0_BASE),
-		       IO_ADDRESS(U8500_CPU0_BACKUPRAM_ADDR_BACKUPRAM_LOG_ADDR));
-
-		writel(IO_ADDRESS(U8500_BACKUPRAM0_BASE),
-		       IO_ADDRESS(U8500_CPU1_BACKUPRAM_ADDR_BACKUPRAM_LOG_ADDR));
-	}
 
 	if (cpu_is_u5500()) {
 		context_tpiu.base = ioremap(U5500_TPIU_BASE, SZ_4K);
@@ -884,6 +870,13 @@ static int __init context_init(void)
 		context_gic_dist_common.base = ioremap(U5500_GIC_DIST_BASE, SZ_4K);
 		per_cpu(context_gic_cpu, 0).base = ioremap(U5500_GIC_CPU_BASE, SZ_4K);
 	} else if (cpu_is_u8500()) {
+		/* Give logical address to backup RAM. For both CPUs */
+		writel(IO_ADDRESS(U8500_PUBLIC_BOOT_ROM_BASE),
+		       IO_ADDRESS(U8500_CPU0_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR));
+
+		writel(IO_ADDRESS(U8500_PUBLIC_BOOT_ROM_BASE),
+		       IO_ADDRESS(U8500_CPU1_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR));
+
 		context_tpiu.base = ioremap(U8500_TPIU_BASE, SZ_4K);
 		context_stm_ape.base = ioremap(U8500_STM_REG_BASE, SZ_4K);
 		context_scu.base = ioremap(U8500_SCU_BASE, SZ_4K);
