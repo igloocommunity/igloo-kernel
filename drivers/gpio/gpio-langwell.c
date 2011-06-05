@@ -1,4 +1,6 @@
-/* langwell_gpio.c Moorestown platform Langwell chip GPIO driver
+/*
+ * Moorestown platform Langwell chip GPIO driver
+ *
  * Copyright (c) 2008 - 2009,  Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -223,7 +225,7 @@ static void lnw_irq_handler(unsigned irq, struct irq_desc *desc)
 		gedr = gpio_reg(&lnw->chip, base, GEDR);
 		pending = readl(gedr);
 		while (pending) {
-			gpio = __ffs(pending);
+			gpio = __ffs(pending) - 1;
 			mask = BIT(gpio);
 			pending &= ~mask;
 			/* Clear before handling so we can't lose an edge */

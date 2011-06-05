@@ -1,5 +1,5 @@
 /*
- * tps65910-gpio.c  --  TI TPS6591x
+ * TI TPS6591x GPIO driver
  *
  * Copyright 2010 Texas Instruments Inc.
  *
@@ -81,10 +81,8 @@ void tps65910_gpio_init(struct tps65910 *tps65910, int gpio_base)
 	switch(tps65910_chip_id(tps65910)) {
 	case TPS65910:
 		tps65910->gpio.ngpio	= 6;
-		break;
 	case TPS65911:
 		tps65910->gpio.ngpio	= 9;
-		break;
 	default:
 		return;
 	}
