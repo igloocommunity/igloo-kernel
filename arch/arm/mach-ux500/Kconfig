@@ -79,7 +79,7 @@ choice
 
 config UX500_PRCMU_TIMER
 	bool "PRCMU Timer sched_clock"
-	depends on U8500_CPUIDLE && !UX500_SOC_DB5500
+	depends on !HAS_MTU
 	help
 	  Add support for an always on sched_clock, required for
 	  proper cpuidle and suspend.
