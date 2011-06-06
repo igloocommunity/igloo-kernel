@@ -11,6 +11,7 @@
 #include <linux/irq.h>
 #include <linux/gpio/nomadik.h>
 
+#include <asm/pmu.h>
 #include <asm/mach/map.h>
 #include <asm/pmu.h>
 
@@ -204,6 +205,25 @@ void __init u5500_map_io(void)
 	_PRCMU_BASE = __io_address(U5500_PRCMU_BASE);
 }
 
+static void __init db5500_pmu_init(void)
+{
+	struct resource res[] = {
+		[0] = {
+			.start		= IRQ_DB5500_PMU0,
+			.end		= IRQ_DB5500_PMU0,
+			.flags		= IORESOURCE_IRQ,
+		},
+		[1] = {
+			.start		= IRQ_DB5500_PMU1,
+			.end		= IRQ_DB5500_PMU1,
+			.flags		= IORESOURCE_IRQ,
+		},
+	};
+
+	platform_device_register_simple("arm-pmu", ARM_PMU_DEVICE_CPU,
+					res, ARRAY_SIZE(res));
+}
+
 static int usb_db5500_rx_dma_cfg[] = {
 	DB5500_DMA_DEV4_USB_OTG_IEP_1_9,
 	DB5500_DMA_DEV5_USB_OTG_IEP_2_10,
@@ -233,6 +253,7 @@ void __init u5500_init_devices(void)
 	/* platform_device_register(&u5500_stm_device); */
 #endif
 	db5500_add_gpios();
+	db5500_pmu_init();
 	db5500_dma_init();
 	db5500_add_rtc();
 	db5500_add_usb(usb_db5500_rx_dma_cfg, usb_db5500_tx_dma_cfg);
