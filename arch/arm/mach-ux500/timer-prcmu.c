@@ -7,9 +7,10 @@
  * sched_clock implementation is based on:
  * plat-nomadik/timer.c Linus Walleij <linus.walleij@stericsson.com>
  *
- * UX500 PRCMU Timer
+ * DBx500-PRCMU Timer
  * The PRCMU has 5 timers which are available in a always-on
- * power domain. we use the Timer 4 for our always-on clock source.
+ * power domain.  We use the Timer 4 for our always-on clock
+ * source on DB8500 and Timer 3 on DB5500.
  */
 #include <linux/clockchips.h>
 #include <linux/clk.h>
@@ -26,12 +27,14 @@
 #define TIMER_MODE_CONTINOUS	(0x1)
 #define TIMER_DOWNCOUNT_VAL	(0xffffffff)
 
-/* PRCMU Timer 4 */
-#define PRCMU_TIMER_4_REF       (prcmu_base + 0x450)
-#define PRCMU_TIMER_4_DOWNCOUNT (prcmu_base + 0x454)
-#define PRCMU_TIMER_4_MODE      (prcmu_base + 0x458)
+#define PRCMU_TIMER_3_BASE       0x338
+#define PRCMU_TIMER_4_BASE       0x450
 
-static __iomem void *prcmu_base;
+#define PRCMU_TIMER_REF       0x0
+#define PRCMU_TIMER_DOWNCOUNT 0x4
+#define PRCMU_TIMER_MODE      0x8
+
+static __iomem void *timer_base;
 
 #define SCHED_CLOCK_MIN_WRAP (131072) /* 2^32 / 32768 */
 
@@ -41,7 +44,7 @@ static cycle_t prcmu_read_timer_nop(struct clocksource *cs)
 }
 
 static struct clocksource prcmu_clksrc = {
-	.name		= "prcmu-timer4",
+	.name		= "prcmu-timer",
 	.rating		= 300,
 	.read		= prcmu_read_timer_nop,
 	.shift		= 10,
@@ -54,8 +57,8 @@ static cycle_t prcmu_read_timer(struct clocksource *cs)
 	u32 count, count2;
 
 	do {
-		count = readl(PRCMU_TIMER_4_DOWNCOUNT);
-		count2 = readl(PRCMU_TIMER_4_DOWNCOUNT);
+		count = readl(timer_base + PRCMU_TIMER_DOWNCOUNT);
+		count2 = readl(timer_base + PRCMU_TIMER_DOWNCOUNT);
 	} while (count2 != count);
 
 	/*
@@ -94,10 +97,19 @@ static struct boottime_timer __initdata boottime_timer = {
 
 void __init prcmu_timer_init(void)
 {
+	void __iomem *prcmu_base;
+
 	if (ux500_is_svp())
 		return;
 
-	prcmu_base = __io_address(U8500_PRCMU_BASE);
+	if (cpu_is_u8500()) {
+		prcmu_base = __io_address(U8500_PRCMU_BASE);
+		timer_base = prcmu_base + PRCMU_TIMER_4_BASE;
+	} else if (cpu_is_u5500()) {
+		prcmu_base = __io_address(U5500_PRCMU_BASE);
+		timer_base = prcmu_base + PRCMU_TIMER_3_BASE;
+	} else
+		ux500_unknown_soc();
 
 	clocksource_calc_mult_shift(&prcmu_clksrc,
 		RATE_32K, SCHED_CLOCK_MIN_WRAP);
@@ -108,9 +120,9 @@ void __init prcmu_timer_init(void)
 	 * The PRCMU should configure it but if it for some reason
 	 * don't we do it here.
 	 */
-	if (readl(PRCMU_TIMER_4_MODE) != TIMER_MODE_CONTINOUS) {
-		writel(TIMER_MODE_CONTINOUS, PRCMU_TIMER_4_MODE);
-		writel(TIMER_DOWNCOUNT_VAL, PRCMU_TIMER_4_REF);
+	if (readl(timer_base + PRCMU_TIMER_MODE) != TIMER_MODE_CONTINOUS) {
+		writel(TIMER_MODE_CONTINOUS, timer_base + PRCMU_TIMER_MODE);
+		writel(TIMER_DOWNCOUNT_VAL, timer_base + PRCMU_TIMER_REF);
 	}
 	prcmu_clksrc.read = prcmu_read_timer;
 
