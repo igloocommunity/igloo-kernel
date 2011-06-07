@@ -60,7 +60,6 @@ struct state_history {
 	ktime_t start;
 	u32 state;
 	u32 exit_counter;
-	u32 timed_out;
 	ktime_t measure_begin;
 	int ape_blocked;
 	int time_blocked;
@@ -81,6 +80,7 @@ static bool reset_timer;
 static int deepest_allowed_state = CONFIG_U8500_CPUIDLE_DEEPEST_STATE;
 static u32 measure_latency;
 static bool wake_latency;
+static int verbose;
 
 static bool apidle_both_blocked;
 static bool apidle_ape_blocked;
@@ -210,19 +210,19 @@ static void store_latency(struct state_history *sh,
 }
 
 void ux500_ci_dbg_exit_latency(int ctarget, ktime_t now, ktime_t exit,
-			       ktime_t enter,  bool timed_out)
+			       ktime_t enter)
 {
 	struct state_history *sh;
 	bool hit = true;
 	enum prcmu_idle_stat prcmu_status;
 	unsigned int d;
 
+	if (!verbose)
+		return;
+
 	sh = per_cpu(state_history, smp_processor_id());
 
 	sh->exit_counter++;
-
-	if (timed_out)
-		sh->timed_out++;
 
 	d = ktime_to_us(ktime_sub(now, enter));
 
@@ -261,7 +261,7 @@ void ux500_ci_dbg_exit_latency(int ctarget, ktime_t now, ktime_t exit,
 		sh->states[ctarget].state_int++;
 		break;
 	default:
-		pr_debug("cpuidle: unknown prcmu exit code: 0x%x state: %d\n",
+		pr_info("cpuidle: unknown prcmu exit code: 0x%x state: %d\n",
 			prcmu_status, cstates[ctarget].state);
 		sh->states[ctarget].state_error++;
 		break;
@@ -336,9 +336,7 @@ static void state_record_time(struct state_history *sh, int ctarget,
 void ux500_ci_dbg_register_reason(int idx, bool power_state_req,
 				  u32 time, u32 max_depth)
 {
-
-
-	if (cstates[idx].state == CI_IDLE) {
+	if (cstates[idx].state == CI_IDLE && verbose) {
 		apidle_ape_blocked = power_state_req;
 		apidle_time_blocked = time < cstates[idx + 1].threshold;
 		apidle_both_blocked = power_state_req && apidle_time_blocked;
@@ -363,7 +361,7 @@ void ux500_ci_dbg_log(int ctarget, ktime_t enter_time)
 
 	spin_lock_irqsave(&dbg_lock, flags);
 
-	if (cstates[ctarget].state == CI_IDLE) {
+	if (cstates[ctarget].state == CI_IDLE && verbose) {
 		if (apidle_both_blocked)
 			sh->both_blocked++;
 		if (apidle_ape_blocked)
@@ -454,7 +452,6 @@ static void state_history_reset(void)
 		/* Don't touch sh->state, since that is where we are now */
 
 		sh->exit_counter = 0;
-		sh->timed_out = 0;
 		sh->ape_blocked = 0;
 		sh->time_blocked = 0;
 		sh->both_blocked = 0;
@@ -463,30 +460,42 @@ static void state_history_reset(void)
 	spin_unlock_irqrestore(&dbg_lock, flags);
 }
 
+static int get_val(const char __user *user_buf,
+		   size_t count, int min, int max, ssize_t *buf_size)
+{
+	char buf[32];
+	long unsigned int i;
+
+	/* Get userspace string and assure termination */
+	(*buf_size) = min(count, (sizeof(buf) - 1));
+	if (copy_from_user(buf, user_buf, (*buf_size)))
+		return -EFAULT;
+	buf[(*buf_size)] = 0;
+
+	if (strict_strtoul(buf, 0, &i) != 0)
+		return -EFAULT;
+
+	if (i > max)
+		i = max;
+	if (i < min)
+		i = min;
+
+	return i;
+}
+
 static ssize_t set_deepest_state(struct file *file,
 				 const char __user *user_buf,
 				 size_t count, loff_t *ppos)
 {
-	char buf[32];
 	ssize_t buf_size;
-	long unsigned int i;
+	int val;
 
-	/* Get userspace string and assure termination */
-	buf_size = min(count, (sizeof(buf)-1));
-	if (copy_from_user(buf, user_buf, buf_size))
-		return -EFAULT;
-	buf[buf_size] = 0;
+	val = get_val(user_buf, count, CI_WFI, cstates_len - 1, &buf_size);
 
-	if (strict_strtoul(buf, 0, &i) != 0)
-		return buf_size;
+	if (val < 0)
+		return val;
 
-	if (i > cstates_len - 1)
-		i = cstates_len - 1;
-
-	if (i == 0)
-		i = CI_WFI;
-
-	deepest_allowed_state = i;
+	deepest_allowed_state = val;
 
 	pr_debug("cpuidle: changed deepest allowed sleep state to %d.\n",
 		 deepest_allowed_state);
@@ -512,16 +521,43 @@ static ssize_t stats_write(struct file *file,
 
 static int wake_latency_read(struct seq_file *s, void *p)
 {
-	seq_printf(s, "%s\n", wake_latency ? "on" : "off");
+	seq_printf(s, "wake latency measurements is %s\n",
+		   wake_latency ? "on" : "off");
 	return 0;
 }
 
 static ssize_t wake_latency_write(struct file *file,
-				     const char __user *user_buf,
-				     size_t count, loff_t *ppos)
+				  const char __user *user_buf,
+				  size_t count, loff_t *ppos)
 {
-	wake_latency = !wake_latency;
+	ssize_t buf_size;
+	int val = get_val(user_buf, count, 0, 1, &buf_size);
+	if (val < 0)
+		return val;
+
+	wake_latency = val;
 	ux500_rtcrtt_measure_latency(wake_latency);
+	return buf_size;
+}
+
+static int verbose_read(struct seq_file *s, void *p)
+{
+	seq_printf(s, "verbose debug is %s\n", verbose ? "on" : "off");
+	return 0;
+}
+
+static ssize_t verbose_write(struct file *file,
+				  const char __user *user_buf,
+				  size_t count, loff_t *ppos)
+{
+	ssize_t buf_size;
+	int val = get_val(user_buf, count, 0, 1, &buf_size);
+	if (val < 0)
+		return val;
+
+	verbose = val;
+	state_history_reset();
+
 	return count;
 }
 
@@ -561,7 +597,7 @@ static void stats_disp_one(struct seq_file *s, struct state_history *sh,
 	if (sh->states[i].counter == 0)
 		return;
 
-	if (i > CI_WFI)
+	if (i > CI_WFI && verbose)
 		seq_printf(s, " (%u int:%u err:%u)",
 			   sh->states[i].state_ok,
 			   sh->states[i].state_int,
@@ -570,12 +606,12 @@ static void stats_disp_one(struct seq_file *s, struct state_history *sh,
 	seq_printf(s, " in %d ms %d%%",
 		   (u32) t_us, (u32)perc);
 
-	if (cstates[i].state == CI_IDLE)
+	if (cstates[i].state == CI_IDLE && verbose)
 		seq_printf(s, ", reg:%d time:%d both:%d gov:%d",
 			   sh->ape_blocked, sh->time_blocked,
 			   sh->both_blocked, sh->gov_blocked);
 
-	if (sh->states[i].counter)
+	if (sh->states[i].counter && verbose)
 		seq_printf(s, ", hit rate: %u%% ",
 			   100 * sh->states[i].hit_rate /
 			   sh->states[i].counter);
@@ -655,16 +691,18 @@ static int stats_print(struct seq_file *s, void *p)
 
 		do_div(total_s, 1000);
 
-		if (total_s)
-			seq_printf(s,
-				   "wake ups per s: %u.%u timed out: %u%%\n",
-				   sh->exit_counter / (int) total_s,
-				   (10 * sh->exit_counter / (int) total_s) -
-				   10 * (sh->exit_counter / (int) total_s),
-				   100 * sh->timed_out / sh->exit_counter);
+		if (verbose) {
+			if (total_s)
+				seq_printf(s,
+					   "wake ups per s: %u.%u \n",
+					   sh->exit_counter / (int) total_s,
+					   (10 * sh->exit_counter / (int) total_s) -
+					   10 * (sh->exit_counter / (int) total_s));
 
-		seq_printf(s, "delta accounted vs wall clock: %lld us\n",
-			   ktime_to_us(ktime_sub(wall, total)));
+			seq_printf(s,
+				   "\ndelta accounted vs wall clock: %lld us\n",
+				   ktime_to_us(ktime_sub(wall, total)));
+		}
 
 		for (i = 0; i < cstates_len; i++)
 			stats_disp_one(s, sh, total_us, i);
@@ -703,6 +741,11 @@ static int deepest_state_open_file(struct inode *inode, struct file *file)
 	return single_open(file, deepest_state_print, inode->i_private);
 }
 
+static int verbose_open_file(struct inode *inode, struct file *file)
+{
+	return single_open(file, verbose_read, inode->i_private);
+}
+
 static int stats_open_file(struct inode *inode, struct file *file)
 {
 	return single_open(file, stats_print, inode->i_private);
@@ -723,6 +766,15 @@ static int wake_latency_open(struct inode *inode,
 static const struct file_operations deepest_state_fops = {
 	.open = deepest_state_open_file,
 	.write = set_deepest_state,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations verbose_state_fops = {
+	.open = verbose_open_file,
+	.write = verbose_write,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = single_release,
@@ -766,6 +818,11 @@ static void setup_debugfs(void)
 	if (IS_ERR_OR_NULL(debugfs_create_file("deepest_state",
 					       S_IWUGO | S_IRUGO, cpuidle_dir,
 					       NULL, &deepest_state_fops)))
+		goto fail;
+
+	if (IS_ERR_OR_NULL(debugfs_create_file("verbose",
+					       S_IWUGO | S_IRUGO, cpuidle_dir,
+					       NULL, &verbose_state_fops)))
 		goto fail;
 
 	if (IS_ERR_OR_NULL(debugfs_create_file("stats",
