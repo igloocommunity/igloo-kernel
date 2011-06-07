@@ -18,7 +18,7 @@ void ux500_ci_dbg_remove(void);
 void ux500_ci_dbg_log(int ctarget, ktime_t enter_time);
 void ux500_ci_dbg_wake_latency(int ctarget, int sleep_time);
 void ux500_ci_dbg_exit_latency(int ctarget, ktime_t now, ktime_t exit,
-			       ktime_t enter, bool timed_out);
+			       ktime_t enter);
 
 void ux500_ci_dbg_register_reason(int idx, bool power_state_req,
 				  u32 sleep_time, u32 max_depth);
@@ -41,7 +41,7 @@ static inline void ux500_ci_dbg_log(int ctarget,
 
 static inline void ux500_ci_dbg_exit_latency(int ctarget,
 					     ktime_t now, ktime_t exit,
-					     ktime_t enter, bool timed_out) { }
+					     ktime_t enter) { }
 static inline void ux500_ci_dbg_wake_latency(int ctarget, int sleep_time) { }
 
 
