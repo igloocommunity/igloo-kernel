@@ -576,19 +576,11 @@ exit_fast:
 	ret = (int)diff;
 
 	ux500_ci_dbg_console_check_uart();
-	if (slept_well) {
-		bool timed_out;
-
-		spin_lock(&cpuidle_lock);
-		timed_out = ktime_to_us(time_wake) > ktime_to_us(time_next);
-		spin_unlock(&cpuidle_lock);
-
+	if (slept_well)
 		ux500_ci_dbg_exit_latency(target,
 					  time_exit, /* now */
 					  time_wake, /* exit from wfi */
-					  time_enter, /* enter cpuidle */
-					  timed_out);
-	}
+					  time_enter); /* enter cpuidle */
 
 	ux500_ci_dbg_log(CI_RUNNING, time_exit);
 
