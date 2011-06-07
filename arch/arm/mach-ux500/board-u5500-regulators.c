@@ -174,12 +174,12 @@ static struct regulator_consumer_supply u5500_sga_consumers[] = {
 
 static struct regulator_consumer_supply u5500_hva_consumers[] = {
 	REGULATOR_SUPPLY("debug", "reg-virt-consumer.1"),
-	REGULATOR_SUPPLY("sva-pipe", "cm_control"),
+	REGULATOR_SUPPLY("v-hva", NULL),
 };
 
 static struct regulator_consumer_supply u5500_sia_consumers[] = {
 	REGULATOR_SUPPLY("debug", "reg-virt-consumer.2"),
-	REGULATOR_SUPPLY("sia-pipe", "cm_control"),
+	REGULATOR_SUPPLY("v-sia", "mmio_camera"),
 };
 
 static struct regulator_consumer_supply u5500_disp_consumers[] = {
