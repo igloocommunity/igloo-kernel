@@ -425,6 +425,8 @@ static DEF_PRCMU_CLK(mcdeclk, PRCMU_MCDECLK, 160000000);
 static DEF_PRCMU_CLK(tvclk, PRCMU_TVCLK, 40000000);
 static DEF_PRCMU_CLK(dsialtclk, PRCMU_DSIALTCLK, 400000000);
 static DEF_PRCMU_CLK(timclk, PRCMU_TIMCLK, 3250000);
+static DEF_PRCMU_CLK(svaclk, PRCMU_SVACLK, 156000000);
+static DEF_PRCMU_CLK(siaclk, PRCMU_SIACLK, 133330000);
 
 /* PRCC PClocks */
 
@@ -564,6 +566,8 @@ static struct clk *db5500_dbg_clks[] __initdata = {
 
 	/* PRCMU clocks */
 	&sgaclk,
+	&siaclk,
+	&svaclk,
 	&uartclk,
 	&msp02clk,
 	&i2cclk,
@@ -659,6 +663,8 @@ static struct clk_lookup u8500_v2_sysclks[] = {
 
 static struct clk_lookup db5500_prcmu_clocks[] = {
 	CLK_LOOKUP(sgaclk, "mali", NULL),
+	CLK_LOOKUP(siaclk, "mmio_camera", "sia"),
+	CLK_LOOKUP(svaclk, "hva", NULL),
 	CLK_LOOKUP(uartclk, "UART", NULL),
 	CLK_LOOKUP(msp02clk, "MSP02", NULL),
 	CLK_LOOKUP(i2cclk, "I2C", NULL),
