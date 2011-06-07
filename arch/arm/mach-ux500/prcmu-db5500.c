@@ -237,6 +237,8 @@ static struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
 	CLK_MGT_ENTRY(B2R2CLK),
 	CLK_MGT_ENTRY(TVCLK),
 	CLK_MGT_ENTRY(RNGCLK),
+	CLK_MGT_ENTRY(SIACLK),
+	CLK_MGT_ENTRY(SVACLK),
 };
 
 static int request_timclk(bool enable)
