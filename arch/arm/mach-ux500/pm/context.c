@@ -359,9 +359,9 @@ static void restore_tpiu(void)
 
 static void save_gic_if_cpu(struct context_gic_cpu *c_gic_cpu)
 {
-	c_gic_cpu->ctrl     = readl(c_gic_cpu->base + GIC_CPU_CTRL);
-	c_gic_cpu->primask  = readl(c_gic_cpu->base + GIC_CPU_PRIMASK);
-	c_gic_cpu->binpoint = readl(c_gic_cpu->base + GIC_CPU_BINPOINT);
+	c_gic_cpu->ctrl     = readl_relaxed(c_gic_cpu->base + GIC_CPU_CTRL);
+	c_gic_cpu->primask  = readl_relaxed(c_gic_cpu->base + GIC_CPU_PRIMASK);
+	c_gic_cpu->binpoint = readl_relaxed(c_gic_cpu->base + GIC_CPU_BINPOINT);
 }
 
 /*
@@ -371,9 +371,9 @@ static void save_gic_if_cpu(struct context_gic_cpu *c_gic_cpu)
  */
 static void restore_gic_if_cpu(struct context_gic_cpu *c_gic_cpu)
 {
-	writel(c_gic_cpu->ctrl,     c_gic_cpu->base + GIC_CPU_CTRL);
-	writel(c_gic_cpu->primask,  c_gic_cpu->base + GIC_CPU_PRIMASK);
-	writel(c_gic_cpu->binpoint, c_gic_cpu->base + GIC_CPU_BINPOINT);
+	writel_relaxed(c_gic_cpu->ctrl,     c_gic_cpu->base + GIC_CPU_CTRL);
+	writel_relaxed(c_gic_cpu->primask,  c_gic_cpu->base + GIC_CPU_PRIMASK);
+	writel_relaxed(c_gic_cpu->binpoint, c_gic_cpu->base + GIC_CPU_BINPOINT);
 }
 
 /*
@@ -388,27 +388,27 @@ static void save_gic_dist_common(void)
 {
 	int i;
 
-	context_gic_dist_common.ns = readl(context_gic_dist_common.base +
-					   GIC_DIST_ENABLE_NS);
+	context_gic_dist_common.ns = readl_relaxed(context_gic_dist_common.base
+					   + GIC_DIST_ENABLE_NS);
 
 	for (i = 0; i < GIC_DIST_ENABLE_SET_COMMON_NUM; i++)
 		context_gic_dist_common.enable_set[i] =
-			readl(context_gic_dist_common.base +
+			readl_relaxed(context_gic_dist_common.base +
 			      GIC_DIST_ENABLE_SET_SPI32 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_PRI_COMMON_NUM; i++)
 		context_gic_dist_common.priority_level[i] =
-			readl(context_gic_dist_common.base +
+			readl_relaxed(context_gic_dist_common.base +
 			      GIC_DIST_PRI_SPI32 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_SPI_TARGET_COMMON_NUM; i++)
 		context_gic_dist_common.spi_target[i] =
-			readl(context_gic_dist_common.base +
+			readl_relaxed(context_gic_dist_common.base +
 			      GIC_DIST_SPI_TARGET_SPI32 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_CONFIG_COMMON_NUM; i++)
 		context_gic_dist_common.config[i] =
-			readl(context_gic_dist_common.base +
+			readl_relaxed(context_gic_dist_common.base +
 			      GIC_DIST_CONFIG_SPI32 +  i * 4);
 }
 
@@ -425,26 +425,26 @@ static void restore_gic_dist_common(void)
 	int i;
 
 	for (i = 0; i < GIC_DIST_CONFIG_COMMON_NUM; i++)
-		writel(context_gic_dist_common.config[i],
+		writel_relaxed(context_gic_dist_common.config[i],
 		       context_gic_dist_common.base +
 		       GIC_DIST_CONFIG_SPI32 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_SPI_TARGET_COMMON_NUM; i++)
-		writel(context_gic_dist_common.spi_target[i],
+		writel_relaxed(context_gic_dist_common.spi_target[i],
 		       context_gic_dist_common.base +
 		       GIC_DIST_SPI_TARGET_SPI32 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_PRI_COMMON_NUM; i++)
-		writel(context_gic_dist_common.priority_level[i],
+		writel_relaxed(context_gic_dist_common.priority_level[i],
 			context_gic_dist_common.base +
 		       GIC_DIST_PRI_SPI32 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_ENABLE_SET_COMMON_NUM; i++)
-		writel(context_gic_dist_common.enable_set[i],
+		writel_relaxed(context_gic_dist_common.enable_set[i],
 		       context_gic_dist_common.base +
 		       GIC_DIST_ENABLE_SET_SPI32 +  i * 4);
 
-	writel(context_gic_dist_common.ns,
+	writel_relaxed(context_gic_dist_common.ns,
 	       context_gic_dist_common.base + GIC_DIST_ENABLE_NS);
 }
 
@@ -463,22 +463,22 @@ static void save_gic_dist_cpu(struct context_gic_dist_cpu *c_gic)
 
 	for (i = 0; i < GIC_DIST_ENABLE_SET_CPU_NUM; i++)
 		c_gic->enable_set[i] =
-			readl(c_gic->base +
+			readl_relaxed(c_gic->base +
 			      GIC_DIST_ENABLE_SET_SPI0 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_PRI_CPU_NUM; i++)
 		c_gic->priority_level[i] =
-			readl(c_gic->base +
+			readl_relaxed(c_gic->base +
 			      GIC_DIST_PRI_SPI0 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_SPI_TARGET_CPU_NUM; i++)
 		c_gic->spi_target[i] =
-			readl(c_gic->base +
+			readl_relaxed(c_gic->base +
 			      GIC_DIST_SPI_TARGET_SPI0 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_CONFIG_CPU_NUM; i++)
 		c_gic->config[i] =
-			readl(c_gic->base +
+			readl_relaxed(c_gic->base +
 			      GIC_DIST_CONFIG_SPI0 +  i * 4);
 }
 
@@ -495,54 +495,54 @@ static void restore_gic_dist_cpu(struct context_gic_dist_cpu *c_gic)
 	int i;
 
 	for (i = 0; i < GIC_DIST_CONFIG_CPU_NUM; i++)
-		writel(c_gic->config[i],
+		writel_relaxed(c_gic->config[i],
 		       c_gic->base +
 		       GIC_DIST_CONFIG_SPI0 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_SPI_TARGET_CPU_NUM; i++)
-		writel(c_gic->spi_target[i],
+		writel_relaxed(c_gic->spi_target[i],
 		       c_gic->base +
 		       GIC_DIST_SPI_TARGET_SPI0 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_PRI_CPU_NUM; i++)
-		writel(c_gic->priority_level[i],
+		writel_relaxed(c_gic->priority_level[i],
 			c_gic->base +
 		       GIC_DIST_PRI_SPI0 +  i * 4);
 
 	for (i = 0; i < GIC_DIST_ENABLE_SET_CPU_NUM; i++)
-		writel(c_gic->enable_set[i],
+		writel_relaxed(c_gic->enable_set[i],
 		       c_gic->base +
 		       GIC_DIST_ENABLE_SET_SPI0 +  i * 4);
 }
 static void save_scu(void)
 {
 	context_scu.ctrl =
-		readl(context_scu.base + SCU_CTRL);
+		readl_relaxed(context_scu.base + SCU_CTRL);
 	context_scu.cpu_pwrstatus =
-		readl(context_scu.base + SCU_CPU_STATUS);
+		readl_relaxed(context_scu.base + SCU_CPU_STATUS);
 	context_scu.inv_all_nonsecure =
-		readl(context_scu.base + SCU_INVALIDATE);
+		readl_relaxed(context_scu.base + SCU_INVALIDATE);
 	context_scu.filter_start_addr =
-		readl(context_scu.base + SCU_FILTER_STARTADDR);
+		readl_relaxed(context_scu.base + SCU_FILTER_STARTADDR);
 	context_scu.filter_end_addr	=
-		readl(context_scu.base + SCU_FILTER_ENDADDR);
+		readl_relaxed(context_scu.base + SCU_FILTER_ENDADDR);
 	context_scu.access_ctrl_sac	=
-		readl(context_scu.base + SCU_ACCESS_CTRL_SAC);
+		readl_relaxed(context_scu.base + SCU_ACCESS_CTRL_SAC);
 }
 
 static void restore_scu(void)
 {
-	writel(context_scu.ctrl,
+	writel_relaxed(context_scu.ctrl,
 	       context_scu.base + SCU_CTRL);
-	writel(context_scu.cpu_pwrstatus,
+	writel_relaxed(context_scu.cpu_pwrstatus,
 	       context_scu.base + SCU_CPU_STATUS);
-	writel(context_scu.inv_all_nonsecure,
+	writel_relaxed(context_scu.inv_all_nonsecure,
 	       context_scu.base + SCU_INVALIDATE);
-	writel(context_scu.filter_start_addr,
+	writel_relaxed(context_scu.filter_start_addr,
 	       context_scu.base + SCU_FILTER_STARTADDR);
-	writel(context_scu.filter_end_addr,
+	writel_relaxed(context_scu.filter_end_addr,
 	       context_scu.base + SCU_FILTER_ENDADDR);
-	writel(context_scu.access_ctrl_sac,
+	writel_relaxed(context_scu.access_ctrl_sac,
 	       context_scu.base + SCU_ACCESS_CTRL_SAC);
 }
 
@@ -756,6 +756,7 @@ void context_varm_restore_common(void)
  */
 void context_varm_save_core(void)
 {
+
 	int cpu = smp_processor_id();
 
 	atomic_notifier_call_chain(&context_arm_notifier_list,
