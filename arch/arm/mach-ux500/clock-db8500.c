@@ -1231,8 +1231,7 @@ static int __init init_clock_states(void)
 	clk_enable(&p6_pclk1);
 	clk_enable(&p6_pclk2);
 	clk_enable(&p6_pclk3);
-	if (cpu_is_u8500() && !ux500_is_svp())
-		clk_enable(&p6_rng_clk);
+	clk_enable(&p6_rng_clk);
 	/*
 	 * Disable clocks that are on at boot, but should be off.
 	 */
@@ -1270,23 +1269,6 @@ late_initcall(init_clock_states);
 
 int __init db8500_clk_init(void)
 {
-
-	if (ux500_is_svp()) {
-		sysclk_ops.enable = NULL;
-		sysclk_ops.disable = NULL;
-		prcmu_clk_ops.enable = NULL;
-		prcmu_clk_ops.disable = NULL;
-		prcmu_opp100_clk_ops.enable = NULL;
-		prcmu_opp100_clk_ops.disable = NULL;
-		prcc_pclk_ops.enable = NULL;
-		prcc_pclk_ops.disable = NULL;
-		prcc_kclk_ops.enable = NULL;
-		prcc_kclk_ops.disable = NULL;
-		clkout0_ops.enable = NULL;
-		clkout0_ops.disable = NULL;
-		clkout1_ops.enable = NULL;
-		clkout1_ops.disable = NULL;
-	}
 
 	clks_register(u8500_v2_sysclks,
 		      ARRAY_SIZE(u8500_v2_sysclks));
