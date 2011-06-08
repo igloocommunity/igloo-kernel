@@ -3,7 +3,7 @@
 #
 obj-y := pm.o runtime.o
 
-obj-$(CONFIG_U8500_CPUIDLE) 		+= cpuidle.o
+obj-$(CONFIG_U8500_CPUIDLE) 		+= cpuidle.o timer.o
 obj-$(CONFIG_U8500_CPUIDLE_DEBUG) 	+= cpuidle_dbg.o
 obj-$(CONFIG_UX500_CONTEXT) 		+= context.o context_arm.o context-db8500.o context-db5500.o
 obj-$(CONFIG_U8500_CPUFREQ) 		+= cpufreq.o
