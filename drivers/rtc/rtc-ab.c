@@ -13,7 +13,6 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/mfd/abx500.h>
-#include <linux/mfd/abx500/ab5500.h>
 
 #define AB5500_RTC_CLOCK_RATE	32768
 #define AB5500_RTC		0x00
