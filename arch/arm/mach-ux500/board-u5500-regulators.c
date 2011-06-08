@@ -47,6 +47,7 @@ static struct regulator_consumer_supply ab5500_ldo_vdigmic_consumers[] = {
 };
 
 static struct regulator_consumer_supply ab5500_ldo_sim_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.5"),
 };
 
 static struct regulator_init_data
@@ -150,7 +151,7 @@ static void __init u5500_regulators_init_debug(void)
 	const char data[] = "debug";
 	int i;
 
-	for (i = 0; i < 4; i++)
+	for (i = 0; i < 6; i++)
 		platform_device_register_data(NULL, "reg-virt-consumer", i,
 			data, sizeof(data));
 }
