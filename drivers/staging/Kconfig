@@ -47,6 +47,16 @@ config U8500_CM
 	  the driver in kernel to ease there life. By default, this driver
 	  must be built outside this kernel source tree.
 
+config AB5500_SIM
+        bool "ST-Ericsson AB5500 SIM Interface driver"
+        depends on AB5500_CORE
+        help
+          SIM Interface driver provides interface to configure
+          various parameters of AB5550 SIM Level Shifter.Support provided are:
+          Configure Pull up on sim lines
+          Configure Operation Mode
+          Notify Sim Insert/Extract Interrupt
+
 config STAGING_EXCLUDE_BUILD
 	bool "Exclude Staging drivers from being built" if STAGING
 	default y
