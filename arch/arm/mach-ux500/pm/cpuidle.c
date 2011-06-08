@@ -24,6 +24,7 @@
 #include "cpuidle_dbg.h"
 #include "context.h"
 #include "pm.h"
+#include "timer.h"
 #include "../regulator-db8500.h"
 
 #define DEEP_SLEEP_WAKE_UP_LATENCY 8500
@@ -172,7 +173,6 @@ static DEFINE_SPINLOCK(cpuidle_lock);
 static bool restore_ape; /* protected by cpuidle_lock */
 static bool restore_arm; /* protected by cpuidle_lock */
 
-extern struct clock_event_device rtt_clkevt;
 extern struct clock_event_device u8500_mtu_clkevt;
 
 static atomic_t idle_cpus_counter = ATOMIC_INIT(0);
@@ -239,7 +239,8 @@ static void restore_sequence(struct cpu_state *state,
 
 		ux500_ci_dbg_console_handle_ape_resume();
 
-		clockevents_set_mode(&rtt_clkevt, CLOCK_EVT_MODE_SHUTDOWN);
+		ux500_rtcrtt_off();
+
 		/*
 		 * TODO: We might have woken on other interrupt.
 		 * Reprogram MTU to wake at correct time.
@@ -269,12 +270,10 @@ static void restore_sequence(struct cpu_state *state,
 
 	spin_unlock_irqrestore(&cpuidle_lock, iflags);
 
-	smp_rmb();
-	if (always_on_timer_migrated) {
+	if (always_on_timer_migrated)
 		/* Use the ARM local timer for this cpu */
 		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,
 				   &this_cpu);
-	}
 }
 
 /**
@@ -397,7 +396,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 		       struct cpuidle_state *ci_state)
 {
 	ktime_t t1, t2, t3;
-	ktime_t sleep_time;
+	u32 sleep_time;
 	s64 diff;
 	int ret;
 	int target;
@@ -486,27 +485,20 @@ static int enter_sleep(struct cpuidle_device *dev,
 		/* We are going to sleep or deep sleep => prepare for it */
 
 		/* Program the only timer that is available when APE is off */
-		clockevents_set_mode(&rtt_clkevt,
-				     CLOCK_EVT_MODE_ONESHOT);
 
-		sleep_time = ktime_set(0, get_remaining_sleep_time() * 1000);
+		sleep_time = get_remaining_sleep_time();
 
-		if (cstates[target].UL_PLL == UL_PLL_OFF) {
-			ktime_t ulpll_sleep = ktime_set(0,
-						UL_PLL_START_UP_LATENCY * 1000);
+		if (cstates[target].UL_PLL == UL_PLL_OFF)
 			/* Compensate for ULPLL start up time */
-			sleep_time = ktime_sub(sleep_time, ulpll_sleep);
+			sleep_time -= UL_PLL_START_UP_LATENCY;
 
 			/*
 			 * Not checking for negative sleep time since
 			 * determine_sleep_state has already checked that
 			 * there is enough time.
 			 */
-		}
 
-		clockevents_program_event(&rtt_clkevt,
-					  sleep_time,
-					  time_zero);
+		ux500_rtcrtt_next(sleep_time);
 
 		context_vape_save();
 
