@@ -67,7 +67,6 @@ static void __init ux500_timer_init(void)
  */
 	mtu_timer_init();
 #ifdef CONFIG_UX500_PRCMU_TIMER
-	rtc_rtt_timer_init(0);
 	prcmu_timer_init();
 #endif
 
