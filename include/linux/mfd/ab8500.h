@@ -138,9 +138,6 @@
 #define AB8500_NR_IRQS			112
 #define AB8500_NUM_IRQ_REGS		14
 
-/* Forward declaration */
-struct ab8500_charger;
-
 /**
  * struct ab8500 - ab8500 internal structure
  * @dev: parent device
@@ -154,7 +151,6 @@ struct ab8500_charger;
  * @tx_buf: tx buf for SPI
  * @mask: cache of IRQ regs for bus lock
  * @oldmask: cache of previous IRQ regs for bus lock
- * @charger: pointer to the charger driver device information.
  */
 struct ab8500 {
 	struct device	*dev;
@@ -172,8 +168,6 @@ struct ab8500 {
 
 	u8 mask[AB8500_NUM_IRQ_REGS];
 	u8 oldmask[AB8500_NUM_IRQ_REGS];
-
-	struct ab8500_charger *charger;
 };
 
 struct regulator_reg_init;
