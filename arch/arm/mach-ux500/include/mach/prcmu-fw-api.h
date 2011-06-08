@@ -280,6 +280,7 @@ int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
 void prcmu_ac_wake_req(void);
 void prcmu_ac_sleep_req(void);
 void prcmu_system_reset(u16 reset_code);
+u16 prcmu_get_reset_code(void);
 void prcmu_modem_reset(void);
 bool prcmu_is_ac_wake_requested(void);
 void prcmu_enable_spi2(void);
@@ -443,6 +444,11 @@ static inline void prcmu_ac_wake_req(void) {}
 static inline void prcmu_ac_sleep_req(void) {}
 
 static inline void prcmu_system_reset(u16 reset_code) {}
+
+static inline u16 prcmu_get_reset_code(void)
+{
+	return 0;
+}
 
 static inline void prcmu_modem_reset(void) {}
 
