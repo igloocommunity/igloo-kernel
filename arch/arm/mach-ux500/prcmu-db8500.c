@@ -1737,13 +1737,24 @@ bool prcmu_is_ac_wake_requested(void)
 /**
  * prcmu_system_reset - System reset
  *
- * Saves the reset reason code and then sets the APE_SOFRST register which
+ * Saves the reset reason code and then sets the APE_SOFTRST register which
  * fires interrupt to fw
  */
 void prcmu_system_reset(u16 reset_code)
 {
 	writew(reset_code, (tcdm_base + PRCM_SW_RST_REASON));
 	writel(1, (_PRCMU_BASE + PRCM_APE_SOFTRST));
+}
+
+/**
+ * prcmu_get_reset_code - Retrieve SW reset reason code
+ *
+ * Retrieves the reset reason code stored by prcmu_system_reset() before
+ * last restart.
+ */
+u16 prcmu_get_reset_code(void)
+{
+	return readw(tcdm_base + PRCM_SW_RST_REASON);
 }
 
 /**

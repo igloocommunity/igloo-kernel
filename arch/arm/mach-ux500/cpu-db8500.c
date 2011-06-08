@@ -25,6 +25,8 @@
 #include <mach/hardware.h>
 #include <mach/setup.h>
 #include <mach/devices.h>
+#include <mach/prcmu-fw-api.h>
+#include <mach/reboot_reasons.h>
 #include <mach/usb.h>
 #include <mach/ste-dma40-db8500.h>
 
@@ -457,12 +459,25 @@ static ssize_t ux500_get_process(char *buf, struct sysfs_soc_info *si)
 	return sprintf(buf, "%02xnm\n", dbx500_id.process);
 }
 
+static ssize_t ux500_get_reset_code(char *buf, struct sysfs_soc_info *si)
+{
+	return sprintf(buf, "0x%04x\n", prcmu_get_reset_code());
+}
+
+static ssize_t ux500_get_reset_reason(char *buf, struct sysfs_soc_info *si)
+{
+	return sprintf(buf, "%s\n",
+		reboot_reason_string(prcmu_get_reset_code()));
+}
+
 static struct sysfs_soc_info soc_info[] = {
 	SYSFS_SOC_ATTR_CALLBACK("machine", ux500_get_machine),
 	SYSFS_SOC_ATTR_VALUE("family", "Ux500"),
 	SYSFS_SOC_ATTR_CALLBACK("soc_id", ux500_get_soc_id),
 	SYSFS_SOC_ATTR_CALLBACK("revision", ux500_get_revision),
 	SYSFS_SOC_ATTR_CALLBACK("process", ux500_get_process),
+	SYSFS_SOC_ATTR_CALLBACK("reset_code", ux500_get_reset_code),
+	SYSFS_SOC_ATTR_CALLBACK("reset_reason", ux500_get_reset_reason),
 };
 
 static int __init ux500_sys_soc_init(void)
