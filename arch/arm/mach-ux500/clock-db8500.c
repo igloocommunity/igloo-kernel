@@ -140,6 +140,9 @@ static int ab_ulpclk_enable(struct clk *clk)
 			return PTR_ERR(reg);
 		clk->regulator = reg;
 	}
+	err = regulator_set_optimum_mode(clk->regulator, 1500);
+	if (unlikely(err < 0))
+		goto regulator_enable_error;
 	err = regulator_enable(clk->regulator);
 	if (unlikely(err))
 		goto regulator_enable_error;
@@ -169,6 +172,9 @@ static void ab_ulpclk_disable(struct clk *clk)
 		AB8500_SYSULPCLKCTRL1_ULPCLKREQ);
 	if (unlikely(regulator_disable(clk->regulator) || err))
 		goto out_err;
+
+	regulator_set_optimum_mode(clk->regulator, 0);
+
 	return;
 
 out_err:
