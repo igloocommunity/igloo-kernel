@@ -2515,7 +2515,6 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, di);
-	di->parent->charger = di;
 
 	return ret;
 
