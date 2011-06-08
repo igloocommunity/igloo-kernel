@@ -7,7 +7,7 @@ config U8500_CPUFREQ
 
 config U8500_CPUIDLE
 	tristate "CPUIdle support"
-	depends on UX500_SOC_DB8500 && CPU_IDLE
+	depends on UX500_SOC_DB8500 && CPU_IDLE && !RTC_DRV_PL031
 	default y
 	select GENERIC_CLOCKEVENTS_BROADCAST
 	select UX500_CONTEXT
