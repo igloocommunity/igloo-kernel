@@ -121,6 +121,11 @@ enum epod_state {
 	EPOD_OFF,
 	EPOD_ON,
 };
+enum epod_onoffret_state {
+	EPOD_OOR_OFF,
+	EPOD_OOR_RET,
+	EPOD_OOR_ON,
+};
 enum db5500_prcmu_pll {
 	DB5500_PLL_SOC0,
 	DB5500_PLL_SOC1,
@@ -192,8 +197,8 @@ static struct {
 	struct mutex lock;
 	struct completion work;
 	struct {
-		u8 epod_states[DB5500_NUM_EPOD_ID];
-		u8 pll_states[DB5500_NUM_PLL_ID];
+		u8 epod_st[DB5500_NUM_EPOD_ID];
+		u8 pll_st[DB5500_NUM_PLL_ID];
 	} req;
 	struct {
 		u8 header;
@@ -377,11 +382,11 @@ static int request_pll(u8 pll, bool enable)
 	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(2))
 		cpu_relax();
 
-	mb2_transfer.req.pll_states[pll] = enable;
+	mb2_transfer.req.pll_st[pll] = enable;
 
 	/* fill in mailbox */
 	writeb(pll, PRCM_REQ_MB2_PLL_CLIENT);
-	writeb(mb2_transfer.req.pll_states[pll], PRCM_REQ_MB2_PLL_STATE);
+	writeb(mb2_transfer.req.pll_st[pll], PRCM_REQ_MB2_PLL_STATE);
 
 	writeb(MB2H_PLL_REQUEST, PRCM_REQ_MB2_HEADER);
 
@@ -606,28 +611,21 @@ static void ack_dbb_wakeup(void)
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
 }
 
-int db5500_prcmu_set_epod(u16 epod_id, u8 epod_state)
+int db5500_prcmu_set_epod(u16 epod, u8 epod_state)
 {
 	int r = 0;
 	bool ram_retention = false;
 
 	/* check argument */
-	BUG_ON(epod_id < DB5500_EPOD_ID_BASE);
+	BUG_ON(epod < DB5500_EPOD_ID_BASE);
 	BUG_ON(epod_state > EPOD_STATE_ON);
+	BUG_ON((epod - DB5500_EPOD_ID_BASE) >= DB5500_NUM_EPOD_ID);
 
-	epod_id &= 0xFF;
-	BUG_ON(epod_id > DB5500_NUM_EPOD_ID);
-
-	/* TODO: FW does not take retention for ESRAM12?
-	   set flag if retention is possible */
-	switch (epod_id) {
-	case DB5500_EPOD_ID_ESRAM12:
+	if (epod == DB5500_EPOD_ID_ESRAM12)
 		ram_retention = true;
-		break;
-	}
 
 	/* check argument */
-	/* BUG_ON(epod_state == EPOD_STATE_RAMRET && !ram_retention); */
+	BUG_ON(epod_state == EPOD_STATE_RAMRET && !ram_retention);
 
 	/* get lock */
 	mutex_lock(&mb2_transfer.lock);
@@ -636,19 +634,42 @@ int db5500_prcmu_set_epod(u16 epod_id, u8 epod_state)
 	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(2))
 		cpu_relax();
 
-	/* PRCMU FW can only handle on or off */
-	if (epod_state == EPOD_STATE_ON)
-		mb2_transfer.req.epod_states[epod_id] = EPOD_ON;
-	else if (epod_state == EPOD_STATE_OFF)
-		mb2_transfer.req.epod_states[epod_id] = EPOD_OFF;
-	else {
-		r = -EINVAL;
-		goto unlock_and_return;
+	/* Retention is allowed only for ESRAM12 */
+	if (epod  == DB5500_EPOD_ID_ESRAM12) {
+		switch (epod_state) {
+		case EPOD_STATE_ON:
+			mb2_transfer.req.epod_st[epod - DB5500_EPOD_ID_BASE] =
+				EPOD_OOR_ON;
+			break;
+		case EPOD_STATE_OFF:
+			mb2_transfer.req.epod_st[epod - DB5500_EPOD_ID_BASE] =
+				EPOD_OOR_OFF;
+			break;
+		case EPOD_STATE_RAMRET:
+			mb2_transfer.req.epod_st[epod - DB5500_EPOD_ID_BASE] =
+				EPOD_OOR_RET;
+			break;
+		default:
+			r = -EINVAL;
+			goto unlock_and_return;
+			break;
+		}
+	} else {
+		if (epod_state == EPOD_STATE_ON)
+			mb2_transfer.req.epod_st[epod - DB5500_EPOD_ID_BASE] =
+				EPOD_ON;
+		else if (epod_state == EPOD_STATE_OFF)
+			mb2_transfer.req.epod_st[epod - DB5500_EPOD_ID_BASE] =
+				EPOD_OFF;
+		else {
+			r = -EINVAL;
+			goto unlock_and_return;
+		}
 	}
-
 	/* fill in mailbox */
-	writeb(epod_id, PRCM_REQ_MB2_EPOD_CLIENT);
-	writeb(mb2_transfer.req.epod_states[epod_id], PRCM_REQ_MB2_EPOD_STATE);
+	writeb((epod - DB5500_EPOD_ID_BASE), PRCM_REQ_MB2_EPOD_CLIENT);
+	writeb(mb2_transfer.req.epod_st[epod - DB5500_EPOD_ID_BASE],
+		PRCM_REQ_MB2_EPOD_STATE);
 
 	writeb(MB2H_EPOD_REQUEST, PRCM_REQ_MB2_HEADER);
 
