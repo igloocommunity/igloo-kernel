@@ -122,6 +122,9 @@ enum mb5_header {
 #define PRCMU_DISABLE_PLLDSI			0x00000000
 
 #define PRCMU_DSI_RESET_SW			0x00000003
+#define PRCMU_RESOUTN0_PIN			0x00000001
+#define PRCMU_RESOUTN1_PIN			0x00000002
+#define PRCMU_RESOUTN2_PIN			0x00000004
 
 #define PRCMU_PLLDSI_LOCKP_LOCKED		0x3
 
@@ -328,6 +331,34 @@ int db5500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
 	mutex_unlock(&mb5_transfer.lock);
 
 	return r;
+}
+
+int prcmu_resetout(u8 resoutn, u8 state)
+{
+	int offset;
+	int pin = -1;
+
+	offset = state > 0 ? PRCM_RESOUTN_SET_OFFSET : PRCM_RESOUTN_CLR_OFFSET;
+
+	switch (resoutn) {
+	case 0:
+		pin = PRCMU_RESOUTN0_PIN;
+		break;
+	case 1:
+		pin = PRCMU_RESOUTN1_PIN;
+		break;
+	case 2:
+		pin = PRCMU_RESOUTN2_PIN;
+	default:
+		break;
+	}
+
+	if (pin > 0)
+		writel(pin, _PRCMU_BASE + offset);
+	else
+		return -EINVAL;
+
+	return 0;
 }
 
 int db5500_prcmu_enable_dsipll(void)
