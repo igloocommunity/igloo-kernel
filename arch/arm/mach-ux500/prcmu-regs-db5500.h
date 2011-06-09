@@ -72,5 +72,7 @@
 
 /* Miscellaneous unit registers */
 #define PRCM_DSI_SW_RESET 0x324
+#define PRCM_RESOUTN_SET_OFFSET 0x214
+#define PRCM_RESOUTN_CLR_OFFSET 0x218
 
 #endif
