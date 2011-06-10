@@ -49,6 +49,7 @@ struct state_history_state {
 	u32 state_ok;
 	u32 state_error;
 	u32 state_int;
+	u32 sga;
 
 	u32 latency_count[NUM_LATENCY];
 	ktime_t latency_sum[NUM_LATENCY];
@@ -260,6 +261,9 @@ void ux500_ci_dbg_exit_latency(int ctarget, ktime_t now, ktime_t exit,
 	case ARM2PRCMUPENDINGIT_ER:
 		sh->states[ctarget].state_int++;
 		break;
+	case HWACFCT_IN_SGA:
+		sh->states[ctarget].sga++;
+		break;
 	default:
 		pr_info("cpuidle: unknown prcmu exit code: 0x%x state: %d\n",
 			prcmu_status, cstates[ctarget].state);
@@ -435,6 +439,7 @@ static void state_history_reset(void)
 			sh->states[i].state_ok = 0;
 			sh->states[i].state_error = 0;
 			sh->states[i].state_int = 0;
+			sh->states[i].sga = 0;
 
 			sh->states[i].time = ktime_set(0, 0);
 
@@ -598,9 +603,10 @@ static void stats_disp_one(struct seq_file *s, struct state_history *sh,
 		return;
 
 	if (i > CI_WFI && verbose)
-		seq_printf(s, " (%u int:%u err:%u)",
+		seq_printf(s, " (%u int:%u sga: %u err:%u)",
 			   sh->states[i].state_ok,
 			   sh->states[i].state_int,
+			   sh->states[i].sga,
 			   sh->states[i].state_error);
 
 	seq_printf(s, " in %d ms %d%%",
