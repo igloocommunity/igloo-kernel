@@ -17,6 +17,7 @@ enum prcmu_idle_stat {
 	IDLE_OK			= 0xf0,
 	DEEPIDLE_OK		= 0xe3,
 	ARM2PRCMUPENDINGIT_ER	= 0x91,
+	HWACFCT_IN_SGA		= 0x93,
 };
 
 /**
