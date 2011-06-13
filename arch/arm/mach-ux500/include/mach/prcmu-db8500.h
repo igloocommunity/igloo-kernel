@@ -186,6 +186,12 @@ int prcmu_stop_temp_sense(void);
 void prcmu_enable_spi2(void);
 void prcmu_disable_spi2(void);
 
+int prcmu_config_a9wdog(u8 num, bool sleep_auto_off);
+int prcmu_enable_a9wdog(u8 id);
+int prcmu_disable_a9wdog(u8 id);
+int prcmu_kick_a9wdog(u8 id);
+int prcmu_load_a9wdog(u8 id, u32 val);
+
 void db8500_prcmu_system_reset(u16 reset_code);
 int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 		bool keep_ap_pll);
@@ -328,6 +334,31 @@ static inline int db8500_prcmu_config_esram0_deep_sleep(u8 state)
 static inline void db8500_prcmu_config_abb_event_readout(u32 abb_events) {}
 
 static inline void db8500_prcmu_get_abb_event_buffer(void __iomem **buf) {}
+
+static inline int prcmu_config_a9wdog(u8 num, bool sleep_auto_off)
+{
+	return 0;
+}
+
+static inline int prcmu_enable_a9wdog(u8 id)
+{
+	return 0;
+}
+
+static inline int prcmu_disable_a9wdog(u8 id)
+{
+	return 0;
+}
+
+static inline int prcmu_kick_a9wdog(u8 id)
+{
+	return 0;
+}
+
+static inline int prcmu_load_a9wdog(u8 id, u32 val)
+{
+	return 0;
+}
 
 #endif /* CONFIG_UX500_SOC_DB8500 */
 
