@@ -219,22 +219,31 @@ struct regulator_ops ux500_regulator_ops = {
 static bool epod_on[NUM_EPOD_ID];
 static bool epod_ramret[NUM_EPOD_ID];
 
+static int epod_id_to_index(u16 epod_id)
+{
+	if (cpu_is_u5500())
+		return epod_id - DB5500_EPOD_ID_BASE;
+	else
+		return epod_id;
+}
+
 static int enable_epod(u16 epod_id, bool ramret)
 {
+	int idx = epod_id_to_index(epod_id);
 	int ret;
 
 	if (ramret) {
-		if (!epod_on[epod_id]) {
+		if (!epod_on[idx]) {
 			ret = prcmu_set_epod(epod_id, EPOD_STATE_RAMRET);
 			if (ret < 0)
 				return ret;
 		}
-		epod_ramret[epod_id] = true;
+		epod_ramret[idx] = true;
 	} else {
 		ret = prcmu_set_epod(epod_id, EPOD_STATE_ON);
 		if (ret < 0)
 			return ret;
-		epod_on[epod_id] = true;
+		epod_on[idx] = true;
 	}
 
 	return 0;
@@ -242,17 +251,18 @@ static int enable_epod(u16 epod_id, bool ramret)
 
 static int disable_epod(u16 epod_id, bool ramret)
 {
+	int idx = epod_id_to_index(epod_id);
 	int ret;
 
 	if (ramret) {
-		if (!epod_on[epod_id]) {
+		if (!epod_on[idx]) {
 			ret = prcmu_set_epod(epod_id, EPOD_STATE_OFF);
 			if (ret < 0)
 				return ret;
 		}
-		epod_ramret[epod_id] = false;
+		epod_ramret[idx] = false;
 	} else {
-		if (epod_ramret[epod_id]) {
+		if (epod_ramret[idx]) {
 			ret = prcmu_set_epod(epod_id, EPOD_STATE_RAMRET);
 			if (ret < 0)
 				return ret;
@@ -261,7 +271,7 @@ static int disable_epod(u16 epod_id, bool ramret)
 			if (ret < 0)
 				return ret;
 		}
-		epod_on[epod_id] = false;
+		epod_on[idx] = false;
 	}
 
 	return 0;
