@@ -184,7 +184,8 @@ static int ux500_suspend_valid(suspend_state_t state)
 
 static int ux500_suspend_prepare_late(void)
 {
-	(void)prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_OFF);
+	/* ESRAM to retention instead of OFF until ROM is fixed */
+	(void)prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
 	ab8500_regulator_debug_force();
 
 	return 0;
