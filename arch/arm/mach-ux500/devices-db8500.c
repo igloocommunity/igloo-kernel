@@ -444,6 +444,11 @@ struct platform_device ux500_wdt_device = {
 	.num_resources  = ARRAY_SIZE(ux500_wdt_resources),
 };
 
+struct platform_device ux500_prcmu_wdt_device = {
+	.name		= "ux500_wdt",
+	.id		= -1,
+};
+
 /*
  * HSI
  */
