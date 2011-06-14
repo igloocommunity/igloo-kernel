@@ -238,6 +238,9 @@ static struct ab8500_platform_data ab8500_platdata = {
 #ifdef CONFIG_INPUT_AB8500_ACCDET
 	.accdet = &ab8500_accdet_pdata,
 #endif
+#ifdef CONFIG_PM
+       .pm_power_off = true,
+#endif
 };
 
 static struct resource ab8500_resources[] = {
