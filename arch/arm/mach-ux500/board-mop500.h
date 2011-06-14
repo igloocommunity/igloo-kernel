@@ -7,6 +7,9 @@
 #ifndef __BOARD_MOP500_H
 #define __BOARD_MOP500_H
 
+/* This defines the NOMADIK_NR_GPIO */
+#include <mach/gpio.h>
+
 /* snowball GPIO for MMC card */
 #define SNOWBALL_SDMMC_EN_GPIO 217
 #define SNOWBALL_SDMMC_1V8_3V_GPIO 228
