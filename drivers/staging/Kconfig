@@ -28,6 +28,17 @@ config U8500_MMIO
 	bool "ST-Ericsson MMIO (Camera) Driver"
 	depends on ARCH_U8500
 
+config U8500_CM
+	tristate "U8500 Component Manager driver"
+	depends on UX500_SOC_DB8500
+	help
+	  This is the Component Manager driver. It is part of the
+	  Nomadik Multiprocessing Framework.
+
+	  Note: This option allows the kernel developers to build
+	  the driver in kernel to ease there life. By default, this driver
+	  must be built outside this kernel source tree.
+
 config STAGING_EXCLUDE_BUILD
 	bool "Exclude Staging drivers from being built" if STAGING
 	default y
