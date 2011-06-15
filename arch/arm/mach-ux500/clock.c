@@ -370,11 +370,19 @@ struct clkops prcc_pclk_ops = {
 
 static int prcc_kclk_enable(struct clk *clk)
 {
+	int err;
 	void __iomem *io_base = __io_address(clk->io_base);
+
+	err = __clk_enable(clk->clock, clk->mutex);
+	if (err)
+		return err;
 
 	writel(clk->cg_sel, (io_base + PRCC_KCKEN));
 	while (!(readl(io_base + PRCC_KCKSR) & clk->cg_sel))
 		cpu_relax();
+
+	__clk_disable(clk->clock, clk->mutex);
+
 	return 0;
 }
 
@@ -382,7 +390,9 @@ static void prcc_kclk_disable(struct clk *clk)
 {
 	void __iomem *io_base = __io_address(clk->io_base);
 
+	(void)__clk_enable(clk->clock, clk->mutex);
 	writel(clk->cg_sel, (io_base + PRCC_KCKDIS));
+	__clk_disable(clk->clock, clk->mutex);
 }
 
 struct clkops prcc_kclk_ops = {
