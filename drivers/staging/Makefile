@@ -73,3 +73,4 @@ obj-$(CONFIG_INTEL_MEI)		+= mei/
 obj-$(CONFIG_MFD_NVEC)		+= nvec/
 obj-$(CONFIG_CW1200)   		+= cw1200/
 obj-$(CONFIG_U8500_MMIO)	+= mmio/
+obj-$(CONFIG_U8500_CM)		+= nmf-cm/
