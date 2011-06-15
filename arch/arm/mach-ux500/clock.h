@@ -32,6 +32,7 @@
  *		be a %NULL-terminated &struct_clk array. Present if and only
  *		if clk_set_parent() is implemented for the clock.
  * @regulator:	The regulator needed to have the clock functional, if any.
+ * @clock:	The clock needed to control the clock, if any.
  */
 struct clk {
 	const struct clkops *ops;
@@ -46,6 +47,7 @@ struct clk {
 	struct clk *bus_parent;
 	struct clk **parents;
 	struct regulator *regulator;
+	struct clk *clock;
 	struct list_head list;
 #if defined(CONFIG_DEBUG_FS)
 	struct dentry		*dent;	/* For visible tree hierarchy */
@@ -108,13 +110,14 @@ extern struct clkops sga_clk_ops;
 		.parent = _parent, \
 	}
 
-#define DEF_PRCC_KCLK(_name, _io_base, _cg_bit, _parent) \
+#define DEF_PRCC_KCLK(_name, _io_base, _cg_bit, _parent, _clock) \
 	struct clk _name = { \
 		.name = #_name, \
 		.ops = &prcc_kclk_ops, \
 		.io_base = _io_base, \
 		.cg_sel = BIT(_cg_bit), \
 		.parent = _parent, \
+		.clock = _clock, \
 	}
 
 #define DEF_PER_CLK(_name, _bus_parent, _parent) \

@@ -229,15 +229,15 @@ static struct clkops clkout1_ops = {
 	DEF_PRCC_PCLK(_name, U5500_CLKRST6_BASE, _cg_bit, &per6clk)
 
 #define DEF_PER1_KCLK(_cg_bit, _name, _parent) \
-	DEF_PRCC_KCLK(_name, U5500_CLKRST1_BASE, _cg_bit, _parent)
+	DEF_PRCC_KCLK(_name, U5500_CLKRST1_BASE, _cg_bit, _parent, &per1clk)
 #define DEF_PER2_KCLK(_cg_bit, _name, _parent) \
-	DEF_PRCC_KCLK(_name, U5500_CLKRST2_BASE, _cg_bit, _parent)
+	DEF_PRCC_KCLK(_name, U5500_CLKRST2_BASE, _cg_bit, _parent, &per2clk)
 #define DEF_PER3_KCLK(_cg_bit, _name, _parent) \
-	DEF_PRCC_KCLK(_name, U5500_CLKRST3_BASE, _cg_bit, _parent)
+	DEF_PRCC_KCLK(_name, U5500_CLKRST3_BASE, _cg_bit, _parent, &per3clk)
 #define DEF_PER5_KCLK(_cg_bit, _name, _parent) \
-	DEF_PRCC_KCLK(_name, U5500_CLKRST5_BASE, _cg_bit, _parent)
+	DEF_PRCC_KCLK(_name, U5500_CLKRST5_BASE, _cg_bit, _parent, &per5clk)
 #define DEF_PER6_KCLK(_cg_bit, _name, _parent) \
-	DEF_PRCC_KCLK(_name, U5500_CLKRST6_BASE, _cg_bit, _parent)
+	DEF_PRCC_KCLK(_name, U5500_CLKRST6_BASE, _cg_bit, _parent, &per6clk)
 
 #define DEF_MTU_CLK(_cg_sel, _name, _bus_parent) \
 	struct clk _name = { \
