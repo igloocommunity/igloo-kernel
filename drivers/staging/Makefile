@@ -72,3 +72,4 @@ obj-$(CONFIG_SPEAKUP)	+= speakup/
 obj-$(CONFIG_TOUCHSCREEN_CLEARPAD_TM1217)	+= cptm1217/
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)	+= ste_rmi4/
 obj-$(CONFIG_CW1200)   		+= cw1200/
+obj-$(CONFIG_U8500_MMIO)	+= mmio/

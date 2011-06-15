@@ -24,6 +24,10 @@ menuconfig STAGING
 
 if STAGING
 
+config U8500_MMIO
+	bool "ST-Ericsson MMIO (Camera) Driver"
+	depends on ARCH_U8500
+
 config STAGING_EXCLUDE_BUILD
 	bool "Exclude Staging drivers from being built" if STAGING
 	default y
