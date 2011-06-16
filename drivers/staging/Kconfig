@@ -28,6 +28,10 @@ config U8500_MMIO
 	bool "ST-Ericsson MMIO (Camera) Driver"
 	depends on ARCH_U8500
 
+config U8500_FLASH
+	bool "ST-Ericsson Flash (Camera) Driver"
+	depends on ARCH_U8500
+
 config U8500_CM
 	tristate "U8500 Component Manager driver"
 	depends on UX500_SOC_DB8500
