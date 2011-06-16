@@ -24,9 +24,13 @@ menuconfig STAGING
 
 if STAGING
 
+config U5500_MMIO
+	bool "ST-Ericsson U5500 MMIO (Camera) Driver"
+	depends on UX500_SOC_DB5500
+
 config U8500_MMIO
 	bool "ST-Ericsson MMIO (Camera) Driver"
-	depends on ARCH_U8500
+	depends on UX500_SOC_DB8500
 
 config U8500_FLASH
 	bool "ST-Ericsson Flash (Camera) Driver"
