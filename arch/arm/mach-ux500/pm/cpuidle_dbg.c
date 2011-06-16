@@ -809,7 +809,7 @@ static const struct file_operations wake_latency_fops = {
 
 static struct dentry *cpuidle_dir;
 
-static void setup_debugfs(void)
+static void __init setup_debugfs(void)
 {
 	cpuidle_dir = debugfs_create_dir("cpuidle", NULL);
 	if (IS_ERR_OR_NULL(cpuidle_dir))
@@ -876,9 +876,14 @@ fail:
 	debugfs_remove_recursive(cpuidle_dir);
 }
 
-void ux500_ci_dbg_init(void)
+#define __UART_BASE(soc, x)     soc##_UART##x##_BASE
+#define UART_BASE(soc, x)       __UART_BASE(soc, x)
+
+void __init ux500_ci_dbg_init(void)
 {
-	char clkname[10];
+	static const char clkname[] __initconst
+		= "uart" __stringify(CONFIG_UX500_DEBUG_UART);
+	unsigned long baseaddr;
 	int cpu;
 
 	struct state_history *sh;
@@ -911,22 +916,17 @@ void ux500_ci_dbg_init(void)
 	setup_debugfs();
 
 	/* Uart debug init */
-	switch (CONFIG_UX500_DEBUG_UART) {
-	case 0:
-		uart_base = ioremap(U8500_UART0_BASE, SZ_4K);
-		break;
-	case 1:
-		uart_base = ioremap(U8500_UART1_BASE, SZ_4K);
-		break;
-	case 2:
-		uart_base = ioremap(U8500_UART2_BASE, SZ_4K);
-		break;
-	default:
-		uart_base = ioremap(U8500_UART2_BASE, SZ_4K);
-		break;
-	}
 
-	snprintf(clkname, sizeof(clkname), "uart%d", CONFIG_UX500_DEBUG_UART);
+	if (cpu_is_u8500())
+		baseaddr = UART_BASE(U8500, CONFIG_UX500_DEBUG_UART);
+	else if (cpu_is_u5500())
+		baseaddr = UART_BASE(U5500, CONFIG_UX500_DEBUG_UART);
+	else
+		ux500_unknown_soc();
+
+	uart_base = ioremap(baseaddr, SZ_4K);
+	BUG_ON(!uart_base);
+
 	uart_clk = clk_get_sys(clkname, NULL);
 	BUG_ON(IS_ERR(uart_clk));
 
