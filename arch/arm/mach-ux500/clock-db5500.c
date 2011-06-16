@@ -741,8 +741,8 @@ static struct clk_lookup db5500_prcc_clocks[] = {
 };
 
 static struct clk_lookup db5500_clkouts[] = {
-	CLK_LOOKUP(clkout1, "pri-cam", NULL),
-	CLK_LOOKUP(clkout1, "sec-cam", NULL),
+	CLK_LOOKUP(clkout1, "mmio_camera", "primary-cam"),
+	CLK_LOOKUP(clkout1, "mmio_camera", "secondary-cam"),
 };
 
 static struct clk_lookup u5500_clocks[] = {
