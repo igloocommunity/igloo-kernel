@@ -174,14 +174,39 @@ static struct regulator_consumer_supply db8500_b2r2_mcde_consumers[] = {
 	REGULATOR_SUPPLY("vsupply", "mcde"),
 };
 
+/* SVA MMDSP regulator switch */
+static struct regulator_consumer_supply db8500_svammdsp_consumers[] = {
+	REGULATOR_SUPPLY("sva-mmdsp", "cm_control"),
+};
+
+/* SVA pipe regulator switch */
+static struct regulator_consumer_supply db8500_svapipe_consumers[] = {
+	REGULATOR_SUPPLY("sva-pipe", "cm_control"),
+};
+
+/* SIA MMDSP regulator switch */
+static struct regulator_consumer_supply db8500_siammdsp_consumers[] = {
+	REGULATOR_SUPPLY("sia-mmdsp", "cm_control"),
+};
+
+/* SIA pipe regulator switch */
+static struct regulator_consumer_supply db8500_siapipe_consumers[] = {
+	REGULATOR_SUPPLY("sia-pipe", "cm_control"),
+};
+
 static struct regulator_consumer_supply db8500_sga_consumers[] = {
 	REGULATOR_SUPPLY("v-mali", NULL),
 };
 
+/* ESRAM1 and 2 regulator switch */
+static struct regulator_consumer_supply db8500_esram12_consumers[] = {
+	REGULATOR_SUPPLY("esram12", "cm_control"),
+};
+
 /* ESRAM3 and 4 regulator switch */
-static struct regulator_consumer_supply u8500_esram34_consumers[] = {
+static struct regulator_consumer_supply db8500_esram34_consumers[] = {
 	REGULATOR_SUPPLY("v-esram34", "mcde"),
-	REGULATOR_SUPPLY("v-esram34", "cm_control"),
+	REGULATOR_SUPPLY("esram34", "cm_control"),
 };
 
 static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
@@ -243,6 +268,8 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 			.name = "db8500-sva-mmdsp",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.consumer_supplies = db8500_svammdsp_consumers,
+		.num_consumer_supplies = ARRAY_SIZE(db8500_svammdsp_consumers),
 	},
 	[DB8500_REGULATOR_SWITCH_SVAMMDSPRET] = {
 		.constraints = {
@@ -257,6 +284,8 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 			.name = "db8500-sva-pipe",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.consumer_supplies = db8500_svapipe_consumers,
+		.num_consumer_supplies = ARRAY_SIZE(db8500_svapipe_consumers),
 	},
 	[DB8500_REGULATOR_SWITCH_SIAMMDSP] = {
 		.supply_regulator = "db8500-vape",
@@ -264,6 +293,8 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 			.name = "db8500-sia-mmdsp",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.consumer_supplies = db8500_siammdsp_consumers,
+		.num_consumer_supplies = ARRAY_SIZE(db8500_siammdsp_consumers),
 	},
 	[DB8500_REGULATOR_SWITCH_SIAMMDSPRET] = {
 		.constraints = {
@@ -277,6 +308,8 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 			.name = "db8500-sia-pipe",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.consumer_supplies = db8500_siapipe_consumers,
+		.num_consumer_supplies = ARRAY_SIZE(db8500_siapipe_consumers),
 	},
 	[DB8500_REGULATOR_SWITCH_SGA] = {
 		.supply_regulator = "db8500-vape",
@@ -303,6 +336,8 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 			.name = "db8500-esram12",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.consumer_supplies = db8500_esram12_consumers,
+		.num_consumer_supplies = ARRAY_SIZE(db8500_esram12_consumers),
 	},
 	[DB8500_REGULATOR_SWITCH_ESRAM12RET] = {
 		.constraints = {
@@ -316,8 +351,8 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 			.name = "db8500-esram34",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
-		.consumer_supplies = u8500_esram34_consumers,
-		.num_consumer_supplies = ARRAY_SIZE(u8500_esram34_consumers),
+		.consumer_supplies = db8500_esram34_consumers,
+		.num_consumer_supplies = ARRAY_SIZE(db8500_esram34_consumers),
 	},
 	[DB8500_REGULATOR_SWITCH_ESRAM34RET] = {
 		.constraints = {
