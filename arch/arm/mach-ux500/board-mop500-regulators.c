@@ -83,6 +83,8 @@ static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
 	REGULATOR_SUPPLY("vdd", "3-004b"),
 	/* L3G4200D Gyroscope device */
 	REGULATOR_SUPPLY("vdd", "l3g4200d"),
+	/* Camera sensors */
+	REGULATOR_SUPPLY("v-mmio-camera", "mmio_camera"),
 	REGULATOR_SUPPLY_DEBUG("aux1", "reg-virt-consumer.0")
 };
 
