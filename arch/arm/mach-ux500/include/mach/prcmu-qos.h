@@ -15,13 +15,13 @@
 #define PRCMU_QOS_DDR_OPP 2
 #define PRCMU_QOS_DEFAULT_VALUE -1
 
-#ifdef CONFIG_UX500_SOC_DB8500
+#ifdef CONFIG_UX500_PRCMU_QOS_POWER
 
 unsigned long prcmu_qos_get_cpufreq_opp_delay(void);
 void prcmu_qos_set_cpufreq_opp_delay(unsigned long);
 void prcmu_qos_force_opp(int, s32);
 
-#else /* !CONFIG_UX500_SOC_DB8500 */
+#else
 
 static inline unsigned long prcmu_qos_get_cpufreq_opp_delay(void)
 {
@@ -32,7 +32,7 @@ static inline void prcmu_qos_set_cpufreq_opp_delay(unsigned long n) {}
 
 static inline void prcmu_qos_force_opp(int prcmu_qos_class, s32 i) {}
 
-#endif /* CONFIG_UX500_SOC_DB8500 */
+#endif
 
 #ifdef CONFIG_UX500_PRCMU_QOS_POWER
 
