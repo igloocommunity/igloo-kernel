@@ -875,13 +875,13 @@ void db8500_prcmu_get_abb_event_buffer(void __iomem **buf)
 }
 
 /**
- * prcmu_set_arm_opp - set the appropriate ARM OPP
+ * db8500_prcmu_set_arm_opp - set the appropriate ARM OPP
  * @opp: The new ARM operating point to which transition is to be made
  * Returns: 0 on success, non-zero on failure
  *
  * This function sets the the operating point of the ARM.
  */
-int prcmu_set_arm_opp(u8 opp)
+int db8500_prcmu_set_arm_opp(u8 opp)
 {
 	int r;
 
@@ -912,11 +912,11 @@ int prcmu_set_arm_opp(u8 opp)
 }
 
 /**
- * prcmu_get_arm_opp - get the current ARM OPP
+ * db8500_prcmu_get_arm_opp - get the current ARM OPP
  *
  * Returns: the current ARM OPP
  */
-int prcmu_get_arm_opp(void)
+int db8500_prcmu_get_arm_opp(void)
 {
 	return readb(tcdm_base + PRCM_ACK_MB1_CURRENT_ARM_OPP);
 }
@@ -1834,7 +1834,7 @@ unlock_and_return:
 	mutex_unlock(&mb0_transfer.ac_wake_lock);
 }
 
-bool prcmu_is_ac_wake_requested(void)
+bool db8500_prcmu_is_ac_wake_requested(void)
 {
 	return (atomic_read(&ac_wake_req_state) != 0);
 }

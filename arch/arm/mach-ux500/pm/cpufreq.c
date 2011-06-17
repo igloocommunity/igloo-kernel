@@ -20,19 +20,19 @@
 static struct cpufreq_frequency_table *freq_table;
 static enum arm_opp *idx2opp;
 
-static struct freq_attr *u8500_cpufreq_attr[] = {
+static struct freq_attr *ux500_cpufreq_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
 	NULL,
 };
 
-static int u8500_cpufreq_verify_speed(struct cpufreq_policy *policy)
+static int ux500_cpufreq_verify_speed(struct cpufreq_policy *policy)
 {
 	return cpufreq_frequency_table_verify(policy, freq_table);
 }
 
 extern bool wlan_mode_on;
 
-static int u8500_cpufreq_target(struct cpufreq_policy *policy,
+static int ux500_cpufreq_target(struct cpufreq_policy *policy,
 				unsigned int target_freq,
 				unsigned int relation)
 {
@@ -67,7 +67,7 @@ static int u8500_cpufreq_target(struct cpufreq_policy *policy,
 
 	/* request the PRCM unit for opp change */
 	if (prcmu_set_arm_opp(idx2opp[idx])) {
-		pr_err("u8500-cpufreq:  Failed to set OPP level\n");
+		pr_err("ux500-cpufreq:  Failed to set OPP level\n");
 		return -EINVAL;
 	}
 
@@ -77,7 +77,7 @@ static int u8500_cpufreq_target(struct cpufreq_policy *policy,
 	return 0;
 }
 
-static unsigned int u8500_cpufreq_getspeed(unsigned int cpu)
+static unsigned int ux500_cpufreq_getspeed(unsigned int cpu)
 {
 	int i;
 	/* request the prcm to get the current ARM opp */
@@ -86,7 +86,7 @@ static unsigned int u8500_cpufreq_getspeed(unsigned int cpu)
 	return freq_table[i].frequency;
 }
 
-static int __cpuinit u8500_cpufreq_init(struct cpufreq_policy *policy)
+static int __cpuinit ux500_cpufreq_init(struct cpufreq_policy *policy)
 {
 	int res;
 	int i;
@@ -96,13 +96,13 @@ static int __cpuinit u8500_cpufreq_init(struct cpufreq_policy *policy)
 	if (!res)
 		cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
 	else {
-		pr_err("u8500-cpufreq : Failed to read policy table\n");
+		pr_err("ux500-cpufreq : Failed to read policy table\n");
 		return res;
 	}
 
 	policy->min = policy->cpuinfo.min_freq;
 	policy->max = policy->cpuinfo.max_freq;
-	policy->cur = u8500_cpufreq_getspeed(policy->cpu);
+	policy->cur = ux500_cpufreq_getspeed(policy->cpu);
 
 	for (i = 0; freq_table[i].frequency != policy->cur; i++)
 		;
@@ -124,14 +124,14 @@ static int __cpuinit u8500_cpufreq_init(struct cpufreq_policy *policy)
 	return 0;
 }
 
-static struct cpufreq_driver u8500_cpufreq_driver = {
+static struct cpufreq_driver ux500_cpufreq_driver = {
 	.flags  = CPUFREQ_STICKY,
-	.verify = u8500_cpufreq_verify_speed,
-	.target = u8500_cpufreq_target,
-	.get    = u8500_cpufreq_getspeed,
-	.init   = u8500_cpufreq_init,
-	.name   = "U8500",
-	.attr   = u8500_cpufreq_attr,
+	.verify = ux500_cpufreq_verify_speed,
+	.target = ux500_cpufreq_target,
+	.get    = ux500_cpufreq_getspeed,
+	.init   = ux500_cpufreq_init,
+	.name   = "UX500",
+	.attr   = ux500_cpufreq_attr,
 };
 
 int __init
@@ -144,6 +144,6 @@ ux500_cpufreq_register(struct cpufreq_frequency_table *table,
 	if (cpu_is_u8500v1() || ux500_is_svp())
 		return -ENODEV;
 
-	pr_info("cpufreq for u8500 started\n");
-	return cpufreq_register_driver(&u8500_cpufreq_driver);
+	pr_info("cpufreq for ux500 started\n");
+	return cpufreq_register_driver(&ux500_cpufreq_driver);
 }

@@ -1,9 +1,11 @@
-config U8500_CPUFREQ
+config UX500_CPUFREQ
 	tristate "CPUFreq support"
-	depends on UX500_SOC_DB8500 && CPU_FREQ && PM
+	depends on (UX500_SOC_DB8500 || UX500_SOC_DB5500) && CPU_FREQ && PM
 	default y
 	help
-	  Add support for CPU Frequency scaling for U8500.
+	  Add support for CPU Frequency scaling for Ux500 SOCs.
+	  ARM power domains operating points can be set
+	  dynamically. It depends on CPUfreq and PM subsystem.
 
 config U8500_CPUIDLE
 	tristate "CPUIdle support"

@@ -204,6 +204,10 @@ int db8500_prcmu_enable_dsipll(void);
 void db8500_prcmu_config_abb_event_readout(u32 abb_events);
 void db8500_prcmu_get_abb_event_buffer(void __iomem **buf);
 int db8500_prcmu_config_esram0_deep_sleep(u8 state);
+u16 db8500_prcmu_get_reset_code(void);
+bool db8500_prcmu_is_ac_wake_requested(void);
+int db8500_prcmu_set_arm_opp(u8 opp);
+int db8500_prcmu_get_arm_opp(void);
 
 #else /* !CONFIG_UX500_SOC_DB8500 */
 
@@ -356,6 +360,21 @@ static inline int prcmu_kick_a9wdog(u8 id)
 }
 
 static inline int prcmu_load_a9wdog(u8 id, u32 val)
+{
+	return 0;
+}
+
+static inline bool db8500_prcmu_is_ac_wake_requested(void)
+{
+	return 0;
+}
+
+static inline int db8500_prcmu_set_arm_opp(u8 opp)
+{
+	return 0;
+}
+
+static inline int db8500_prcmu_get_arm_opp(void)
 {
 	return 0;
 }

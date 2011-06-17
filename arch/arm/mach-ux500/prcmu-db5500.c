@@ -84,6 +84,16 @@
 #define PRCM_ACK_MB0_WAKEUP_1_ABB      (PRCM_ACK_MB0 + 0x2C)
 #define PRCM_ACK_MB0_EVENT_ABB_NUMBERS 20
 
+/* Request mailbox 1 fields. */
+#define PRCM_REQ_MB1_ARM_OPP			(PRCM_REQ_MB1 + 0x0)
+#define PRCM_REQ_MB1_APE_OPP			(PRCM_REQ_MB1 + 0x1)
+
+/* Mailbox 1 ACKs */
+#define PRCM_ACK_MB1_CURRENT_ARM_OPP	(PRCM_ACK_MB1 + 0x0)
+#define PRCM_ACK_MB1_CURRENT_APE_OPP	(PRCM_ACK_MB1 + 0x1)
+#define PRCM_ACK_MB1_ARM_VOLT_STATUS	(PRCM_ACK_MB1 + 0x2)
+#define PRCM_ACK_MB1_APE_VOLT_STATUS	(PRCM_ACK_MB1 + 0x3)
+
 /* Mailbox 2 REQs */
 #define PRCM_REQ_MB2_EPOD_CLIENT (PRCM_REQ_MB2 + 0x0)
 #define PRCM_REQ_MB2_EPOD_STATE  (PRCM_REQ_MB2 + 0x1)
@@ -107,9 +117,16 @@ enum mb0_header {
 	/* acknowledge */
 	MB0H_WAKE_UP = 0,
 	/* request */
-	MB0H_PWR_STATE_TRANS = 1,
+	MB0H_PWR_STATE_TRANS,
 	MB0H_WAKE_UP_CFG,
 	MB0H_RD_WAKE_UP_ACK,
+};
+
+/* Mailbox 1 headers.*/
+enum mb1_header {
+	MB1H_ARM_OPP = 1,
+	MB1H_APE_OPP,
+	MB1H_ARM_APE_OPP,
 };
 
 /* Mailbox 2 headers. */
@@ -133,6 +150,12 @@ enum sysclk_state {
 enum mb5_header {
 	MB5H_I2C_WRITE = 1,
 	MB5H_I2C_READ,
+};
+
+enum db5500_arm_opp {
+	DB5500_ARM_100_OPP = 1,
+	DB5500_ARM_50_OPP,
+	DB5500_ARM_EXT_OPP,
 };
 
 enum epod_state {
@@ -300,6 +323,29 @@ static struct {
 	} req;
 } mb0_transfer;
 
+
+/*
+ * mb1_transfer - state needed for mailbox 1 communication.
+ * @lock:	The transaction lock.
+ * @work:	The transaction completion structure.
+ * @req_arm_opp Requested arm opp
+ * @req_ape_opp Requested ape opp
+ * @ack:	Reply ("acknowledge") data.
+ */
+static struct {
+	struct mutex lock;
+	struct completion work;
+	u8 req_arm_opp;
+	u8 req_ape_opp;
+	struct {
+		u8 header;
+		u8 arm_opp;
+		u8 ape_opp;
+		u8 arm_voltage_st;
+		u8 ape_voltage_st;
+	} ack;
+} mb1_transfer;
+
 /*
  * mb2_transfer - state needed for mailbox 2 communication.
  * @lock:      The transaction lock.
@@ -393,7 +439,7 @@ static struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
 	CLK_MGT_ENTRY(SVACLK),
 };
 
-bool prcmu_is_ac_wake_requested(void)
+bool db5500_prcmu_is_ac_wake_requested(void)
 {
 	return false;
 }
@@ -618,7 +664,7 @@ int db5500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll)
 	case PRCMU_AP_IDLE:
 		writeb(DB5500_AP_IDLE, PRCM_REQ_MB0_AP_POWER_STATE);
 		/* TODO: Can be high latency */
-		writeb(DDR_PWR_STATE_OFFLOWLAT, PRCM_REQ_MB0_DDR_STATE);
+		writeb(DDR_PWR_STATE_UNCHANGED, PRCM_REQ_MB0_DDR_STATE);
 		break;
 	case PRCMU_AP_SLEEP:
 		writeb(DB5500_AP_SLEEP, PRCM_REQ_MB0_AP_POWER_STATE);
@@ -767,6 +813,75 @@ int db5500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
 	mutex_unlock(&mb5_transfer.lock);
 
 	return r;
+}
+
+/**
+ * db5500_prcmu_set_arm_opp - set the appropriate ARM OPP
+ * @opp: The new ARM operating point to which transition is to be made
+ * Returns: 0 on success, non-zero on failure
+ *
+ * This function sets the the operating point of the ARM.
+ */
+int db5500_prcmu_set_arm_opp(u8 opp)
+{
+	int r;
+	u8 db5500_opp;
+
+	r = 0;
+
+	switch (opp) {
+	case ARM_EXTCLK:
+		db5500_opp = DB5500_ARM_EXT_OPP;
+		break;
+	case ARM_50_OPP:
+		db5500_opp = DB5500_ARM_50_OPP;
+		break;
+	case ARM_100_OPP:
+		db5500_opp = DB5500_ARM_100_OPP;
+		break;
+	default:
+		pr_err("prcmu: %s() received wrong opp value: %d\n",
+				__func__, opp);
+		r = -EINVAL;
+		goto bailout;
+	}
+
+	mutex_lock(&mb1_transfer.lock);
+
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(1))
+		cpu_relax();
+
+	writeb(MB1H_ARM_OPP, PRCM_REQ_MB1_HEADER);
+
+	writeb(db5500_opp, PRCM_REQ_MB1_ARM_OPP);
+	writel(MBOX_BIT(1), (_PRCMU_BASE + PRCM_MBOX_CPU_SET));
+
+	if (!wait_for_completion_timeout(&mb1_transfer.work,
+		msecs_to_jiffies(500))) {
+		r = -EIO;
+		WARN(1, "prcmu: failed to set arm opp");
+		goto unlock_and_return;
+	}
+
+	if (mb1_transfer.ack.header != MB1H_ARM_OPP ||
+		(mb1_transfer.ack.arm_opp != db5500_opp) ||
+		(mb1_transfer.ack.arm_voltage_st != RC_SUCCESS))
+		r = -EIO;
+
+unlock_and_return:
+	mutex_unlock(&mb1_transfer.lock);
+bailout:
+	return r;
+}
+
+/**
+ * db5500_prcmu_get_arm_opp - get the current ARM OPP
+ *
+ * Returns: the current ARM OPP
+ */
+int db5500_prcmu_get_arm_opp(void)
+{
+	return readb(PRCM_ACK_MB1_CURRENT_ARM_OPP);
 }
 
 int prcmu_resetout(u8 resoutn, u8 state)
@@ -982,7 +1097,33 @@ static bool read_mailbox_0(void)
 
 static bool read_mailbox_1(void)
 {
+	u8 header;
+	bool do_complete = true;
+
+	header = mb1_transfer.ack.header = readb(PRCM_ACK_MB1_HEADER);
+
+	switch (header) {
+	case MB1H_ARM_OPP:
+		mb1_transfer.ack.arm_opp = readb(PRCM_ACK_MB1_CURRENT_ARM_OPP);
+		mb1_transfer.ack.arm_voltage_st =
+			readb(PRCM_ACK_MB1_ARM_VOLT_STATUS);
+		break;
+	case MB1H_ARM_APE_OPP:
+		mb1_transfer.ack.ape_opp = readb(PRCM_ACK_MB1_CURRENT_APE_OPP);
+		mb1_transfer.ack.ape_voltage_st =
+			readb(PRCM_ACK_MB1_APE_VOLT_STATUS);
+		break;
+	default:
+		print_unknown_header_warning(1, header);
+		do_complete = false;
+		break;
+	}
+
 	writel(MBOX_BIT(1), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
+
+	if (do_complete)
+		complete(&mb1_transfer.work);
+
 	return false;
 }
 
@@ -1165,6 +1306,8 @@ void __init db5500_prcmu_early_init(void)
 	tcdm_base = __io_address(U5500_PRCMU_TCDM_BASE);
 	spin_lock_init(&mb0_transfer.lock);
 	spin_lock_init(&mb0_transfer.dbb_irqs_lock);
+	mutex_init(&mb1_transfer.lock);
+	init_completion(&mb1_transfer.work);
 	mutex_init(&mb2_transfer.lock);
 	init_completion(&mb2_transfer.work);
 	mutex_init(&mb3_transfer.sysclk_lock);

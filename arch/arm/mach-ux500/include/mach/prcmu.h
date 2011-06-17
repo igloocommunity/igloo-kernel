@@ -290,10 +290,24 @@ static inline int prcmu_request_clock(u8 clock, bool enable)
 
 int prcmu_set_ape_opp(u8 opp);
 int prcmu_get_ape_opp(void);
-int prcmu_set_arm_opp(u8 opp);
-int prcmu_get_arm_opp(void);
 int prcmu_set_ddr_opp(u8 opp);
 int prcmu_get_ddr_opp(void);
+
+static inline int prcmu_set_arm_opp(u8 opp)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_set_arm_opp(opp);
+	else
+		return db8500_prcmu_set_arm_opp(opp);
+}
+
+static inline int prcmu_get_arm_opp(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_get_arm_opp();
+	else
+		return db8500_prcmu_get_arm_opp();
+}
 
 static inline void prcmu_system_reset(u16 reset_code)
 {
@@ -308,7 +322,13 @@ u16 prcmu_get_reset_code(void);
 void prcmu_ac_wake_req(void);
 void prcmu_ac_sleep_req(void);
 void prcmu_modem_reset(void);
-bool prcmu_is_ac_wake_requested(void);
+static inline bool prcmu_is_ac_wake_requested(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_is_ac_wake_requested();
+	else
+		return db8500_prcmu_is_ac_wake_requested();
+}
 
 static inline int prcmu_set_display_clocks(void)
 {
