@@ -88,6 +88,9 @@
 #define STM_MMC_OFFSET	0x08
 #define STM_TER_OFFSET	0x10
 
+#define U5500_PRCMU_DBG_PWRCTRL		(U5500_PRCMU_BASE + 0x4AC)
+#define PRCMU_DBG_PWRCTRL_A9DBGCLKEN	(1 << 4)
+
 #define TPIU_PORT_SIZE 0x4
 #define TPIU_TRIGGER_COUNTER 0x104
 #define TPIU_TRIGGER_MULTIPLIER 0x108
@@ -302,6 +305,16 @@ static void restore_stm_ape(void)
 	       context_stm_ape.base + STM_CR_OFFSET);
 }
 
+static bool tpiu_clocked(void)
+{
+	if (cpu_is_u5500()) {
+		return readl_relaxed(__io_address(U5500_PRCMU_DBG_PWRCTRL))
+			& PRCMU_DBG_PWRCTRL_A9DBGCLKEN;
+	}
+
+	return true;
+}
+
 /*
  * Save the context of the Trace Port Interface Unit (TPIU).
  * Saving/restoring is needed for the PTM tracing to work together
@@ -309,6 +322,9 @@ static void restore_stm_ape(void)
  */
 static void save_tpiu(void)
 {
+	if (!tpiu_clocked())
+		return;
+
 	context_tpiu.port_size		  = readl(context_tpiu.base +
 						  TPIU_PORT_SIZE);
 	context_tpiu.trigger_counter	  = readl(context_tpiu.base +
@@ -332,6 +348,9 @@ static void save_tpiu(void)
  */
 static void restore_tpiu(void)
 {
+	if (!tpiu_clocked())
+		return;
+
 	writel(TPIU_UNLOCK_CODE,
 	       context_tpiu.base + TPIU_LOCK_ACCESS_REGISTER);
 
