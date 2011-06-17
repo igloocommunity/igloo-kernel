@@ -1450,7 +1450,7 @@ int db8500_prcmu_request_clock(u8 clock, bool enable)
 		return -EINVAL;
 }
 
-int prcmu_config_esram0_deep_sleep(u8 state)
+int db8500_prcmu_config_esram0_deep_sleep(u8 state)
 {
 	if ((state > ESRAM0_DEEP_SLEEP_STATE_RET) ||
 	    (state < ESRAM0_DEEP_SLEEP_STATE_OFF))

@@ -22,12 +22,9 @@ int db5500_prcmu_enable_dsipll(void);
 void db5500_prcmu_config_abb_event_readout(u32 abb_events);
 void db5500_prcmu_get_abb_event_buffer(void __iomem **buf);
 int prcmu_resetout(u8 resoutn, u8 state);
-
-static inline int db5500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
-	bool keep_ap_pll)
-{
-	return 0;
-}
+int db5500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+	bool keep_ap_pll);
+int db5500_prcmu_config_esram0_deep_sleep(u8 state);
 
 static inline void db5500_prcmu_system_reset(u16 reset_code) {}
 
@@ -62,6 +59,11 @@ static inline int db5500_prcmu_enable_dsipll(void)
 	return 0;
 }
 
+static inline int db5500_prcmu_config_esram0_deep_sleep(u8 state)
+{
+	return 0;
+}
+
 static inline void db5500_prcmu_enable_wakeups(u32 wakeups) {}
 
 static inline int prcmu_resetout(u8 resoutn, u8 state)
@@ -76,6 +78,12 @@ static inline int db5500_prcmu_set_epod(u16 epod_id, u8 epod_state)
 
 static inline void db5500_prcmu_get_abb_event_buffer(void __iomem **buf) {}
 static inline void db5500_prcmu_config_abb_event_readout(u32 abb_events) {}
+
+static inline int db5500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+	bool keep_ap_pll)
+{
+	return 0;
+}
 
 #endif /* CONFIG_UX500_SOC_DB5500 */
 

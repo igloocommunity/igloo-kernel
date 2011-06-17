@@ -202,6 +202,26 @@ enum ddr_opp {
 	DDR_25_OPP = 0x02,
 };
 
+/*
+ * Definitions for controlling ESRAM0 in deep sleep.
+ */
+#define ESRAM0_DEEP_SLEEP_STATE_OFF 1
+#define ESRAM0_DEEP_SLEEP_STATE_RET 2
+
+/**
+ * enum ddr_pwrst - DDR power states definition
+ * @DDR_PWR_STATE_UNCHANGED: SDRAM and DDR controller state is unchanged
+ * @DDR_PWR_STATE_ON:
+ * @DDR_PWR_STATE_OFFLOWLAT:
+ * @DDR_PWR_STATE_OFFHIGHLAT:
+ */
+enum ddr_pwrst {
+	DDR_PWR_STATE_UNCHANGED     = 0x00,
+	DDR_PWR_STATE_ON            = 0x01,
+	DDR_PWR_STATE_OFFLOWLAT     = 0x02,
+	DDR_PWR_STATE_OFFHIGHLAT    = 0x03
+};
+
 #include <mach/prcmu-db8500.h>
 #include <mach/prcmu-db5500.h>
 
@@ -314,6 +334,13 @@ static inline int prcmu_enable_dsipll(void)
 		return db8500_prcmu_enable_dsipll();
 }
 
+static inline int prcmu_config_esram0_deep_sleep(u8 state)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_config_esram0_deep_sleep(state);
+	else
+		return db8500_prcmu_config_esram0_deep_sleep(state);
+}
 #else
 
 static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
@@ -410,6 +437,11 @@ static inline int prcmu_disable_dsipll(void)
 }
 
 static inline int prcmu_enable_dsipll(void)
+{
+	return 0;
+}
+
+static inline int prcmu_config_esram0_deep_sleep(u8 state)
 {
 	return 0;
 }

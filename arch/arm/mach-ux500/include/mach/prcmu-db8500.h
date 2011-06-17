@@ -81,26 +81,6 @@ enum hw_acc_dev{
 	NUM_HW_ACC
 };
 
-/*
- * Definitions for controlling ESRAM0 in deep sleep.
- */
-#define ESRAM0_DEEP_SLEEP_STATE_OFF 1
-#define ESRAM0_DEEP_SLEEP_STATE_RET 2
-
-/**
- * enum ddr_pwrst - DDR power states definition
- * @DDR_PWR_STATE_UNCHANGED: SDRAM and DDR controller state is unchanged
- * @DDR_PWR_STATE_ON:
- * @DDR_PWR_STATE_OFFLOWLAT:
- * @DDR_PWR_STATE_OFFHIGHLAT:
- */
-enum ddr_pwrst {
-	DDR_PWR_STATE_UNCHANGED     = 0x00,
-	DDR_PWR_STATE_ON            = 0x01,
-	DDR_PWR_STATE_OFFLOWLAT     = 0x02,
-	DDR_PWR_STATE_OFFHIGHLAT    = 0x03
-};
-
 /**
  * enum hw_acc_state - State definition for hardware accelerator
  * @HW_NO_CHANGE: The hardware accelerator state must remain unchanged
@@ -198,7 +178,6 @@ enum romcode_read prcmu_get_rc_p2a(void);
 enum ap_pwrst prcmu_get_xp70_current_state(void);
 
 /* TODO: Common API with DB5500? */
-int prcmu_config_esram0_deep_sleep(u8 state);
 bool prcmu_has_arm_maxopp(void);
 int prcmu_config_hotdog(u8 threshold);
 int prcmu_config_hotmon(u8 low, u8 high);
@@ -218,6 +197,7 @@ int db8500_prcmu_disable_dsipll(void);
 int db8500_prcmu_enable_dsipll(void);
 void db8500_prcmu_config_abb_event_readout(u32 abb_events);
 void db8500_prcmu_get_abb_event_buffer(void __iomem **buf);
+int db8500_prcmu_config_esram0_deep_sleep(u8 state);
 
 #else /* !CONFIG_UX500_SOC_DB8500 */
 
@@ -269,11 +249,6 @@ static inline enum romcode_read prcmu_get_rc_p2a(void)
 static inline enum ap_pwrst prcmu_get_xp70_current_state(void)
 {
 	return AP_EXECUTE;
-}
-
-static inline int prcmu_config_esram0_deep_sleep(u8 state)
-{
-	return 0;
 }
 
 static inline bool prcmu_has_arm_maxopp(void)
@@ -341,6 +316,11 @@ static inline int db8500_prcmu_disable_dsipll(void)
 }
 
 static inline int db8500_prcmu_enable_dsipll(void)
+{
+	return 0;
+}
+
+static inline int db8500_prcmu_config_esram0_deep_sleep(u8 state)
 {
 	return 0;
 }
