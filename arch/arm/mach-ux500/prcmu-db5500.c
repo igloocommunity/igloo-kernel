@@ -66,6 +66,23 @@
 #define PRCM_ACK_MB6 (tcdm_base + 0xF0C)
 #define PRCM_ACK_MB7 (tcdm_base + 0xF08)
 
+/* Mailbox 0 REQs */
+#define PRCM_REQ_MB0_AP_POWER_STATE    (PRCM_REQ_MB0 + 0x0)
+#define PRCM_REQ_MB0_AP_PLL_STATE      (PRCM_REQ_MB0 + 0x1)
+#define PRCM_REQ_MB0_ULP_CLOCK_STATE   (PRCM_REQ_MB0 + 0x2)
+#define PRCM_REQ_MB0_DDR_STATE         (PRCM_REQ_MB0 + 0x3)
+#define PRCM_REQ_MB0_WAKEUP_DBB        (PRCM_REQ_MB0 + 0x8)
+#define PRCM_REQ_MB0_WAKEUP_ABB        (PRCM_REQ_MB0 + 0xC)
+
+/* Mailbox 0 ACKs */
+#define PRCM_ACK_MB0_AP_PWRSTTR_STATUS (PRCM_ACK_MB0 + 0x0)
+#define PRCM_ACK_MB0_READ_POINTER      (PRCM_ACK_MB0 + 0x1)
+#define PRCM_ACK_MB0_WAKEUP_0_DBB      (PRCM_ACK_MB0 + 0x4)
+#define PRCM_ACK_MB0_WAKEUP_0_ABB      (PRCM_ACK_MB0 + 0x8)
+#define PRCM_ACK_MB0_WAKEUP_1_DBB      (PRCM_ACK_MB0 + 0x28)
+#define PRCM_ACK_MB0_WAKEUP_1_ABB      (PRCM_ACK_MB0 + 0x2C)
+#define PRCM_ACK_MB0_EVENT_ABB_NUMBERS 20
+
 /* Mailbox 2 REQs */
 #define PRCM_REQ_MB2_EPOD_CLIENT (PRCM_REQ_MB2 + 0x0)
 #define PRCM_REQ_MB2_EPOD_STATE  (PRCM_REQ_MB2 + 0x1)
@@ -86,12 +103,12 @@ enum mb_return_code {
 
 /* Mailbox 0 headers. */
 enum mb0_header {
-	/* request */
-	RMB0H_PWR_STATE_TRANS = 1,
-	RMB0H_WAKE_UP_CFG,
-	RMB0H_RD_WAKE_UP_ACK,
 	/* acknowledge */
-	AMB0H_WAKE_UP = 1,
+	MB0H_WAKE_UP = 0,
+	/* request */
+	MB0H_PWR_STATE_TRANS = 1,
+	MB0H_WAKE_UP_CFG,
+	MB0H_RD_WAKE_UP_ACK,
 };
 
 /* Mailbox 2 headers. */
@@ -179,11 +196,95 @@ enum db5500_prcmu_pll {
 #define PRCMU_PLLDSI_LOCKP_LOCKED		0x3
 
 /*
+ * Wakeups/IRQs
+ */
+
+#define WAKEUP_BIT_RTC BIT(0)
+#define WAKEUP_BIT_RTT0 BIT(1)
+#define WAKEUP_BIT_RTT1 BIT(2)
+#define WAKEUP_BIT_CD_IRQ BIT(3)
+#define WAKEUP_BIT_SRP_TIM BIT(4)
+#define WAKEUP_BIT_APE_REQ BIT(5)
+#define WAKEUP_BIT_USB BIT(6)
+#define WAKEUP_BIT_ABB BIT(7)
+#define WAKEUP_BIT_LOW_POWER_AUDIO BIT(8)
+#define WAKEUP_BIT_TEMP_SENSOR BIT(9)
+#define WAKEUP_BIT_ARM BIT(10)
+#define WAKEUP_BIT_AC_WAKE_ACK BIT(11)
+#define WAKEUP_BIT_MODEM_SW_RESET_REQ BIT(20)
+#define WAKEUP_BIT_GPIO0 BIT(23)
+#define WAKEUP_BIT_GPIO1 BIT(24)
+#define WAKEUP_BIT_GPIO2 BIT(25)
+#define WAKEUP_BIT_GPIO3 BIT(26)
+#define WAKEUP_BIT_GPIO4 BIT(27)
+#define WAKEUP_BIT_GPIO5 BIT(28)
+#define WAKEUP_BIT_GPIO6 BIT(29)
+#define WAKEUP_BIT_GPIO7 BIT(30)
+#define WAKEUP_BIT_AC_REL_ACK BIT(30)
+
+/*
+ * This vector maps irq numbers to the bits in the bit field used in
+ * communication with the PRCMU firmware.
+ *
+ * The reason for having this is to keep the irq numbers contiguous even though
+ * the bits in the bit field are not. (The bits also have a tendency to move
+ * around, to further complicate matters.)
+ */
+#define IRQ_INDEX(_name) ((IRQ_DB5500_PRCMU_##_name) - IRQ_DB5500_PRCMU_BASE)
+#define IRQ_ENTRY(_name)[IRQ_INDEX(_name)] = (WAKEUP_BIT_##_name)
+static u32 prcmu_irq_bit[NUM_DB5500_PRCMU_WAKEUPS] = {
+	IRQ_ENTRY(RTC),
+	IRQ_ENTRY(RTT0),
+	IRQ_ENTRY(RTT1),
+	IRQ_ENTRY(CD_IRQ),
+	IRQ_ENTRY(SRP_TIM),
+	IRQ_ENTRY(APE_REQ),
+	IRQ_ENTRY(USB),
+	IRQ_ENTRY(ABB),
+	IRQ_ENTRY(LOW_POWER_AUDIO),
+	IRQ_ENTRY(TEMP_SENSOR),
+	IRQ_ENTRY(ARM),
+	IRQ_ENTRY(AC_WAKE_ACK),
+	IRQ_ENTRY(MODEM_SW_RESET_REQ),
+	IRQ_ENTRY(GPIO0),
+	IRQ_ENTRY(GPIO1),
+	IRQ_ENTRY(GPIO2),
+	IRQ_ENTRY(GPIO3),
+	IRQ_ENTRY(GPIO4),
+	IRQ_ENTRY(GPIO5),
+	IRQ_ENTRY(GPIO6),
+	IRQ_ENTRY(GPIO7),
+	IRQ_ENTRY(AC_REL_ACK),
+};
+
+#define VALID_WAKEUPS (BIT(NUM_PRCMU_WAKEUP_INDICES) - 1)
+#define WAKEUP_ENTRY(_name)[PRCMU_WAKEUP_INDEX_##_name] = (WAKEUP_BIT_##_name)
+static u32 prcmu_wakeup_bit[NUM_PRCMU_WAKEUP_INDICES] = {
+	WAKEUP_ENTRY(RTC),
+	WAKEUP_ENTRY(RTT0),
+	WAKEUP_ENTRY(RTT1),
+	WAKEUP_ENTRY(CD_IRQ),
+	WAKEUP_ENTRY(USB),
+	WAKEUP_ENTRY(ABB),
+	WAKEUP_ENTRY(ARM)
+};
+
+/*
  * mb0_transfer - state needed for mailbox 0 communication.
- * @lock:		The transaction lock.
+ * @lock                The transaction lock.
+ * @dbb_irqs_lock       lock used for (un)masking DBB wakeup interrupts
+ * @mask_work:          Work structure used for (un)masking wakeup interrupts.
+ * @req:                Request data that need to persist between requests.
  */
 static struct {
 	spinlock_t lock;
+	spinlock_t dbb_irqs_lock;
+	struct work_struct mask_work;
+	struct {
+		u32 dbb_irqs;
+		u32 dbb_wakeups;
+		u32 abb_events;
+	} req;
 } mb0_transfer;
 
 /*
@@ -409,10 +510,6 @@ unlock_and_return:
 	return r;
 }
 
-void db5500_prcmu_enable_wakeups(u32 wakeups)
-{
-}
-
 /**
  * db5500_prcmu_request_clock() - Request for a clock to be enabled or disabled.
  * @clock:      The clock for which the request is made.
@@ -437,6 +534,78 @@ int db5500_prcmu_request_clock(u8 clock, bool enable)
 		return request_sysclk(enable);
 	else
 		return -EINVAL;
+}
+
+/* This function should only be called while mb0_transfer.lock is held. */
+static void config_wakeups(void)
+{
+	static u32 last_dbb_events;
+	static u32 last_abb_events;
+	u32 dbb_events;
+	u32 abb_events;
+
+	dbb_events = mb0_transfer.req.dbb_irqs | mb0_transfer.req.dbb_wakeups;
+
+	abb_events = mb0_transfer.req.abb_events;
+
+	if ((dbb_events == last_dbb_events) && (abb_events == last_abb_events))
+		return;
+
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(0))
+		cpu_relax();
+
+	writel(dbb_events, PRCM_REQ_MB0_WAKEUP_DBB);
+	writel(abb_events, PRCM_REQ_MB0_WAKEUP_ABB);
+	writeb(MB0H_WAKE_UP_CFG, PRCM_REQ_MB0_HEADER);
+	writel(MBOX_BIT(0), (_PRCMU_BASE + PRCM_MBOX_CPU_SET));
+
+	last_dbb_events = dbb_events;
+	last_abb_events = abb_events;
+}
+
+void db5500_prcmu_enable_wakeups(u32 wakeups)
+{
+	unsigned long flags;
+	u32 bits;
+	int i;
+
+	BUG_ON(wakeups != (wakeups & VALID_WAKEUPS));
+
+	for (i = 0, bits = 0; i < NUM_PRCMU_WAKEUP_INDICES; i++) {
+		if (wakeups & BIT(i)) {
+			if (prcmu_wakeup_bit[i] == 0)
+				WARN(1, "WAKEUP NOT SUPPORTED");
+			else
+				bits |= prcmu_wakeup_bit[i];
+		}
+	}
+
+	spin_lock_irqsave(&mb0_transfer.lock, flags);
+
+	mb0_transfer.req.dbb_wakeups = bits;
+	config_wakeups();
+
+	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
+}
+
+void db5500_prcmu_config_abb_event_readout(u32 abb_events)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&mb0_transfer.lock, flags);
+
+	mb0_transfer.req.abb_events = abb_events;
+	config_wakeups();
+
+	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
+}
+
+void db5500_prcmu_get_abb_event_buffer(void __iomem **buf)
+{
+	if (readb(PRCM_ACK_MB0_READ_POINTER) & 1)
+		*buf = (PRCM_ACK_MB0_WAKEUP_1_ABB);
+	else
+		*buf = (PRCM_ACK_MB0_WAKEUP_0_ABB);
 }
 
 /**
@@ -605,7 +774,7 @@ static void ack_dbb_wakeup(void)
 	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(0))
 		cpu_relax();
 
-	writeb(RMB0H_RD_WAKE_UP_ACK, PRCM_REQ_MB0_HEADER);
+	writeb(MB0H_RD_WAKE_UP_ACK, PRCM_REQ_MB0_HEADER);
 	writel(MBOX_BIT(0), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
@@ -702,11 +871,25 @@ static inline void print_unknown_header_warning(u8 n, u8 header)
 static bool read_mailbox_0(void)
 {
 	bool r;
+	u32 ev;
+	unsigned int n;
+
 	u8 header;
 
 	header = readb(PRCM_ACK_MB0_HEADER);
 	switch (header) {
-	case AMB0H_WAKE_UP:
+	case MB0H_WAKE_UP:
+		if (readb(PRCM_ACK_MB0_READ_POINTER) & 1)
+			ev = readl(PRCM_ACK_MB0_WAKEUP_1_DBB);
+		else
+			ev = readl(PRCM_ACK_MB0_WAKEUP_0_DBB);
+
+		ev &= mb0_transfer.req.dbb_irqs;
+
+		for (n = 0; n < NUM_DB5500_PRCMU_WAKEUPS; n++) {
+			if (ev & prcmu_irq_bit[n])
+				generic_handle_irq(IRQ_DB5500_PRCMU_BASE + n);
+		}
 		r = true;
 		break;
 	default:
@@ -850,16 +1033,77 @@ static irqreturn_t prcmu_irq_thread_fn(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static void prcmu_mask_work(struct work_struct *work)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&mb0_transfer.lock, flags);
+
+	config_wakeups();
+
+	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
+}
+
+static void prcmu_irq_mask(unsigned int irq)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
+
+	mb0_transfer.req.dbb_irqs &= ~prcmu_irq_bit[irq - IRQ_DB5500_PRCMU_BASE];
+
+	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
+	schedule_work(&mb0_transfer.mask_work);
+}
+
+static void prcmu_irq_unmask(unsigned int irq)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
+
+	mb0_transfer.req.dbb_irqs |= prcmu_irq_bit[irq - IRQ_DB5500_PRCMU_BASE];
+
+	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
+	schedule_work(&mb0_transfer.mask_work);
+}
+
+static void noop(unsigned int irq)
+{
+}
+
+static struct irq_chip prcmu_irq_chip = {
+	.name           = "prcmu",
+	.disable        = prcmu_irq_mask,
+	.ack            = noop,
+	.mask           = prcmu_irq_mask,
+	.unmask         = prcmu_irq_unmask,
+};
 void __init db5500_prcmu_early_init(void)
 {
+	unsigned int i;
+
 	tcdm_base = __io_address(U5500_PRCMU_TCDM_BASE);
 	spin_lock_init(&mb0_transfer.lock);
+	spin_lock_init(&mb0_transfer.dbb_irqs_lock);
 	mutex_init(&mb2_transfer.lock);
 	init_completion(&mb2_transfer.work);
 	mutex_init(&mb3_transfer.sysclk_lock);
 	init_completion(&mb3_transfer.sysclk_work);
 	mutex_init(&mb5_transfer.lock);
 	init_completion(&mb5_transfer.work);
+
+	INIT_WORK(&mb0_transfer.mask_work, prcmu_mask_work);
+
+	/* Initalize irqs. */
+	for (i = 0; i < NUM_DB5500_PRCMU_WAKEUPS; i++) {
+		unsigned int irq;
+
+		irq = IRQ_DB5500_PRCMU_BASE + i;
+		set_irq_chip(irq, &prcmu_irq_chip);
+		set_irq_flags(irq, IRQF_VALID);
+		set_irq_handler(irq, handle_simple_irq);
+	}
 }
 
 /**

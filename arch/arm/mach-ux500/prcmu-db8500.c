@@ -842,7 +842,7 @@ void db8500_prcmu_enable_wakeups(u32 wakeups)
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
 }
 
-void prcmu_config_abb_event_readout(u32 abb_events)
+void db8500_prcmu_config_abb_event_readout(u32 abb_events)
 {
 	unsigned long flags;
 
@@ -854,7 +854,7 @@ void prcmu_config_abb_event_readout(u32 abb_events)
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
 }
 
-void prcmu_get_abb_event_buffer(void __iomem **buf)
+void db8500_prcmu_get_abb_event_buffer(void __iomem **buf)
 {
 	if (readb(tcdm_base + PRCM_ACK_MB0_READ_POINTER) & 1)
 		*buf = (tcdm_base + PRCM_ACK_MB0_WAKEUP_1_4500);

@@ -23,6 +23,7 @@ enum prcmu_wakeup_index {
 	PRCMU_WAKEUP_INDEX_ABB,
 	PRCMU_WAKEUP_INDEX_ABB_FIFO,
 	PRCMU_WAKEUP_INDEX_ARM,
+	PRCMU_WAKEUP_INDEX_CD_IRQ,
 	NUM_PRCMU_WAKEUP_INDICES
 };
 #define PRCMU_WAKEUP(_name) (BIT(PRCMU_WAKEUP_INDEX_##_name))
@@ -238,6 +239,22 @@ static inline void prcmu_disable_wakeups(void)
 	prcmu_enable_wakeups(0);
 }
 
+static inline void prcmu_config_abb_event_readout(u32 abb_events)
+{
+	if (machine_is_u5500())
+		db5500_prcmu_config_abb_event_readout(abb_events);
+	else
+		db8500_prcmu_config_abb_event_readout(abb_events);
+}
+
+static inline void prcmu_get_abb_event_buffer(void __iomem **buf)
+{
+	if (machine_is_u5500())
+		db5500_prcmu_get_abb_event_buffer(buf);
+	else
+		db8500_prcmu_get_abb_event_buffer(buf);
+}
+
 int prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size);
 int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
 
@@ -395,6 +412,13 @@ static inline int prcmu_disable_dsipll(void)
 static inline int prcmu_enable_dsipll(void)
 {
 	return 0;
+}
+
+static inline void prcmu_config_abb_event_readout(u32 abb_events) {}
+
+static inline void prcmu_get_abb_event_buffer(void __iomem **buf)
+{
+	*buf = NULL;
 }
 
 #endif

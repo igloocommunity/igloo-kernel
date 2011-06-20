@@ -200,8 +200,6 @@ enum ap_pwrst prcmu_get_xp70_current_state(void);
 /* TODO: Common API with DB5500? */
 int prcmu_config_esram0_deep_sleep(u8 state);
 bool prcmu_has_arm_maxopp(void);
-void prcmu_config_abb_event_readout(u32 abb_events);
-void prcmu_get_abb_event_buffer(void __iomem **buf);
 int prcmu_config_hotdog(u8 threshold);
 int prcmu_config_hotmon(u8 low, u8 high);
 int prcmu_start_temp_sense(u16 cycles32k);
@@ -218,6 +216,8 @@ int db8500_prcmu_request_clock(u8 clock, bool enable);
 int db8500_prcmu_set_display_clocks(void);
 int db8500_prcmu_disable_dsipll(void);
 int db8500_prcmu_enable_dsipll(void);
+void db8500_prcmu_config_abb_event_readout(u32 abb_events);
+void db8500_prcmu_get_abb_event_buffer(void __iomem **buf);
 
 #else /* !CONFIG_UX500_SOC_DB8500 */
 
@@ -280,8 +280,6 @@ static inline bool prcmu_has_arm_maxopp(void)
 {
 	return false;
 }
-
-static inline void prcmu_config_abb_event_readout(u32 abb_events) {}
 
 static inline int prcmu_config_hotdog(u8 threshold)
 {
@@ -346,6 +344,11 @@ static inline int db8500_prcmu_enable_dsipll(void)
 {
 	return 0;
 }
+
+static inline void db8500_prcmu_config_abb_event_readout(u32 abb_events) {}
+
+static inline void db8500_prcmu_get_abb_event_buffer(void __iomem **buf) {}
+
 #endif /* CONFIG_UX500_SOC_DB8500 */
 
 #endif /* __MACH_PRCMU_DB8500_H */

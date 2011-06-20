@@ -19,6 +19,8 @@ int db5500_prcmu_set_epod(u16 epod_id, u8 epod_state);
 int db5500_prcmu_set_display_clocks(void);
 int db5500_prcmu_disable_dsipll(void);
 int db5500_prcmu_enable_dsipll(void);
+void db5500_prcmu_config_abb_event_readout(u32 abb_events);
+void db5500_prcmu_get_abb_event_buffer(void __iomem **buf);
 int prcmu_resetout(u8 resoutn, u8 state);
 
 static inline int db5500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
@@ -72,15 +74,9 @@ static inline int db5500_prcmu_set_epod(u16 epod_id, u8 epod_state)
 	return 0;
 }
 
-#endif /* CONFIG_UX500_SOC_DB5500 */
+static inline void db5500_prcmu_get_abb_event_buffer(void __iomem **buf) {}
+static inline void db5500_prcmu_config_abb_event_readout(u32 abb_events) {}
 
-static inline int db5500_prcmu_config_abb_event_readout(u32 abb_events)
-{
-#ifdef CONFIG_MACH_U5500_SIMULATOR
-	return 0;
-#else
-	return -1;
-#endif
-}
+#endif /* CONFIG_UX500_SOC_DB5500 */
 
 #endif /* __MACH_PRCMU_U5500_H */
