@@ -466,36 +466,31 @@ static void state_history_reset(void)
 }
 
 static int get_val(const char __user *user_buf,
-		   size_t count, int min, int max, ssize_t *buf_size)
+		   size_t count, int min, int max)
 {
-	char buf[32];
-	long unsigned int i;
+	long unsigned val;
+	int err;
 
-	/* Get userspace string and assure termination */
-	(*buf_size) = min(count, (sizeof(buf) - 1));
-	if (copy_from_user(buf, user_buf, (*buf_size)))
-		return -EFAULT;
-	buf[(*buf_size)] = 0;
+	err = kstrtoul_from_user(user_buf, count, 0, &val);
 
-	if (strict_strtoul(buf, 0, &i) != 0)
-		return -EFAULT;
+	if (err)
+		return err;
 
-	if (i > max)
-		i = max;
-	if (i < min)
-		i = min;
+	if (val > max)
+		val = max;
+	if (val < min)
+		val = min;
 
-	return i;
+	return val;
 }
 
 static ssize_t set_deepest_state(struct file *file,
 				 const char __user *user_buf,
 				 size_t count, loff_t *ppos)
 {
-	ssize_t buf_size;
 	int val;
 
-	val = get_val(user_buf, count, CI_WFI, cstates_len - 1, &buf_size);
+	val = get_val(user_buf, count, CI_WFI, cstates_len - 1);
 
 	if (val < 0)
 		return val;
@@ -505,7 +500,7 @@ static ssize_t set_deepest_state(struct file *file,
 	pr_debug("cpuidle: changed deepest allowed sleep state to %d.\n",
 		 deepest_allowed_state);
 
-	return buf_size;
+	return count;
 }
 
 static int deepest_state_print(struct seq_file *s, void *p)
@@ -535,14 +530,13 @@ static ssize_t wake_latency_write(struct file *file,
 				  const char __user *user_buf,
 				  size_t count, loff_t *ppos)
 {
-	ssize_t buf_size;
-	int val = get_val(user_buf, count, 0, 1, &buf_size);
+	int val = get_val(user_buf, count, 0, 1);
 	if (val < 0)
 		return val;
 
 	wake_latency = val;
 	ux500_rtcrtt_measure_latency(wake_latency);
-	return buf_size;
+	return count;
 }
 
 static int verbose_read(struct seq_file *s, void *p)
@@ -555,8 +549,7 @@ static ssize_t verbose_write(struct file *file,
 				  const char __user *user_buf,
 				  size_t count, loff_t *ppos)
 {
-	ssize_t buf_size;
-	int val = get_val(user_buf, count, 0, 1, &buf_size);
+	int val = get_val(user_buf, count, 0, 1);
 	if (val < 0)
 		return val;
 
