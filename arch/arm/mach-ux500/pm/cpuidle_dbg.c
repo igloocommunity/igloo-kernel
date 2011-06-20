@@ -290,7 +290,7 @@ void ux500_ci_dbg_wake_latency(int ctarget, int sleep_time)
 	if (!wake_latency || cstates[ctarget].state < CI_IDLE)
 		return;
 
-	zero_time = ktime_set(0, 0);
+	l = zero_time = ktime_set(0, 0);
 	sh = per_cpu(state_history, smp_processor_id());
 
 	if (cstates[ctarget].state >= CI_SLEEP)
