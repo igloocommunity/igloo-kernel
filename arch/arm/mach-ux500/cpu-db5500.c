@@ -223,7 +223,7 @@ void __init u5500_init_devices(void)
 {
 #ifdef CONFIG_STM_TRACE
 	/* Early init for STM tracing */
-	platform_device_register(&ux500_stm_device);
+	/* platform_device_register(&u5500_stm_device); */
 #endif
 	db5500_add_gpios();
 	db5500_dma_init();

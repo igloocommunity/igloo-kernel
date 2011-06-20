@@ -9,6 +9,7 @@
 #define __MACH_PRCMU_H
 
 #include <linux/interrupt.h>
+#include <asm/mach-types.h>
 #include <mach/prcmu-qos.h>
 
 /* PRCMU Wakeup defines */
@@ -205,13 +206,33 @@ enum ddr_opp {
 
 #if defined(CONFIG_UX500_SOC_DB8500) || defined(CONFIG_UX500_SOC_DB5500)
 
-void __init prcmu_early_init(void);
+static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+		bool keep_ap_pll)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_set_power_state(state, keep_ulp_clk,
+			keep_ap_pll);
+	else
+		return db8500_prcmu_set_power_state(state, keep_ulp_clk,
+			keep_ap_pll);
+}
 
-int prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll);
+static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_set_epod(epod_id, epod_state);
+	else
+		return db8500_prcmu_set_epod(epod_id, epod_state);
+}
 
-int prcmu_set_epod(u16 epod_id, u8 epod_state);
+static inline void prcmu_enable_wakeups(u32 wakeups)
+{
+	if (machine_is_u5500())
+		db5500_prcmu_enable_wakeups(wakeups);
+	else
+		db8500_prcmu_enable_wakeups(wakeups);
+}
 
-void prcmu_enable_wakeups(u32 wakeups);
 static inline void prcmu_disable_wakeups(void)
 {
 	prcmu_enable_wakeups(0);
@@ -222,7 +243,13 @@ int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
 
 int prcmu_config_clkout(u8 clkout, u8 source, u8 div);
 
-int prcmu_request_clock(u8 clock, bool enable);
+static inline int prcmu_request_clock(u8 clock, bool enable)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_request_clock(clock, enable);
+	else
+		return db8500_prcmu_request_clock(clock, enable);
+}
 
 int prcmu_set_ape_opp(u8 opp);
 int prcmu_get_ape_opp(void);
@@ -231,7 +258,14 @@ int prcmu_get_arm_opp(void);
 int prcmu_set_ddr_opp(u8 opp);
 int prcmu_get_ddr_opp(void);
 
-void prcmu_system_reset(u16 reset_code);
+static inline void prcmu_system_reset(u16 reset_code)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_system_reset(reset_code);
+	else
+		return db8500_prcmu_system_reset(reset_code);
+}
+
 u16 prcmu_get_reset_code(void);
 
 void prcmu_ac_wake_req(void);
@@ -239,13 +273,31 @@ void prcmu_ac_sleep_req(void);
 void prcmu_modem_reset(void);
 bool prcmu_is_ac_wake_requested(void);
 
-int prcmu_set_display_clocks(void);
-int prcmu_disable_dsipll(void);
-int prcmu_enable_dsipll(void);
+static inline int prcmu_set_display_clocks(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_set_display_clocks();
+	else
+		return db8500_prcmu_set_display_clocks();
+}
+
+static inline int prcmu_disable_dsipll(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_disable_dsipll();
+	else
+		return db8500_prcmu_disable_dsipll();
+}
+
+static inline int prcmu_enable_dsipll(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_enable_dsipll();
+	else
+		return db8500_prcmu_enable_dsipll();
+}
 
 #else
-
-static inline void __init prcmu_early_init(void) {}
 
 static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 	bool keep_ap_pll)
@@ -344,6 +396,16 @@ static inline int prcmu_enable_dsipll(void)
 {
 	return 0;
 }
+
+#endif
+
+#if defined(CONFIG_UX500_SOC_DB8500)
+
+void __init prcmu_early_init(void);
+
+#else
+
+static inline void __init prcmu_early_init(void) {}
 
 #endif
 

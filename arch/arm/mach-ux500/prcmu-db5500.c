@@ -327,19 +327,19 @@ unlock_and_return:
 	return r;
 }
 
-void prcmu_enable_wakeups(u32 wakeups)
+void db5500_prcmu_enable_wakeups(u32 wakeups)
 {
 }
 
 /**
- * prcmu_request_clock() - Request for a clock to be enabled or disabled.
+ * db5500_prcmu_request_clock() - Request for a clock to be enabled or disabled.
  * @clock:      The clock for which the request is made.
  * @enable:     Whether the clock should be enabled (true) or disabled (false).
  *
  * This function should only be used by the clock implementation.
  * Do not use it from any other place!
  */
-int prcmu_request_clock(u8 clock, bool enable)
+int db5500_prcmu_request_clock(u8 clock, bool enable)
 {
 	if (clock < PRCMU_NUM_REG_CLOCKS)
 		return request_reg_clock(clock, enable);
@@ -529,7 +529,7 @@ static void ack_dbb_wakeup(void)
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
 }
 
-int prcmu_set_epod(u16 epod_id, u8 epod_state)
+int db5500_prcmu_set_epod(u16 epod_id, u8 epod_state)
 {
 	int r = 0;
 	bool ram_retention = false;

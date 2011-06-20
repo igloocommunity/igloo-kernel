@@ -209,6 +209,16 @@ int prcmu_stop_temp_sense(void);
 void prcmu_enable_spi2(void);
 void prcmu_disable_spi2(void);
 
+void db8500_prcmu_system_reset(u16 reset_code);
+int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+		bool keep_ap_pll);
+void db8500_prcmu_enable_wakeups(u32 wakeups);
+int db8500_prcmu_set_epod(u16 epod_id, u8 epod_state);
+int db8500_prcmu_request_clock(u8 clock, bool enable);
+int db8500_prcmu_set_display_clocks(void);
+int db8500_prcmu_disable_dsipll(void);
+int db8500_prcmu_enable_dsipll(void);
+
 #else /* !CONFIG_UX500_SOC_DB8500 */
 
 static inline bool prcmu_is_u8400(void)
@@ -303,6 +313,39 @@ static inline int prcmu_disable_spi2(void)
 	return 0;
 }
 
+static inline void db8500_prcmu_system_reset(u16 reset_code) {}
+static inline int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+		bool keep_ap_pll)
+{
+	return 0;
+}
+
+static inline void db8500_prcmu_enable_wakeups(u32 wakeups) {}
+
+static inline int db8500_prcmu_set_epod(u16 epod_id, u8 epod_state)
+{
+	return 0;
+}
+
+static inline int db8500_prcmu_request_clock(u8 clock, bool enable)
+{
+	return 0;
+}
+
+static inline int db8500_prcmu_set_display_clocks(void)
+{
+	return 0;
+}
+
+static inline int db8500_prcmu_disable_dsipll(void)
+{
+	return 0;
+}
+
+static inline int db8500_prcmu_enable_dsipll(void)
+{
+	return 0;
+}
 #endif /* CONFIG_UX500_SOC_DB8500 */
 
 #endif /* __MACH_PRCMU_DB8500_H */

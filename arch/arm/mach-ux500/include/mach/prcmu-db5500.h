@@ -11,21 +11,23 @@
 #ifdef CONFIG_UX500_SOC_DB5500
 
 void db5500_prcmu_early_init(void);
-
 int db5500_prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size);
 int db5500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
-
 int db5500_prcmu_request_clock(u8 clock, bool enable);
-
+void db5500_prcmu_enable_wakeups(u32 wakeups);
+int db5500_prcmu_set_epod(u16 epod_id, u8 epod_state);
+int db5500_prcmu_set_display_clocks(void);
+int db5500_prcmu_disable_dsipll(void);
+int db5500_prcmu_enable_dsipll(void);
 int prcmu_resetout(u8 resoutn, u8 state);
 
-static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+static inline int db5500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 	bool keep_ap_pll)
 {
 	return 0;
 }
 
-static inline void prcmu_system_reset(u16 reset_code) {}
+static inline void db5500_prcmu_system_reset(u16 reset_code) {}
 
 #else /* !CONFIG_UX500_SOC_DB5500 */
 
@@ -43,7 +45,29 @@ static inline int db5500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
 	return -ENOSYS;
 }
 
+static inline int db5500_prcmu_set_display_clocks(void)
+{
+	return 0;
+}
+
+static inline int db5500_prcmu_disable_dsipll(void)
+{
+	return 0;
+}
+
+static inline int db5500_prcmu_enable_dsipll(void)
+{
+	return 0;
+}
+
+static inline void db5500_prcmu_enable_wakeups(u32 wakeups) {}
+
 static inline int prcmu_resetout(u8 resoutn, u8 state)
+{
+	return 0;
+}
+
+static inline int db5500_prcmu_set_epod(u16 epod_id, u8 epod_state)
 {
 	return 0;
 }
