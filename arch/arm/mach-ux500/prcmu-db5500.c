@@ -393,6 +393,11 @@ static struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
 	CLK_MGT_ENTRY(SVACLK),
 };
 
+bool prcmu_is_ac_wake_requested(void)
+{
+	return false;
+}
+
 static int request_sysclk(bool enable)
 {
 	int r;
