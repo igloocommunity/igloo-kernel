@@ -157,6 +157,8 @@ enum ap_pwrst {
 
 #ifdef CONFIG_UX500_SOC_DB8500
 
+void db8500_prcmu_early_init(void);
+
 bool prcmu_is_u8400(void);
 
 int prcmu_request_ape_opp_100_voltage(bool enable);
@@ -210,6 +212,8 @@ int db8500_prcmu_set_arm_opp(u8 opp);
 int db8500_prcmu_get_arm_opp(void);
 
 #else /* !CONFIG_UX500_SOC_DB8500 */
+
+static inline void db8500_prcmu_early_init(void) {}
 
 static inline bool prcmu_is_u8400(void)
 {
@@ -338,6 +342,11 @@ static inline int db8500_prcmu_config_esram0_deep_sleep(u8 state)
 static inline void db8500_prcmu_config_abb_event_readout(u32 abb_events) {}
 
 static inline void db8500_prcmu_get_abb_event_buffer(void __iomem **buf) {}
+
+static inline u16 db8500_prcmu_get_reset_code(void)
+{
+	return 0;
+}
 
 static inline int prcmu_config_a9wdog(u8 num, bool sleep_auto_off)
 {

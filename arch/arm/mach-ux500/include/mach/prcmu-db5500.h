@@ -25,9 +25,7 @@ int prcmu_resetout(u8 resoutn, u8 state);
 int db5500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 	bool keep_ap_pll);
 int db5500_prcmu_config_esram0_deep_sleep(u8 state);
-
-static inline void db5500_prcmu_system_reset(u16 reset_code) {}
-
+void db5500_prcmu_system_reset(u16 reset_code);
 u16 db5500_prcmu_get_reset_code(void);
 bool db5500_prcmu_is_ac_wake_requested(void);
 int db5500_prcmu_set_arm_opp(u8 opp);
@@ -35,9 +33,7 @@ int db5500_prcmu_get_arm_opp(void);
 
 #else /* !CONFIG_UX500_SOC_DB5500 */
 
-static inline void db5500_prcmu_early_init(void)
-{
-}
+static inline void db5500_prcmu_early_init(void) {}
 
 static inline int db5500_prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size)
 {
@@ -94,6 +90,8 @@ static inline int db5500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 {
 	return 0;
 }
+
+static inline void db5500_prcmu_system_reset(u16 reset_code) {}
 
 static inline u16 db5500_prcmu_get_reset_code(void)
 {

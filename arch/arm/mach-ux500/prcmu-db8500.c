@@ -1852,12 +1852,12 @@ void db8500_prcmu_system_reset(u16 reset_code)
 }
 
 /**
- * prcmu_get_reset_code - Retrieve SW reset reason code
+ * db8500_prcmu_get_reset_code - Retrieve SW reset reason code
  *
  * Retrieves the reset reason code stored by prcmu_system_reset() before
  * last restart.
  */
-u16 prcmu_get_reset_code(void)
+u16 db8500_prcmu_get_reset_code(void)
 {
 	return readw(tcdm_base + PRCM_SW_RST_REASON);
 }
@@ -2112,7 +2112,7 @@ static struct irq_chip prcmu_irq_chip = {
 	.irq_unmask	= prcmu_irq_unmask,
 };
 
-void __init prcmu_early_init(void)
+void __init db8500_prcmu_early_init(void)
 {
 	unsigned int i;
 

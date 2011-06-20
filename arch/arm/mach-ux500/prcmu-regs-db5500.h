@@ -60,6 +60,9 @@
 #define PRCM_MBOX_CPU_VAL 0x0FC
 #define PRCM_MBOX_CPU_SET 0x100
 
+/* System reset register */
+#define PRCM_APE_SOFTRST 0x228
+
 /* PRCMU clock/PLL/reset registers */
 #define PRCM_PLLDSI_FREQ	0x500
 #define PRCM_PLLDSI_ENABLE	0x504

@@ -227,6 +227,14 @@ enum ddr_pwrst {
 
 #if defined(CONFIG_UX500_SOC_DB8500) || defined(CONFIG_UX500_SOC_DB5500)
 
+static inline void __init prcmu_early_init(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_early_init();
+	else
+		return db8500_prcmu_early_init();
+}
+
 static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 		bool keep_ap_pll)
 {
@@ -317,7 +325,13 @@ static inline void prcmu_system_reset(u16 reset_code)
 		return db8500_prcmu_system_reset(reset_code);
 }
 
-u16 prcmu_get_reset_code(void);
+static inline u16 prcmu_get_reset_code(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_get_reset_code();
+	else
+		return db8500_prcmu_get_reset_code();
+}
 
 void prcmu_ac_wake_req(void);
 void prcmu_ac_sleep_req(void);
@@ -362,6 +376,8 @@ static inline int prcmu_config_esram0_deep_sleep(u8 state)
 		return db8500_prcmu_config_esram0_deep_sleep(state);
 }
 #else
+
+static inline void __init prcmu_early_init(void) {}
 
 static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 	bool keep_ap_pll)
@@ -472,16 +488,6 @@ static inline void prcmu_get_abb_event_buffer(void __iomem **buf)
 {
 	*buf = NULL;
 }
-
-#endif
-
-#if defined(CONFIG_UX500_SOC_DB8500)
-
-void __init prcmu_early_init(void);
-
-#else
-
-static inline void __init prcmu_early_init(void) {}
 
 #endif
 
