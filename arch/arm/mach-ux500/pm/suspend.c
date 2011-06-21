@@ -167,13 +167,24 @@ static int ux500_suspend_enter(suspend_state_t state)
 			return suspend(true);
 		if (ux500_suspend_sleep_enabled())
 			return suspend(false);
-		/* For debugging, if Sleep and DeepSleep disabled, do Idle */
-		if (!cpu_is_u5500())
-			prcmu_set_power_state(PRCMU_AP_IDLE, true, true);
 	}
+
+	ux500_suspend_dbg_add_wake_on_uart();
+	/*
+	 * Set IOFORCE in order to wake on GPIO the same way
+	 * as in deeper sleep.
+	 * (U5500 is not ready for IOFORCE)
+	 */
+	if (!cpu_is_u5500())
+		ux500_pm_prcmu_set_ioforce(true);
 
 	dsb();
 	__asm__ __volatile__("wfi\n\t" : : : "memory");
+
+	if (!cpu_is_u5500())
+		ux500_pm_prcmu_set_ioforce(false);
+	ux500_suspend_dbg_remove_wake_on_uart();
+
 	return 0;
 }
 
