@@ -522,7 +522,7 @@ config U5500_MBOX
 config U8500_SIM_DETECT
 	bool "Sim hot swap detection support"
 	depends on (MODEM && UX500_SOC_DB8500)
-	default y
+	default n
 	help
 	  Add support for sim hot swap detection support in U8500.Driver
 	  basically wakes up the modem if its sleeping when sim hot plug
