@@ -83,16 +83,14 @@ bool ux500_pm_gic_pending_interrupt(void)
 	/* 5 registers. STI & PPI not skipped */
 	for (i = 0; i < GIC_NUMBER_REGS; i++) {
 
-		pr = readl(__io_address(U8500_GIC_DIST_BASE) +
-			   GIC_DIST_PENDING_SET + i * 4);
-		er = readl(__io_address(U8500_GIC_DIST_BASE) +
-			   GIC_DIST_ENABLE_SET + i * 4);
+		pr = readl_relaxed(__io_address(U8500_GIC_DIST_BASE) +
+				   GIC_DIST_PENDING_SET + i * 4);
+		er = readl_relaxed(__io_address(U8500_GIC_DIST_BASE) +
+				   GIC_DIST_ENABLE_SET + i * 4);
 
 		if (pr & er)
 			return true; /* There is a pending interrupt */
-
 	}
-
 	return false;
 }
 
@@ -130,7 +128,7 @@ void ux500_pm_prcmu_copy_gic_settings(void)
 
 	for (i = 0; i < GIC_NUMBER_SPI_REGS; i++) { /* 4*32 SPI interrupts */
 		/* +1 due to skip STI and PPI */
-		er = readl(IO_ADDRESS(U8500_GIC_DIST_BASE) +
+		er = readl_relaxed(__io_address(U8500_GIC_DIST_BASE) +
 			   GIC_DIST_ENABLE_SET + (i + 1) * 4);
 		writel(er, PRCM_ARMITMSK31TO0 + i * 4);
 	}
@@ -151,7 +149,7 @@ void ux500_pm_gpio_save_wake_up_status(void)
 	}
 
 	for (i = 0; i < num_banks; i++)
-		ux500_gpio_wks[i] = readl(IO_ADDRESS(banks[i]) + NMK_GPIO_WKS);
+		ux500_gpio_wks[i] = readl(__io_address(banks[i]) + NMK_GPIO_WKS);
 }
 
 u32 ux500_pm_gpio_read_wake_up_status(unsigned int bank_num)
