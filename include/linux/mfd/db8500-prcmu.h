@@ -513,7 +513,6 @@ void prcmu_configure_auto_pm(struct prcmu_auto_pm_config *sleep,
 	struct prcmu_auto_pm_config *idle);
 bool prcmu_is_auto_pm_enabled(void);
 
-int prcmu_config_clkout(u8 clkout, u8 source, u8 div);
 
 int prcmu_config_hotdog(u8 threshold);
 int prcmu_config_hotmon(u8 low, u8 high);
@@ -621,11 +620,6 @@ static inline void prcmu_configure_auto_pm(struct prcmu_auto_pm_config *sleep,
 static inline bool prcmu_is_auto_pm_enabled(void)
 {
 	return false;
-}
-
-static inline int prcmu_config_clkout(u8 clkout, u8 source, u8 div)
-{
-	return 0;
 }
 
 static inline int prcmu_config_hotdog(u8 threshold)

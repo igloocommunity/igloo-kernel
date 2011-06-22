@@ -411,6 +411,9 @@ static struct {
 	} ack;
 } mb5_transfer;
 
+/* Spinlocks */
+static DEFINE_SPINLOCK(clkout_lock);
+
 /* PRCMU TCDM base IO address. */
 static __iomem void *tcdm_base;
 
@@ -455,6 +458,116 @@ static struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
 bool db5500_prcmu_is_ac_wake_requested(void)
 {
 	return false;
+}
+
+/**
+ * prcmu_config_clkout - Configure one of the programmable clock outputs.
+ * @clkout:	The CLKOUT number (0 or 1).
+ * @source:	Clock source.
+ * @div:	The divider to be applied.
+ *
+ * Configures one of the programmable clock outputs (CLKOUTs).
+ */
+int prcmu_config_clkout(u8 clkout, u8 source, u8 div)
+{
+	static bool configured[2] = {false, false};
+	int r = 0;
+	unsigned long flags;
+	u32 sel_val;
+	u32 div_val;
+	u32 sel_bits;
+	u32 div_bits;
+	u32 sel_mask;
+	u32 div_mask;
+	u8 sel0 = CLKOUT_SEL0_SEL_CLK;
+	u16 sel = 0;
+
+	BUG_ON(clkout > DB5500_CLKOUT1);
+	BUG_ON(source > DB5500_CLKOUT_IRDACLK);
+	BUG_ON(div > 7);
+
+	switch (source) {
+	case DB5500_CLKOUT_REF_CLK_SEL0:
+		sel0 = CLKOUT_SEL0_REF_CLK;
+		break;
+	case DB5500_CLKOUT_RTC_CLK0_SEL0:
+		sel0 = CLKOUT_SEL0_RTC_CLK0;
+		break;
+	case DB5500_CLKOUT_ULP_CLK_SEL0:
+		sel0 = CLKOUT_SEL0_ULP_CLK;
+		break;
+	case DB5500_CLKOUT_STATIC0:
+		sel = CLKOUT_SEL_STATIC0;
+		break;
+	case DB5500_CLKOUT_REFCLK:
+		sel = CLKOUT_SEL_REFCLK;
+		break;
+	case DB5500_CLKOUT_ULPCLK:
+		sel = CLKOUT_SEL_ULPCLK;
+		break;
+	case DB5500_CLKOUT_ARMCLK:
+		sel = CLKOUT_SEL_ARMCLK;
+		break;
+	case DB5500_CLKOUT_SYSACC0CLK:
+		sel = CLKOUT_SEL_SYSACC0CLK;
+		break;
+	case DB5500_CLKOUT_SOC0PLLCLK:
+		sel = CLKOUT_SEL_SOC0PLLCLK;
+		break;
+	case DB5500_CLKOUT_SOC1PLLCLK:
+		sel = CLKOUT_SEL_SOC1PLLCLK;
+		break;
+	case DB5500_CLKOUT_DDRPLLCLK:
+		sel = CLKOUT_SEL_DDRPLLCLK;
+		break;
+	case DB5500_CLKOUT_TVCLK:
+		sel = CLKOUT_SEL_TVCLK;
+		break;
+	case DB5500_CLKOUT_IRDACLK:
+		sel = CLKOUT_SEL_IRDACLK;
+		break;
+	}
+
+	switch (clkout) {
+	case DB5500_CLKOUT0:
+		sel_mask = PRCM_CLKOCR_CLKOUT0_SEL0_MASK |
+			PRCM_CLKOCR_CLKOUT0_SEL_MASK;
+		sel_bits = ((sel0 << PRCM_CLKOCR_CLKOUT0_SEL0_SHIFT) |
+			(sel << PRCM_CLKOCR_CLKOUT0_SEL_SHIFT));
+		div_mask = PRCM_CLKODIV_CLKOUT0_DIV_MASK;
+		div_bits = div << PRCM_CLKODIV_CLKOUT0_DIV_SHIFT;
+		break;
+	case DB5500_CLKOUT1:
+		sel_mask = PRCM_CLKOCR_CLKOUT1_SEL0_MASK |
+			PRCM_CLKOCR_CLKOUT1_SEL_MASK;
+		sel_bits = ((sel0 << PRCM_CLKOCR_CLKOUT1_SEL0_SHIFT) |
+			(sel << PRCM_CLKOCR_CLKOUT1_SEL_SHIFT));
+		div_mask = PRCM_CLKODIV_CLKOUT1_DIV_MASK;
+		div_bits = div << PRCM_CLKODIV_CLKOUT1_DIV_SHIFT;
+		break;
+	}
+
+	spin_lock_irqsave(&clkout_lock, flags);
+
+	if (configured[clkout]) {
+		r = -EINVAL;
+		goto unlock_and_return;
+	}
+
+	sel_val = readl(_PRCMU_BASE + PRCM_CLKOCR);
+	writel((sel_bits | (sel_val & ~sel_mask)),
+		(_PRCMU_BASE + PRCM_CLKOCR));
+
+	div_val = readl(_PRCMU_BASE + PRCM_CLKODIV);
+	writel((div_bits | (div_val & ~div_mask)),
+		(_PRCMU_BASE + PRCM_CLKODIV));
+
+	configured[clkout] = true;
+
+unlock_and_return:
+	spin_unlock_irqrestore(&clkout_lock, flags);
+
+	return r;
 }
 
 static int request_sysclk(bool enable)
