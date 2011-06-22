@@ -164,4 +164,6 @@ source "drivers/staging/cg2900/Kconfig"
 
 source "drivers/staging/cw1200/Kconfig"
 
+source "drivers/staging/mmio/Kconfig"
+
 endif # STAGING
