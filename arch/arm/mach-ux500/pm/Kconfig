@@ -1,6 +1,6 @@
 config U8500_CPUIDLE
 	tristate "CPUIdle support"
-	depends on UX500_SOC_DB8500 && CPU_IDLE && !RTC_DRV_PL031 && PM
+	depends on (UX500_SOC_DB8500 || UX500_SOC_DB5500) && CPU_IDLE && !RTC_DRV_PL031 && PM
 	default y
 	select GENERIC_CLOCKEVENTS_BROADCAST
 	select UX500_CONTEXT
@@ -9,7 +9,8 @@ config U8500_CPUIDLE
 
 config U8500_CPUIDLE_DEEPEST_STATE
 	int "Deepest sleep state"
-	default 4
+	default 4 if UX500_SOC_DB8500
+	default 1 if UX500_SOC_DB5500
 	depends on U8500_CPUIDLE
 	help
 	  Set deepest sleep state. See the cstate struct in cpuidle.c.
@@ -37,7 +38,7 @@ config UX500_SUSPEND
 
 config UX500_SUSPEND_STANDBY
 	bool "Suspend Standby goes to ApSleep"
-	depends on UX500_SUSPEND && UX500_SOC_DB8500
+	depends on UX500_SUSPEND
 	help
 	  If yes, echo standby > /sys/power/state puts the system into ApSleep.
 
