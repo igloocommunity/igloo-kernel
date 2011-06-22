@@ -1343,7 +1343,7 @@ int __init db5500_prcmu_init(void)
 	writel(ALL_MBOX_BITS, _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 
 	r = request_threaded_irq(IRQ_DB5500_PRCMU1, prcmu_irq_handler,
-		prcmu_irq_thread_fn, 0, "prcmu", NULL);
+		prcmu_irq_thread_fn, IRQF_NO_SUSPEND, "prcmu", NULL);
 	if (r < 0) {
 		pr_err("prcmu: Failed to allocate IRQ_DB5500_PRCMU1.\n");
 		return -EBUSY;
