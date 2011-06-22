@@ -1720,7 +1720,7 @@ static struct dentry *ab8500_regulator_suspend_force_file;
 static int __devinit ab8500_regulator_debug_probe(struct platform_device *plf)
 {
 	void __iomem *boot_info_backupram;
-	int ret;
+	int ret, i;
 
 	/* setup dev pointers */
 	dev = &plf->dev;
@@ -1730,6 +1730,21 @@ static int __devinit ab8500_regulator_debug_probe(struct platform_device *plf)
 	ret = ab8500_regulator_record_state(AB8500_REGULATOR_STATE_INIT);
 	if (ret < 0)
 		dev_err(&plf->dev, "Failed to record init state.\n");
+
+	/* remove force of external regulators on AB8500 3.0 */
+	if (abx500_get_chip_id(&pdev->dev) >= 0x30) {
+		/*
+		 * find ExtSupplyRegu register (bank 0x04, addr 0x08)
+		 * and reset mask and value
+		 */
+		for (i = 0; i < ARRAY_SIZE(ab8500_force_reg); i++) {
+			if (ab8500_force_reg[i].bank == 0x04 &&
+			    ab8500_force_reg[i].addr == 0x08) {
+				ab8500_force_reg[i].mask = 0x00;
+				ab8500_force_reg[i].val = 0x00;
+			}
+		}
+	}
 
 	/* make suspend-force default if board profile is v5x-power */
 	boot_info_backupram = ioremap(BOOT_INFO_BACKUPRAM1, 0x4);
