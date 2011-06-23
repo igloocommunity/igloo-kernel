@@ -11,6 +11,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
+#include <linux/gpio/nomadik.h>
 #include <asm/processor.h>
 
 #include <asm/hardware/gic.h>
