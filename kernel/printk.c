@@ -41,7 +41,6 @@
 #include <linux/cpu.h>
 #include <linux/notifier.h>
 #include <linux/rculist.h>
-#include <trace/kernel.h>
 #include <trace/stm.h>
 
 #include <asm/uaccess.h>
