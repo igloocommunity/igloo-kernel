@@ -53,6 +53,7 @@ out:
 	return ret;
 }
 
+#if 0
 /*
  * Exported interface for CPUIdle only. This function is called when interrupts
  * are turned off. Hence, no locking.
@@ -61,6 +62,7 @@ int power_state_active_is_enabled(void)
 {
 	return (power_state_active_cnt > 0);
 }
+#endif
 
 struct ux500_regulator {
 	char *name;

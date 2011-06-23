@@ -39,15 +39,16 @@ static inline void platform_do_lowpower(unsigned int cpu)
 		context_restore_cpu_registers();
 		context_varm_restore_core();
 
-	/* we put the platform to just WFI */
-	for (;;) {
-		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
-				: : : "memory");
-		if (pen_release == cpu) {
-			/*
-			 * OK, proper wakeup, we're done
-			 */
-			break;
+		/* we put the platform to just WFI */
+		for (;;) {
+			__asm__ __volatile__("dsb\n\t" "wfi\n\t"
+					: : : "memory");
+			if (pen_release == cpu) {
+				/*
+				 * OK, proper wakeup, we're done
+				 */
+				break;
+			}
 		}
 	}
 }
@@ -76,3 +77,4 @@ int platform_cpu_disable(unsigned int cpu)
 	 */
 	return cpu == 0 ? -EPERM : 0;
 }
+

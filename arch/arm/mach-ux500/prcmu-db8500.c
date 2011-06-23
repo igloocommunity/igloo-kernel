@@ -35,8 +35,10 @@
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
+
 #include "prcmu-regs-db8500.h"
 #include "prcmu-debug.h"
+
 #include <mach/prcmu.h>
 #include <mach/db8500-regs.h>
 #include <mach/id.h>

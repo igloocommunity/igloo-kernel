@@ -141,10 +141,6 @@ static struct mmci_platform_data mop500_sdi1_data = {
 };
 #endif /* CONFIG_CW1200 */
 
-/* GPIO pins used by the sdi0 level shifter */
-static int sdi0_en = -1;
-static int sdi0_vsel = -1;
-
 static void sdi0_sdi1_configure(void)
 {
 	int ret;

@@ -9,8 +9,9 @@
 #define __MACH_PRCMU_H
 
 #include <linux/interrupt.h>
-#include <mach/prcmu-qos.h>
+//#include <mach/prcmu-qos.h>
 
+#if 0
 /* PRCMU Wakeup defines */
 enum prcmu_wakeup_index {
 	PRCMU_WAKEUP_INDEX_RTC,
@@ -200,8 +201,12 @@ enum ddr_opp {
 	DDR_25_OPP = 0x02,
 };
 
-#include <mach/prcmu-db8500.h>
-#include <mach/prcmu-db5500.h>
+#endif
+
+#include <linux/mfd/db8500-prcmu.h>
+#include <linux/mfd/db5500-prcmu.h>
+
+#if 0
 
 #if defined(CONFIG_UX500_SOC_DB8500) || defined(CONFIG_UX500_SOC_DB5500)
 
@@ -344,6 +349,8 @@ static inline int prcmu_enable_dsipll(void)
 {
 	return 0;
 }
+
+#endif
 
 #endif
 
