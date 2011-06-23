@@ -12,6 +12,7 @@
 
 #include <linux/suspend.h>
 #include <linux/gpio.h>
+#include <linux/gpio/nomadik.h>
 #include <linux/delay.h>
 #include <linux/regulator/ab8500-debug.h>
 

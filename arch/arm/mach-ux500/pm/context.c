@@ -25,7 +25,8 @@
 #include <mach/irqs.h>
 #include <mach/scu.h>
 
-#include <plat/gpio.h>
+#include <linux/gpio/nomadik.h>
+#include <linux/gpio.h>
 
 #include "context.h"
 #include "pm.h"
