@@ -10,12 +10,13 @@
 #include <linux/percpu.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/gpio.h>
+#include <asm/processor.h>
 
 #include <asm/hardware/gic.h>
 
 #include <mach/hardware.h>
 #include <mach/prcmu-regs.h>
-#include <mach/gpio.h>
 
 #include "pm.h"
 

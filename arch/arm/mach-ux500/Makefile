@@ -7,13 +7,13 @@ obj-y				:= clock.o cpu.o devices.o dcache.o \
 				   timer.o timer-mtu.o usb.o reboot_reasons.o
 obj-y				+= pm/
 ifeq ($(CONFIG_UX500_SOC_DB5500), y)
-obj-$(CONFIG_UX500_SOC_DBX500)	+= cpu-db5500.o dma-db5500.o prcmu-db5500.o \
+obj-$(CONFIG_UX500_SOC_DBX500)	+= cpu-db5500.o dma-db5500.o \
 				   devices-db5500.o clock-db5500.o \
 				   clock-debug.o
 endif
 ifeq ($(CONFIG_UX500_SOC_DB8500), y)
 obj-$(CONFIG_UX500_SOC_DBX500)	+= cpu-db8500.o devices-db8500.o \
-				   prcmu-db8500.o clock-db8500.o
+				   clock-db8500.o
 endif
 obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
 				board-mop500-regulators.o \
