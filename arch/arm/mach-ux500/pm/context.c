@@ -19,6 +19,8 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 
+#include <asm/hardware/gic.h>
+
 #include <mach/hardware.h>
 #include <mach/irqs.h>
 #include <mach/scu.h>
