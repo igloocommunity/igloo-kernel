@@ -288,7 +288,6 @@ static struct i2c_driver bh1780_driver = {
 	.id_table	= bh1780_id,
 	.driver = {
 		.name = "bh1780",
-<<<<<<< HEAD
 		.pm	= BH1780_PMOPS,
 	},
 };
