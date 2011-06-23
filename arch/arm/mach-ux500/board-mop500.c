@@ -35,8 +35,9 @@
 #include <linux/spi/stm_msp.h>
 #include <linux/leds_pwm.h>
 #include <linux/pwm_backlight.h>
-
+#include <linux/gpio/nomadik.h>
 #include <linux/leds.h>
+
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
@@ -876,7 +877,7 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
 	&snowball_led_dev,
 	&snowball_key_dev,
 	&snowball_sbnet_dev,
-//EROBEMA	&ab8500_device,
+	&ab8500_device,
 	&snowball_gpio_wlan_vbat_regulator_device,
 	&u8500_mcde_device,
 	&u8500_b2r2_device,
