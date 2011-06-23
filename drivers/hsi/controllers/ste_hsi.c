@@ -1684,16 +1684,15 @@ static int __init ste_hsi_init(void)
 {
 	return platform_driver_probe(&ste_hsi_driver, ste_hsi_probe);
 }
-
 module_init(ste_hsi_init)
 
 static void __exit ste_hsi_exit(void)
 {
 	platform_driver_unregister(&ste_hsi_driver);
 }
-
 module_exit(ste_hsi_exit)
 
-    MODULE_AUTHOR("Lukasz Baj <lukasz.baj@tieto.com")
-    MODULE_DESCRIPTION("STE HSI driver.")
-    MODULE_LICENSE("GPL")
+MODULE_AUTHOR("Lukasz Baj <lukasz.baj@tieto.com");
+MODULE_DESCRIPTION("STE HSI driver.");
+MODULE_LICENSE("GPL");
+
