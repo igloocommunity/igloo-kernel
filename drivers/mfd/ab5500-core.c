@@ -28,7 +28,7 @@
 #include <linux/spinlock.h>
 #include <linux/mfd/core.h>
 #include <linux/version.h>
-#include <mach/prcmu-db5500.h>
+#include <linux/mfd/db5500-prcmu.h>
 
 #define AB5500_NAME_STRING "ab5500"
 #define AB5500_ID_FORMAT_STRING "AB5500 %s"
@@ -1332,7 +1332,7 @@ static int ab5500_startup_irq_enabled(struct device *dev, unsigned int irq)
 	struct ab5500 *ab;
 	bool val;
 
-	ab = get_irq_chip_data(irq);
+	ab = irq_get_chip_data(irq);
 	irq -= ab->irq_base;
 	val = ((ab->startup_events[irq / 8] & BIT(irq % 8)) != 0);
 
@@ -2303,10 +2303,10 @@ static int ab5500_irq_init(struct ab5500 *ab)
 	for (i = 0; i < ab5500_plf_data->irq.count; i++) {
 
 		irq = ab5500_plf_data->irq.base + i;
-		set_irq_chip_data(irq, ab);
-		set_irq_chip_and_handler(irq, &ab5500_irq_chip,
+		irq_set_chip_data(irq, ab);
+		irq_set_chip_and_handler(irq, &ab5500_irq_chip,
 			handle_simple_irq);
-		set_irq_nested_thread(irq, 1);
+		irq_set_nested_thread(irq, 1);
 #ifdef CONFIG_ARM
 		set_irq_flags(irq, IRQF_VALID);
 #else
@@ -2328,8 +2328,8 @@ static void ab5500_irq_remove(struct ab5500 *ab)
 #ifdef CONFIG_ARM
 		set_irq_flags(irq, 0);
 #endif
-		set_irq_chip_and_handler(irq, NULL, NULL);
-		set_irq_chip_data(irq, NULL);
+		irq_set_chip_and_handler(irq, NULL, NULL);
+		irq_set_chip_data(irq, NULL);
 	}
 }
 
@@ -2428,7 +2428,7 @@ static int __init ab5500_probe(struct platform_device *pdev)
 
 	/* Set up and register the platform devices. */
 	for (i = 0; i < AB5500_NUM_DEVICES; i++) {
-		ab5500_devs[i].mfd_data = ab5500_plf_data->dev_data[i];
+		ab5500_devs[i].platform_data = ab5500_plf_data->dev_data[i];
 	}
 
 	err = mfd_add_devices(&pdev->dev, 0, ab5500_devs,
