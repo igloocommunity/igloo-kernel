@@ -21,7 +21,6 @@
 #include <linux/workqueue.h>
 #include <linux/kobject.h>
 #include <linux/mfd/abx500.h>
-#include <linux/mfd/abx500/ab5500.h>
 #include <linux/mfd/abx500/ux500_chargalg.h>
 #include <linux/mfd/abx500/ab5500-bm.h>
 
