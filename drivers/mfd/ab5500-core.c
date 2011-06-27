@@ -1042,11 +1042,11 @@ static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
 		.range = (struct ab5500_reg_range[]) {
 			{
 				.first = 0x1F,
-				.last = 0x22,
-				.perm = AB5500_PERM_RW,
+				.last = 0x21,
+				.perm = AB5500_PERM_RO,
 			},
 			{
-				.first = 0x23,
+				.first = 0x22,
 				.last = 0x24,
 				.perm = AB5500_PERM_RW,
 			},
@@ -1193,7 +1193,7 @@ static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
 	},
 	[AB5500_BANK_FG_BATTCOM_ACC] = {
 		.bankid = AB5500_BANK_FG_BATTCOM_ACC,
-		.nranges = 2,
+		.nranges = 5,
 		.range = (struct ab5500_reg_range[]) {
 			{
 				.first = 0x00,
@@ -1202,14 +1202,30 @@ static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
 			},
 			{
 				.first = 0x0C,
+				.last = 0x10,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x1A,
+				.last = 0x1D,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x20,
+				.last = 0x21,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x23,
 				.last = 0x24,
 				.perm = AB5500_PERM_RW,
 			},
+
 		},
 	},
 	[AB5500_BANK_USB] = {
 		.bankid = AB5500_BANK_USB,
-		.nranges = 12,
+		.nranges = 13,
 		.range = (struct ab5500_reg_range[]) {
 			{
 				.first = 0x01,
@@ -1218,6 +1234,11 @@ static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
 			},
 			{
 				.first = 0x80,
+				.last = 0x80,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x81,
 				.last = 0x83,
 				.perm = AB5500_PERM_RW,
 			},
@@ -1342,7 +1363,7 @@ static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
 	},
 	[AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP] = {
 		.bankid = AB5500_BANK_VIT_IO_I2C_CLK_TST_OTP,
-		.nranges = 13,
+		.nranges = 14,
 		.range = (struct ab5500_reg_range[]) {
 			{
 				.first = 0x01,
@@ -1356,7 +1377,12 @@ static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
 			},
 			{
 				.first = 0x0D,
-				.last = 0x0F,
+				.last = 0x0D,
+				.perm = AB5500_PERM_RO,
+			},
+			{
+				.first = 0x0E,
+				.last = 0x0E,
 				.perm = AB5500_PERM_RW,
 			},
 			{
@@ -1375,13 +1401,8 @@ static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
 				.perm = AB5500_PERM_RW,
 			},
 			{
-				.first = 0x25,
-				.last = 0x25,
-				.perm = AB5500_PERM_RW,
-			},
-			{
 				.first = 0x28,
-				.last = 0x2A,
+				.last = 0x28,
 				.perm = AB5500_PERM_RW,
 			},
 			{
@@ -1409,47 +1430,47 @@ static struct ab5500_i2c_ranges ab5500_reg_ranges[AB5500_NUM_BANKS] = {
 				.last = 0x73,
 				.perm = AB5500_PERM_RW,
 			},
+			{
+				.first = 0xB1,
+				.last = 0xB1,
+				.perm = AB5500_PERM_RW,
+			},
 		},
 	},
 	[AB5500_BANK_VIBRA] = {
 		.bankid = AB5500_BANK_VIBRA,
-		.nranges = 2,
+		.nranges = 1,
 		.range = (struct ab5500_reg_range[]) {
 			{
 				.first = 0x10,
 				.last = 0x13,
 				.perm = AB5500_PERM_RW,
 			},
-			{
-				.first = 0xFE,
-				.last = 0xFE,
-				.perm = AB5500_PERM_RW,
-			},
 		},
 	},
 	[AB5500_BANK_AUDIO_HEADSETUSB] = {
 		.bankid = AB5500_BANK_AUDIO_HEADSETUSB,
-		.nranges = 2,
+		.nranges = 1,
 		.range = (struct ab5500_reg_range[]) {
 			{
 				.first = 0x00,
-				.last = 0x48,
-				.perm = AB5500_PERM_RW,
-			},
-			{
-				.first = 0xEB,
-				.last = 0xFB,
+				.last = 0x47,
 				.perm = AB5500_PERM_RW,
 			},
 		},
 	},
 	[AB5500_BANK_SIM_USBSIM] = {
 		.bankid = AB5500_BANK_SIM_USBSIM,
-		.nranges = 1,
+		.nranges = 2,
 		.range = (struct ab5500_reg_range[]) {
 			{
 				.first = 0x13,
 				.last = 0x19,
+				.perm = AB5500_PERM_RW,
+			},
+			{
+				.first = 0x20,
+				.last = 0x20,
 				.perm = AB5500_PERM_RW,
 			},
 		},
@@ -1553,8 +1574,6 @@ static int ab5500_registers_print(struct seq_file *s, void *p)
 				err = seq_printf(s, "[%d/0x%02X]: 0x%02X\n",
 						bank, reg, value);
 				if (err < 0) {
-					dev_err(ab->dev,
-						"seq_printf overflow\n");
 					/*
 					 * Error is not returned here since
 					 * the output is wanted in any case
