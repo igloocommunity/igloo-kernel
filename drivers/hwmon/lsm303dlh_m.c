@@ -38,6 +38,7 @@
 
 #include <linux/lsm303dlh.h>
 #include <linux/regulator/consumer.h>
+#include <linux/earlysuspend.h>
 #include <linux/kernel.h>
 
 /* lsm303dlh magnetometer registers */
@@ -156,6 +157,7 @@ struct lsm303dlh_m_data {
 	unsigned char mode;
 	unsigned char rate;
 	unsigned char range;
+	struct early_suspend early_suspend;
 	int device_status;
 };
 

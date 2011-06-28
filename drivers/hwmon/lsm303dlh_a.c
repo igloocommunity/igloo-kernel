@@ -37,6 +37,7 @@
 #endif
 
 #include <linux/lsm303dlh.h>
+#include <linux/earlysuspend.h>
 #include <linux/regulator/consumer.h>
 
  /* lsm303dlh accelerometer registers */
@@ -197,6 +198,7 @@ struct lsm303dlh_a_data {
 	unsigned char interrupt_configure[2];
 	unsigned char interrupt_duration[2];
 	unsigned char interrupt_threshold[2];
+	struct early_suspend early_suspend;
 	int device_status;
 };
 
@@ -286,6 +288,7 @@ static int lsm303dlh_a_restore(struct lsm303dlh_a_data *ddata)
 
 	if (ddata->regulator)
 		regulator_enable(ddata->regulator);
+
 	/* BDU should be enabled by default/recommened */
 	reg = ddata->range;
 	reg |= LSM303DLH_A_CR4_BDU_MASK;
