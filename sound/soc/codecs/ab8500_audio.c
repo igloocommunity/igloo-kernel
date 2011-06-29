@@ -277,6 +277,9 @@ static inline int ab8500_codec_update_reg_audio(struct snd_soc_codec *codec,
 	return ab8500_codec_write_reg_audio(codec, reg, new);
 }
 
+static const char *enum_ena_dis[] = {"Enabled", "Disabled"};
+static const char *enum_dis_ena[] = {"Disabled", "Enabled"};
+
 /* Whether widget's register definitions should be inverted or not */
 enum control_inversion {
 	NORMAL = 0,
@@ -312,6 +315,16 @@ static const struct snd_kcontrol_new dapm_ihfr_mute[] = {
 	SOC_DAPM_SINGLE("Playback Switch", REG_DIGMULTCONF2,
 			REG_DIGMULTCONF2_DATOHFREN, 1, NORMAL),
 };
+
+/* Vibra 1 switch control */
+static const struct soc_enum enum_vibra1 = SOC_ENUM_SINGLE(0, 0, 2, enum_dis_ena);
+static const struct snd_kcontrol_new dapm_vibra1_mux =
+				SOC_DAPM_ENUM_VIRT("Vibra 1", enum_vibra1);
+
+/* Vibra 2 switch control */
+static const struct soc_enum enum_vibra2 = SOC_ENUM_SINGLE(0, 0, 2, enum_dis_ena);
+static const struct snd_kcontrol_new dapm_vibra2_mux =
+				SOC_DAPM_ENUM_VIRT("Vibra 2", enum_vibra2);
 
 /* Mic 1 mute control */
 static const struct snd_kcontrol_new dapm_mic1_mute[] = {
@@ -487,10 +500,8 @@ static const struct snd_kcontrol_new dapm_anc_in_select[] = {
 };
 
 /* ANC enable control */
-static const char *enum_anc_dis_ena[] = {"Disabled", "Enabled"};
-
 static SOC_ENUM_SINGLE_DECL(dapm_enum_anc_enable, REG_ANCCONF1,
-			REG_ANCCONF1_ENANC, enum_anc_dis_ena);
+			REG_ANCCONF1_ENANC, enum_dis_ena);
 
 static const struct snd_kcontrol_new dapm_anc_enable[] = {
 	SOC_DAPM_ENUM("ANC", dapm_enum_anc_enable),
@@ -630,7 +641,8 @@ static const struct snd_soc_dapm_widget ab8500_dapm_widgets[] = {
 
 	SND_SOC_DAPM_AIF_IN("DA_IN5", "ab8500_0p", 0, SND_SOC_NOPM, 0, 0),
 	SND_SOC_DAPM_AIF_IN("DA_IN6", "ab8500_0p", 0, SND_SOC_NOPM, 0, 0),
-
+	SND_SOC_DAPM_MUX("Vibra 1", SND_SOC_NOPM, 0, 0, &dapm_vibra1_mux),
+	SND_SOC_DAPM_MUX("Vibra 2", SND_SOC_NOPM, 0, 0, &dapm_vibra2_mux),
 	SND_SOC_DAPM_MIXER("DA5 Channel Gain", REG_DAPATHENA,
 			REG_DAPATHENA_ENDA5, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("DA6 Channel Gain", REG_DAPATHENA,
@@ -871,8 +883,11 @@ static const struct snd_soc_dapm_route intercon[] = {
 
 	/* Vibrator path */
 
-	{"DA5 Channel Gain", NULL, "DA_IN5"},
-	{"DA6 Channel Gain", NULL, "DA_IN6"},
+	{"Vibra 1", "Enabled", "DA_IN5"},
+	{"Vibra 2", "Enabled", "DA_IN6"},
+
+	{"DA5 Channel Gain", NULL, "Vibra 1"},
+	{"DA6 Channel Gain", NULL, "Vibra 2"},
 
 	{"VIB1 DAC", NULL, "DA5 Channel Gain"},
 	{"VIB2 DAC", NULL, "DA6 Channel Gain"},
@@ -1055,9 +1070,6 @@ static DECLARE_TLV_DB_SCALE(lin_gain_tlv, -1000, 200, 0);
 
 /* from -36 to 0 dB in 2 dB steps (mute instead of -38 dB) */
 static DECLARE_TLV_DB_SCALE(lin2hs_gain_tlv, -3800, 200, 1);
-
-static const char *enum_ena_dis[] = {"Enabled", "Disabled"};
-static const char *enum_dis_ena[] = {"Disabled", "Enabled"};
 
 static SOC_ENUM_SINGLE_DECL(soc_enum_hshpen,
 	REG_ANACONF1, REG_ANACONF1_HSHPEN, enum_dis_ena);
@@ -1867,8 +1879,6 @@ void ab8500_audio_pwm_vibra(unsigned char speed_left_pos,
 
 	vibra_on = speed_left_pos | speed_left_neg | speed_right_pos | speed_right_neg;
 	if (!vibra_on) {
-		clear_mask = BMASK(REG_ANACONF4_ENVIB1) | BMASK(REG_ANACONF4_ENVIB2);
-		ab8500_codec_update_reg_audio(ab8500_codec, REG_ANACONF4, clear_mask, 0x00);
 		speed_left_pos = 0;
 		speed_left_neg = 0;
 		speed_right_pos = 0;
@@ -1908,8 +1918,14 @@ void ab8500_audio_pwm_vibra(unsigned char speed_left_pos,
 		speed_right_neg = REG_PWMGENCONFX_PWMVIBXDUTCYC_MAX;
 	ab8500_codec_update_reg_audio(ab8500_codec, REG_PWMGENCONF4, REG_MASK_ALL, speed_right_neg);
 
-	set_mask = BMASK(REG_ANACONF4_ENVIB1) | BMASK(REG_ANACONF4_ENVIB2);
-	ab8500_codec_update_reg_audio(ab8500_codec, REG_ANACONF4, 0x00, set_mask);
+	if (vibra_on) {
+		clear_mask = 0;
+		set_mask = BMASK(REG_ANACONF4_ENVIB1) | BMASK(REG_ANACONF4_ENVIB2);
+	} else {
+		clear_mask = BMASK(REG_ANACONF4_ENVIB1) | BMASK(REG_ANACONF4_ENVIB2);
+		set_mask = 0;
+	};
+	ab8500_codec_update_reg_audio(ab8500_codec, REG_ANACONF4, clear_mask, set_mask);
 }
 
 int ab8500_audio_set_word_length(struct snd_soc_dai *dai, unsigned int wl)
