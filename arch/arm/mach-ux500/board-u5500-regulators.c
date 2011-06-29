@@ -16,9 +16,6 @@
  * AB5500
  */
 
-static struct regulator_consumer_supply ab5500_ldo_d_consumers[] = {
-};
-
 static struct regulator_consumer_supply ab5500_ldo_g_consumers[] = {
 	REGULATOR_SUPPLY("v-MMC-SD", "sdi1"),
 };
@@ -52,14 +49,6 @@ static struct regulator_consumer_supply ab5500_ldo_sim_consumers[] = {
 
 static struct regulator_init_data
 ab5500_regulator_init_data[AB5500_NUM_REGULATORS] = {
-	/* AB internal analog */
-	[AB5500_LDO_D] = {
-		.constraints = {
-			.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
-		},
-		.consumer_supplies	= ab5500_ldo_d_consumers,
-		.num_consumer_supplies	= ARRAY_SIZE(ab5500_ldo_d_consumers),
-	},
 	/* SD Card */
 	[AB5500_LDO_G] = {
 		.constraints = {

@@ -8,7 +8,6 @@
 #define __LINUX_REGULATOR_AB5500_H
 
 enum ab5500_regulator_id {
-	AB5500_LDO_D,
 	AB5500_LDO_G,
 	AB5500_LDO_H,
 	AB5500_LDO_K,
