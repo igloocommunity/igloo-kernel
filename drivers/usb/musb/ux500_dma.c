@@ -65,7 +65,7 @@ static void ux500_tx_work(struct work_struct *data)
 	struct musb *musb = hw_ep->musb;
 	unsigned long flags;
 
-	DBG(4, "DMA tx transfer done on hw_ep=%d\n", hw_ep->epnum);
+	pr_warning("DMA tx transfer done on hw_ep=%d\n", hw_ep->epnum);
 
 	spin_lock_irqsave(&musb->lock, flags);
 	ux500_channel->channel.actual_len = ux500_channel->cur_len;
@@ -84,7 +84,7 @@ static void ux500_rx_work(struct work_struct *data)
 	struct musb *musb = hw_ep->musb;
 	unsigned long flags;
 
-	DBG(4, "DMA rx transfer done on hw_ep=%d\n", hw_ep->epnum);
+	pr_warning("DMA rx transfer done on hw_ep=%d\n", hw_ep->epnum);
 
 	spin_lock_irqsave(&musb->lock, flags);
 	ux500_channel->channel.actual_len = ux500_channel->cur_len;
@@ -117,7 +117,7 @@ static bool ux500_configure_channel(struct dma_channel *channel,
 	dma_addr_t usb_fifo_addr = (MUSB_FIFO_OFFSET(hw_ep->epnum) +
 					ux500_channel->controller->phy_base);
 
-	DBG(4, "packet_sz=%d, mode=%d, dma_addr=0x%x, len=%d is_tx=%d\n",
+	pr_warning("packet_sz=%d, mode=%d, dma_addr=0x%x, len=%d is_tx=%d\n",
 			packet_sz, mode, dma_addr, len, ux500_channel->is_tx);
 
 	ux500_channel->cur_len = len;
@@ -192,7 +192,7 @@ static struct dma_channel *ux500_dma_channel_allocate(struct dma_controller *c,
 	ux500_channel->hw_ep = hw_ep;
 	ux500_channel->is_allocated = 1;
 
-	DBG(7, "hw_ep=%d, is_tx=0x%x, channel=%d\n",
+	pr_devel("hw_ep=%d, is_tx=0x%x, channel=%d\n",
 		hw_ep->epnum, is_tx, ch_num);
 
 	return &(ux500_channel->channel);
@@ -202,7 +202,7 @@ static void ux500_dma_channel_release(struct dma_channel *channel)
 {
 	struct ux500_dma_channel *ux500_channel = channel->private_data;
 
-	DBG(7, "channel=%d\n", ux500_channel->ch_num);
+	pr_devel("channel=%d\n", ux500_channel->ch_num);
 
 	if (ux500_channel->is_allocated) {
 		ux500_channel->is_allocated = 0;
@@ -252,7 +252,7 @@ static int ux500_dma_channel_abort(struct dma_channel *channel)
 	void __iomem *epio = musb->endpoints[ux500_channel->hw_ep->epnum].regs;
 	u16 csr;
 
-	DBG(4, "channel=%d, is_tx=%d\n", ux500_channel->ch_num,
+	pr_warning("channel=%d, is_tx=%d\n", ux500_channel->ch_num,
 						ux500_channel->is_tx);
 
 	if (channel->status == MUSB_DMA_STATUS_BUSY) {
