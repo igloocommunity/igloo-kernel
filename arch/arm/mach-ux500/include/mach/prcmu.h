@@ -9,9 +9,8 @@
 #define __MACH_PRCMU_H
 
 #include <linux/interrupt.h>
-//#include <mach/prcmu-qos.h>
+#include <linux/notifier.h>
 
-#if 0
 /* PRCMU Wakeup defines */
 enum prcmu_wakeup_index {
 	PRCMU_WAKEUP_INDEX_RTC,
@@ -26,15 +25,6 @@ enum prcmu_wakeup_index {
 	NUM_PRCMU_WAKEUP_INDICES
 };
 #define PRCMU_WAKEUP(_name) (BIT(PRCMU_WAKEUP_INDEX_##_name))
-
-/* Low power states */
-#define PRCMU_AP_NO_CHANGE 0x00
-#define PRCMU_AP_SLEEP 0x01
-#define PRCMU_AP_DEEP_SLEEP 0x04
-#define PRCMU_AP_IDLE 0x05
-#define PRCMU_AP_DEEP_IDLE 0x07
-/* Legacy names */
-#define APEXECUTE_TO_APSLEEP PRCMU_AP_SLEEP
 
 /* EPOD (power domain) IDs */
 
@@ -201,12 +191,8 @@ enum ddr_opp {
 	DDR_25_OPP = 0x02,
 };
 
-#endif
-
 #include <linux/mfd/db8500-prcmu.h>
 #include <linux/mfd/db5500-prcmu.h>
-
-#if 0
 
 #if defined(CONFIG_UX500_SOC_DB8500) || defined(CONFIG_UX500_SOC_DB5500)
 
@@ -351,6 +337,68 @@ static inline int prcmu_enable_dsipll(void)
 }
 
 #endif
+
+/* PRCMU QoS APE OPP class */
+#define PRCMU_QOS_APE_OPP 1
+#define PRCMU_QOS_DDR_OPP 2
+#define PRCMU_QOS_DEFAULT_VALUE -1
+
+#ifdef CONFIG_UX500_PRCMU_QOS_POWER
+
+unsigned long prcmu_qos_get_cpufreq_opp_delay(void);
+void prcmu_qos_set_cpufreq_opp_delay(unsigned long);
+void prcmu_qos_force_opp(int, s32);
+int prcmu_qos_requirement(int pm_qos_class);
+int prcmu_qos_add_requirement(int pm_qos_class, char *name, s32 value);
+int prcmu_qos_update_requirement(int pm_qos_class, char *name, s32 new_value);
+void prcmu_qos_remove_requirement(int pm_qos_class, char *name);
+int prcmu_qos_add_notifier(int prcmu_qos_class,
+			   struct notifier_block *notifier);
+int prcmu_qos_remove_notifier(int prcmu_qos_class,
+			      struct notifier_block *notifier);
+
+#else
+
+static inline unsigned long prcmu_qos_get_cpufreq_opp_delay(void)
+{
+	return 0;
+}
+
+static inline void prcmu_qos_set_cpufreq_opp_delay(unsigned long n) {}
+
+static inline void prcmu_qos_force_opp(int prcmu_qos_class, s32 i) {}
+
+static inline int prcmu_qos_requirement(int prcmu_qos_class)
+{
+	return 0;
+}
+
+static inline int prcmu_qos_add_requirement(int prcmu_qos_class,
+					    char *name, s32 value)
+{
+	return 0;
+}
+
+static inline int prcmu_qos_update_requirement(int prcmu_qos_class,
+					       char *name, s32 new_value)
+{
+	return 0;
+}
+
+static inline void prcmu_qos_remove_requirement(int prcmu_qos_class, char *name)
+{
+}
+
+static inline int prcmu_qos_add_notifier(int prcmu_qos_class,
+					 struct notifier_block *notifier)
+{
+	return 0;
+}
+static inline int prcmu_qos_remove_notifier(int prcmu_qos_class,
+					    struct notifier_block *notifier)
+{
+	return 0;
+}
 
 #endif
 
