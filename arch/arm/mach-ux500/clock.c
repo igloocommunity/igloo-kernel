@@ -7,6 +7,7 @@
  * published by the Free Software Foundation.
  */
 #include <linux/module.h>
+#include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/io.h>
 #include <linux/spinlock.h>
