@@ -28,13 +28,6 @@
  * SDI 0 (MicroSD slot)
  */
 
-/* MMCIPOWER bits */
-#define MCI_DATA2DIREN		(1 << 2)
-#define MCI_CMDDIREN		(1 << 3)
-#define MCI_DATA0DIREN		(1 << 4)
-#define MCI_DATA31DIREN		(1 << 5)
-#define MCI_FBCLKEN		(1 << 7)
-
 /* GPIO pins used by the sdi0 level shifter */
 static int sdi0_en = -1;
 static int sdi0_vsel = -1;
