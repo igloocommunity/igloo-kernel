@@ -53,7 +53,8 @@ out:
 	return ret;
 }
 
-#if 0
+/* FIXME: double definitions if U8500+U5500 enabled */
+#ifdef CONFIG_UX500_SOC_DB5500
 /*
  * Exported interface for CPUIdle only. This function is called when interrupts
  * are turned off. Hence, no locking.
@@ -160,6 +161,7 @@ void ux500_regulator_put(struct ux500_regulator *regulator)
 }
 EXPORT_SYMBOL_GPL(ux500_regulator_put);
 
+#ifdef CONFIG_UX500_SOC_DB5500
 static int u8500_regulator_enable(struct regulator_dev *rdev)
 {
 	struct u8500_regulator_info *info = rdev_get_drvdata(rdev);
@@ -403,3 +405,5 @@ ux500_regulator_remove(struct platform_device *pdev,
 
 	return 0;
 }
+
+#endif

@@ -15,8 +15,8 @@
 #include <linux/sched.h>
 #include <linux/tick.h>
 #include <linux/clockchips.h>
-
 #include <linux/gpio.h>
+#include <linux/regulator/db8500-prcmu.h>
 
 #include <mach/prcmu.h>
 
@@ -25,7 +25,6 @@
 #include "context.h"
 #include "pm.h"
 #include "timer.h"
-#include "../regulator-db8500.h"
 
 /*
  * All measurements are with two cpus online (worst case) and at

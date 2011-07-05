@@ -40,10 +40,6 @@ obj-$(CONFIG_U5500_MLOADER)	+= mloader-db5500.o
 obj-$(CONFIG_UX500_PRCMU_TIMER)	+= timer-prcmu.o
 obj-$(CONFIG_REGULATOR)			+= regulator-ux500.o
 
-ifeq ($(CONFIG_UX500_SOC_DB8500), y)
-obj-$(CONFIG_REGULATOR)			+= regulator-db8500.o
-endif
-
 ifeq ($(CONFIG_UX500_SOC_DB5500), y)
 obj-$(CONFIG_REGULATOR)			+= regulator-u5500.o
 endif
