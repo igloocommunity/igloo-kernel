@@ -4,7 +4,6 @@ config UX500_SOC_COMMON
 	bool
 	default y
 	select ARM_GIC
-	#EROBEMAselect HAS_MTU
 	select NOMADIK_GPIO
 	select ARM_ERRATA_753970
 	select SYS_SOC
@@ -22,6 +21,8 @@ config UX500_SOC_DB5500
 
 config UX500_SOC_DB8500
 	bool "DB8500"
+	select MFD_DB8500_PRCMU
+	select REGULATOR_DB8500_PRCMU
 	select UX500_SOC_DBX500
 
 endmenu
@@ -38,6 +39,7 @@ config MACH_U8500
 config MACH_HREFV60
        bool "U85000 Development platform, HREFv60 version"
        depends on UX500_SOC_DB8500
+	select MACH_U8500
        help
          Include support for the HREFv60 new development platform.
 
