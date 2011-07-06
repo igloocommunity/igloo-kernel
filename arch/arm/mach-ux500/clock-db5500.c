@@ -15,7 +15,7 @@
 #include <linux/mutex.h>
 #include <linux/debugfs.h>
 #include <linux/module.h>
-#include <linux/gpio.h>
+#include <linux/gpio/nomadik.h>
 #include <linux/mfd/ab8500/sysctrl.h>
 #include <linux/workqueue.h>
 #include <linux/regulator/consumer.h>
@@ -25,10 +25,10 @@
 
 #include <mach/hardware.h>
 #include <mach/prcmu.h>
+#include <mach/prcmu-regs.h>
 
 #include "clock.h"
 #include "pins-db5500.h"
-#include "prcmu-regs-db5500.h"
 
 static DEFINE_MUTEX(sysclk_mutex);
 static DEFINE_MUTEX(pll_mutex);
@@ -206,12 +206,12 @@ static pin_cfg_t clkout1_pins[] = {
 
 static int clkout0_enable(struct clk *clk)
 {
-	unsigned int val = readl(_PRCMU_BASE + PRCM_CLKOCR);
+	unsigned int val = readl(PRCM_CLKOCR);
 
 	val &= ~PRCM_CLKOCR_CLKOUT0_MASK;
 	val |= PRCM_CLKOCR_CLKOUT0_REF_CLK;
 
-	writel(val, _PRCMU_BASE + PRCM_CLKOCR);
+	writel(val, PRCM_CLKOCR);
 
 	return nmk_config_pins(clkout0_pins, ARRAY_SIZE(clkout0_pins));
 }
@@ -229,12 +229,12 @@ static void clkout0_disable(struct clk *clk)
 
 static int clkout1_enable(struct clk *clk)
 {
-	unsigned int val = readl(_PRCMU_BASE + PRCM_CLKOCR);
+	unsigned int val = readl(PRCM_CLKOCR);
 
 	val &= ~PRCM_CLKOCR_CLKOUT1_MASK;
 	val |= PRCM_CLKOCR_CLKOUT1_REF_CLK;
 
-	writel(val, _PRCMU_BASE + PRCM_CLKOCR);
+	writel(val, PRCM_CLKOCR);
 
 	return nmk_config_pins(clkout1_pins, ARRAY_SIZE(clkout0_pins));
 }
