@@ -24,7 +24,7 @@
 #include <mach/irqs.h>
 #include <mach/prcmu.h>
 #include <mach/db5500-regs.h>
-#include "db5500-prcmu-regs.h"
+#include <mach/prcmu-regs.h>
 
 #define _PRCM_MB_HEADER (tcdm_base + 0xFE8)
 #define PRCM_REQ_MB0_HEADER (_PRCM_MB_HEADER + 0x0)
@@ -245,7 +245,7 @@ static int request_timclk(bool enable)
 
 	if (!enable)
 		val |= PRCM_TCR_STOP_TIMERS;
-	writel(val, (_PRCMU_BASE + PRCM_TCR));
+	writel(val, PRCM_TCR);
 
 	return 0;
 }
@@ -260,7 +260,7 @@ static int request_reg_clock(u8 clock, bool enable)
 	spin_lock_irqsave(&clk_mgt_lock, flags);
 
 	/* Grab the HW semaphore. */
-	while ((readl(_PRCMU_BASE + PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
+	while ((readl(PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
 		cpu_relax();
 
 	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
@@ -273,7 +273,7 @@ static int request_reg_clock(u8 clock, bool enable)
 	writel(val, (_PRCMU_BASE + clk_mgt[clock].offset));
 
 	/* Release the HW semaphore. */
-	writel(0, (_PRCMU_BASE + PRCM_SEM));
+	writel(0, PRCM_SEM);
 
 	spin_unlock_irqrestore(&clk_mgt_lock, flags);
 
@@ -295,7 +295,7 @@ static int request_pll(u8 pll, bool enable)
 	BUG_ON(pll >= DB5500_NUM_PLL_ID);
 	mutex_lock(&mb2_transfer.lock);
 
-	while (readl(PRCM_MBOX_CPU_VAL & MBOX_BIT(2))
+	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(2))
 		cpu_relax();
 
 	mb2_transfer.req.pll_states[pll] = enable;
@@ -325,7 +325,7 @@ unlock_and_return:
 	return r;
 }
 
-void prcmu_enable_wakeups(u32 wakeups)
+void db5500_prcmu_enable_wakeups(u32 wakeups)
 {
 }
 
@@ -337,7 +337,7 @@ void prcmu_enable_wakeups(u32 wakeups)
  * This function should only be used by the clock implementation.
  * Do not use it from any other place!
  */
-int prcmu_request_clock(u8 clock, bool enable)
+int db5500_prcmu_request_clock(u8 clock, bool enable)
 {
 	if (clock < PRCMU_NUM_REG_CLOCKS)
 		return request_reg_clock(clock, enable);
@@ -439,10 +439,7 @@ int db5500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
 
 int prcmu_resetout(u8 resoutn, u8 state)
 {
-	int offset;
 	int pin = -1;
-
-	offset = state > 0 ? PRCM_RESOUTN_SET_OFFSET : PRCM_RESOUTN_CLR_OFFSET;
 
 	switch (resoutn) {
 	case 0:
@@ -458,7 +455,7 @@ int prcmu_resetout(u8 resoutn, u8 state)
 	}
 
 	if (pin > 0)
-		writel(pin, _PRCMU_BASE + offset);
+		writel(pin, state > 0 ? PRCM_RESOUTN_SET : PRCM_RESOUTN_CLR);
 	else
 		return -EINVAL;
 
@@ -529,7 +526,7 @@ static void ack_dbb_wakeup(void)
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
 }
 
-int prcmu_set_epod(u16 epod_id, u8 epod_state)
+int db5500_prcmu_set_epod(u16 epod_id, u8 epod_state)
 {
 	int r = 0;
 	bool ram_retention = false;
@@ -616,13 +613,13 @@ static bool read_mailbox_0(void)
 		r = false;
 		break;
 	}
-	writel(MBOX_BIT(0), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(0), PRCM_ARM_IT1_CLR);
 	return r;
 }
 
 static bool read_mailbox_1(void)
 {
-	writel(MBOX_BIT(1), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(1), PRCM_ARM_IT1_CLR);
 	return false;
 }
 
@@ -643,25 +640,25 @@ static bool read_mailbox_2(void)
 		mb2_transfer.ack.status = readb(PRCM_ACK_MB2_PLL_STATUS);
 		break;
 	default:
-		writel(MBOX_BIT(2), PRCM_ARM_IT1_CLEAR);
+		writel(MBOX_BIT(2), PRCM_ARM_IT1_CLR);
 		pr_err("prcmu: Wrong ACK received for MB2 request \n");
 		return false;
 		break;
 	}
-	writel(MBOX_BIT(2), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(2), PRCM_ARM_IT1_CLR);
 	complete(&mb2_transfer.work);
 	return false;
 }
 
 static bool read_mailbox_3(void)
 {
-	writel(MBOX_BIT(3), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(3), PRCM_ARM_IT1_CLR);
 	return false;
 }
 
 static bool read_mailbox_4(void)
 {
-	writel(MBOX_BIT(4), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(4), PRCM_ARM_IT1_CLR);
 	return false;
 }
 
@@ -682,19 +679,19 @@ static bool read_mailbox_5(void)
 		print_unknown_header_warning(5, header);
 		break;
 	}
-	writel(MBOX_BIT(5), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(5), PRCM_ARM_IT1_CLR);
 	return false;
 }
 
 static bool read_mailbox_6(void)
 {
-	writel(MBOX_BIT(6), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(6), PRCM_ARM_IT1_CLR);
 	return false;
 }
 
 static bool read_mailbox_7(void)
 {
-	writel(MBOX_BIT(7), PRCM_ARM_IT1_CLEAR);
+	writel(MBOX_BIT(7), PRCM_ARM_IT1_CLR);
 	return false;
 }
 
@@ -758,7 +755,7 @@ int __init db5500_prcmu_init(void)
 		return -ENODEV;
 
 	/* Clean up the mailbox interrupts after pre-kernel code. */
-	writel(ALL_MBOX_BITS, PRCM_ARM_IT1_CLEAR);
+	writel(ALL_MBOX_BITS, PRCM_ARM_IT1_CLR);
 
 	r = request_threaded_irq(IRQ_DB5500_PRCMU1, prcmu_irq_handler,
 		prcmu_irq_thread_fn, 0, "prcmu", NULL);

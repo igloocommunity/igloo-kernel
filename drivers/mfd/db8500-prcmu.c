@@ -754,7 +754,7 @@ unlock_and_return:
 	return r;
 }
 
-int prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll)
+int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll)
 {
 	unsigned long flags;
 
@@ -811,7 +811,7 @@ static void config_wakeups(void)
 	last_abb_events = abb_events;
 }
 
-void prcmu_enable_wakeups(u32 wakeups)
+void db8500_prcmu_enable_wakeups(u32 wakeups)
 {
 	unsigned long flags;
 	u32 bits;
@@ -1198,14 +1198,14 @@ out:
 EXPORT_SYMBOL(prcmu_set_hwacc);
 
 /**
- * prcmu_set_epod - set the state of a EPOD (power domain)
+ * db8500_prcmu_set_epod - set the state of a EPOD (power domain)
  * @epod_id: The EPOD to set
  * @epod_state: The new EPOD state
  *
  * This function sets the state of a EPOD (power domain). It may not be called
  * from interrupt context.
  */
-int prcmu_set_epod(u16 epod_id, u8 epod_state)
+int db8500_prcmu_set_epod(u16 epod_id, u8 epod_state)
 {
 	int r = 0;
 	bool ram_retention = false;
@@ -1415,14 +1415,14 @@ static int request_sga_clock(u8 clock, bool enable)
 }
 
 /**
- * prcmu_request_clock() - Request for a clock to be enabled or disabled.
+ * db8500_prcmu_request_clock() - Request for a clock to be enabled or disabled.
  * @clock:      The clock for which the request is made.
  * @enable:     Whether the clock should be enabled (true) or disabled (false).
  *
  * This function should only be used by the clock implementation.
  * Do not use it from any other place!
  */
-int prcmu_request_clock(u8 clock, bool enable)
+int db8500_prcmu_request_clock(u8 clock, bool enable)
 {
 	if (clock == PRCMU_SGACLK)
 		return request_sga_clock(clock, enable);
@@ -1719,12 +1719,12 @@ bool prcmu_is_ac_wake_requested(void)
 }
 
 /**
- * prcmu_system_reset - System reset
+ * db8500_prcmu_system_reset - System reset
  *
  * Saves the reset reason code and then sets the APE_SOFTRST register which
  * fires interrupt to fw
  */
-void prcmu_system_reset(u16 reset_code)
+void db8500_prcmu_system_reset(u16 reset_code)
 {
 	writew(reset_code, (tcdm_base + PRCM_SW_RST_REASON));
 	writel(1, PRCM_APE_SOFTRST);
