@@ -17,10 +17,11 @@
 
 #define BITS(_start, _end) ((BIT(_end) - BIT(_start)) + BIT(_end))
 
+#define PRCM_SVACLK_MGT_OFF		0x008
+#define PRCM_SIACLK_MGT_OFF		0x00C
 #define PRCM_SGACLK_MGT_OFF		0x014
 #define PRCM_UARTCLK_MGT_OFF		0x018
 #define PRCM_MSP02CLK_MGT_OFF		0x01C
-#define PRCM_MSP1CLK_MGT_OFF		0x288
 #define PRCM_I2CCLK_MGT_OFF		0x020
 #define PRCM_SDMMCCLK_MGT_OFF		0x024
 #define PRCM_SLIMCLK_MGT_OFF		0x028
@@ -30,6 +31,9 @@
 #define PRCM_PER5CLK_MGT_OFF		0x038
 #define PRCM_PER6CLK_MGT_OFF		0x03C
 #define PRCM_PER7CLK_MGT_OFF		0x040
+#define PRCM_PWMCLK_MGT_OFF		0x044 /* for DB5500 */
+#define PRCM_IRDACLK_MGT_OFF		0x048 /* for DB5500 */
+#define PRCM_IRRCCLK_MGT_OFF		0x04C /* for DB5500 */
 #define PRCM_LCDCLK_MGT_OFF		0x044
 #define PRCM_BMLCLK_MGT_OFF		0x04C
 #define PRCM_HSITXCLK_MGT_OFF		0x050
@@ -47,6 +51,7 @@
 #define PRCM_SSPCLK_MGT_OFF		0x280
 #define PRCM_RNGCLK_MGT_OFF		0x284
 #define PRCM_UICCCLK_MGT_OFF		0x27C
+#define PRCM_MSP1CLK_MGT_OFF		0x288
 
 #define PRCM_ARM_PLLDIVPS	(_PRCMU_BASE + 0x118)
 #define PRCM_ARM_PLLDIVPS_ARM_BRM_RATE		0x3f
@@ -134,7 +139,12 @@
 #define PRCM_PLLDSI_LOCKP          (_PRCMU_BASE + 0x508)
 #define PRCM_APE_RESETN_SET        (_PRCMU_BASE + 0x1E4)
 #define PRCM_APE_RESETN_CLR        (_PRCMU_BASE + 0x1E8)
+
 #define PRCM_CLKOCR		   (_PRCMU_BASE + 0x1CC)
+#define PRCM_CLKOCR_CLKOUT0_REF_CLK	(1 << 0)
+#define PRCM_CLKOCR_CLKOUT0_MASK	BITS(0, 13)
+#define PRCM_CLKOCR_CLKOUT1_REF_CLK	(1 << 16)
+#define PRCM_CLKOCR_CLKOUT1_MASK	BITS(16, 29)
 
 /* ePOD and memory power signal control registers */
 #define PRCM_EPOD_C_SET            (_PRCMU_BASE + 0x410)
@@ -178,5 +188,9 @@
 #define PRCM_DDR_SUBSYS_APE_MINBW	(_PRCMU_BASE + 0x438)
 #define PRCM_CGATING_BYPASS		(_PRCMU_BASE + 0x134)
 #define PRCM_CGATING_BYPASS_ICN2	BIT(6)
+
+/* Miscellaneous unit registers */
+#define PRCM_RESOUTN_SET		(_PRCMU_BASE + 0x214)
+#define PRCM_RESOUTN_CLR		(_PRCMU_BASE + 0x218)
 
 #endif /* __MACH_PRCMU__REGS_H */

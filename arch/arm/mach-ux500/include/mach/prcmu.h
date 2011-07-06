@@ -10,6 +10,7 @@
 
 #include <linux/interrupt.h>
 #include <linux/notifier.h>
+#include <asm/mach-types.h>
 
 /* PRCMU Wakeup defines */
 enum prcmu_wakeup_index {
@@ -198,11 +199,33 @@ enum ddr_opp {
 
 void __init prcmu_early_init(void);
 
-int prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll);
+static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+		bool keep_ap_pll)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_set_power_state(state, keep_ulp_clk,
+			keep_ap_pll);
+	else
+		return db8500_prcmu_set_power_state(state, keep_ulp_clk,
+			keep_ap_pll);
+}
 
-int prcmu_set_epod(u16 epod_id, u8 epod_state);
+static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_set_epod(epod_id, epod_state);
+	else
+		return db8500_prcmu_set_epod(epod_id, epod_state);
+}
 
-void prcmu_enable_wakeups(u32 wakeups);
+static inline void prcmu_enable_wakeups(u32 wakeups)
+{
+	if (machine_is_u5500())
+		db5500_prcmu_enable_wakeups(wakeups);
+	else
+		db8500_prcmu_enable_wakeups(wakeups);
+}
+
 static inline void prcmu_disable_wakeups(void)
 {
 	prcmu_enable_wakeups(0);
@@ -213,7 +236,13 @@ int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
 
 int prcmu_config_clkout(u8 clkout, u8 source, u8 div);
 
-int prcmu_request_clock(u8 clock, bool enable);
+static inline int prcmu_request_clock(u8 clock, bool enable)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_request_clock(clock, enable);
+	else
+		return db8500_prcmu_request_clock(clock, enable);
+}
 
 int prcmu_set_ape_opp(u8 opp);
 int prcmu_get_ape_opp(void);
@@ -222,7 +251,14 @@ int prcmu_get_arm_opp(void);
 int prcmu_set_ddr_opp(u8 opp);
 int prcmu_get_ddr_opp(void);
 
-void prcmu_system_reset(u16 reset_code);
+static inline void prcmu_system_reset(u16 reset_code)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_system_reset(reset_code);
+	else
+		return db8500_prcmu_system_reset(reset_code);
+}
+
 u16 prcmu_get_reset_code(void);
 
 void prcmu_ac_wake_req(void);

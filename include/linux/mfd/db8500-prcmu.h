@@ -527,8 +527,6 @@ static inline void __init prcmu_early_init(void) {}
 int prcmu_set_rc_a2p(enum romcode_write);
 enum romcode_read prcmu_get_rc_p2a(void);
 enum ap_pwrst prcmu_get_xp70_current_state(void);
-int prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll);
-void prcmu_enable_wakeups(u32 wakeups);
 void prcmu_config_abb_event_readout(u32 abb_events);
 void prcmu_get_abb_event_buffer(void __iomem **buf);
 int prcmu_set_arm_opp(u8 opp);
@@ -545,13 +543,11 @@ unsigned long prcmu_qos_get_cpufreq_opp_delay(void);
 void prcmu_qos_set_cpufreq_opp_delay(unsigned long);
 /* NOTE! Use regulator framework instead */
 int prcmu_set_hwacc(u16 hw_acc_dev, u8 state);
-int prcmu_set_epod(u16 epod_id, u8 epod_state);
 void prcmu_configure_auto_pm(struct prcmu_auto_pm_config *sleep,
 	struct prcmu_auto_pm_config *idle);
 bool prcmu_is_auto_pm_enabled(void);
 
 int prcmu_config_clkout(u8 clkout, u8 source, u8 div);
-int prcmu_request_clock(u8 clock, bool enable);
 int prcmu_set_clock_divider(u8 clock, u8 divider);
 int prcmu_config_esram0_deep_sleep(u8 state);
 int prcmu_config_hotdog(u8 threshold);
@@ -563,11 +559,16 @@ int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
 
 void prcmu_ac_wake_req(void);
 void prcmu_ac_sleep_req(void);
-void prcmu_system_reset(u16 reset_code);
 void prcmu_modem_reset(void);
 bool prcmu_is_ac_wake_requested(void);
 void prcmu_enable_spi2(void);
 void prcmu_disable_spi2(void);
+
+void db8500_prcmu_system_reset(u16 reset_code);
+int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll);
+void db8500_prcmu_enable_wakeups(u32 wakeups);
+int db8500_prcmu_set_epod(u16 epod_id, u8 epod_state);
+int db8500_prcmu_request_clock(u8 clock, bool enable);
 
 #else /* !CONFIG_MFD_DB8500_PRCMU */
 
@@ -585,14 +586,6 @@ static inline enum ap_pwrst prcmu_get_xp70_current_state(void)
 {
 	return AP_EXECUTE;
 }
-
-static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
-	bool keep_ap_pll)
-{
-	return 0;
-}
-
-static inline void prcmu_enable_wakeups(u32 wakeups) {}
 
 static inline void prcmu_disable_wakeups(void) {}
 
@@ -675,11 +668,6 @@ static inline int prcmu_config_clkout(u8 clkout, u8 source, u8 div)
 	return 0;
 }
 
-static inline int prcmu_request_clock(u8 clock, bool enable)
-{
-	return 0;
-}
-
 static inline int prcmu_set_clock_divider(u8 clock, u8 divider)
 {
 	return 0;
@@ -724,8 +712,6 @@ static inline void prcmu_ac_wake_req(void) {}
 
 static inline void prcmu_ac_sleep_req(void) {}
 
-static inline void prcmu_system_reset(u16 reset_code) {}
-
 static inline void prcmu_modem_reset(void) {}
 
 static inline bool prcmu_is_ac_wake_requested(void)
@@ -756,6 +742,26 @@ static inline int prcmu_enable_spi2(void)
 }
 
 static inline int prcmu_disable_spi2(void)
+{
+	return 0;
+}
+
+static inline void db8500_prcmu_system_reset(u16 reset_code) {}
+
+static inline int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+	bool keep_ap_pll)
+{
+	return 0;
+}
+
+static inline void db8500_prcmu_enable_wakeups(u32 wakeups) {}
+
+static inline int db8500_prcmu_set_epod(u16 epod_id, u8 epod_state)
+{
+	return 0;
+}
+
+static inline int db8500_prcmu_request_clock(u8 clock, bool enable)
 {
 	return 0;
 }
