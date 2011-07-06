@@ -1006,7 +1006,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
 	.init_machine	= mop500_init_machine,
 MACHINE_END
 
-MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+MACHINE_START(SNOWBALL, "ST-Ericsson Snowball platform")
 	.boot_params	= 0x100,
 	.map_io		= u8500_map_io,
 	.init_irq	= ux500_init_irq,
