@@ -9,8 +9,8 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/ab5500.h>
+#include <linux/regulator/db5500-prcmu.h>
 
-#include "regulator-u5500.h"
 #include "board-u5500.h"
 
 /*
