@@ -155,7 +155,7 @@ exit:
 	nmk_gpio_wakeups_resume();
 	ux500_suspend_dbg_remove_wake_on_uart();
 
-	return 0;
+	return ret;
 }
 
 static int ux500_suspend_enter(suspend_state_t state)
@@ -168,7 +168,8 @@ static int ux500_suspend_enter(suspend_state_t state)
 		if (ux500_suspend_sleep_enabled())
 			return suspend(false);
 		/* For debugging, if Sleep and DeepSleep disabled, do Idle */
-		prcmu_set_power_state(PRCMU_AP_IDLE, true, true);
+		if (!cpu_is_u5500())
+			prcmu_set_power_state(PRCMU_AP_IDLE, true, true);
 	}
 
 	dsb();

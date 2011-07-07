@@ -11,6 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/err.h>
 #include <linux/regulator/driver.h>
+#include <linux/regulator/dbx500-prcmu.h>
 
 /*
  * power state reference count
