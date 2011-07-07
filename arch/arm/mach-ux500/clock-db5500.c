@@ -36,59 +36,16 @@ static DEFINE_MUTEX(ab_ulpclk_mutex);
 static DEFINE_MUTEX(audioclk_mutex);
 
 /* SysClk operations. */
-
-static int request_sysclk(bool enable)
-{
-	static int requests;
-
-	if ((enable && (requests++ == 0)) || (!enable && (--requests == 0)))
-		return prcmu_request_clock(PRCMU_SYSCLK, enable);
-	return 0;
-}
-
 static int sysclk_enable(struct clk *clk)
 {
-	static bool swat_enable;
-	int r;
-
-	if (!swat_enable) {
-		r = ab8500_sysctrl_set(AB8500_SWATCTRL,
-			AB8500_SWATCTRL_SWATENABLE);
-		if (r)
-			return r;
-
-		swat_enable = true;
-	}
-
-	r = request_sysclk(true);
-	if (r)
-		return r;
-
-	if (clk->cg_sel) {
-		r = ab8500_sysctrl_set(AB8500_SYSULPCLKCTRL1, (u8)clk->cg_sel);
-		if (r)
-			(void)request_sysclk(false);
-	}
-	return r;
+	return prcmu_request_clock(PRCMU_SYSCLK, true);
 }
 
 static void sysclk_disable(struct clk *clk)
 {
-	int r;
 
-	if (clk->cg_sel) {
-		r = ab8500_sysctrl_clear(AB8500_SYSULPCLKCTRL1,
-			(u8)clk->cg_sel);
-		if (r)
-			goto disable_failed;
-	}
-	r = request_sysclk(false);
-	if (r)
-		goto disable_failed;
+	prcmu_request_clock(PRCMU_SYSCLK, false);
 	return;
-
-disable_failed:
-	pr_err("clock: failed to disable %s.\n", clk->name);
 }
 
 static struct clkops sysclk_ops = {
@@ -321,27 +278,6 @@ static struct clk sysclk = {
 	.name = "sysclk",
 	.ops = &sysclk_ops,
 	.rate = 26000000,
-	.mutex = &sysclk_mutex,
-};
-
-static struct clk sysclk2 = {
-	.name = "sysclk2",
-	.ops = &sysclk_ops,
-	.cg_sel = AB8500_SYSULPCLKCTRL1_SYSCLKBUF2REQ,
-	.mutex = &sysclk_mutex,
-};
-
-static struct clk sysclk3 = {
-	.name = "sysclk3",
-	.ops = &sysclk_ops,
-	.cg_sel = AB8500_SYSULPCLKCTRL1_SYSCLKBUF3REQ,
-	.mutex = &sysclk_mutex,
-};
-
-static struct clk sysclk4 = {
-	.name = "sysclk4",
-	.ops = &sysclk_ops,
-	.cg_sel = AB8500_SYSULPCLKCTRL1_SYSCLKBUF4REQ,
 	.mutex = &sysclk_mutex,
 };
 
@@ -633,7 +569,6 @@ static struct clk *db5500_dbg_clks[] __initdata = {
 	&p6_pclk7,
 
 	/* Clock sources */
-	&sysclk2,
 	&clkout0,
 	&clkout1,
 	&rtc_clk1,
@@ -653,12 +588,6 @@ static struct clk_lookup u8500_common_clock_sources[] = {
 	CLK_LOOKUP(sysclk, "ab8500-codec.0", "sysclk"),
 	CLK_LOOKUP(ab_ulpclk, "ab8500-codec.0", "ulpclk"),
 	CLK_LOOKUP(audioclk, "ab8500-codec.0", "audioclk"),
-};
-
-static struct clk_lookup u8500_v2_sysclks[] = {
-	CLK_LOOKUP(sysclk2, NULL, "sysclk2"),
-	CLK_LOOKUP(sysclk3, NULL, "sysclk3"),
-	CLK_LOOKUP(sysclk4, NULL, "sysclk4"),
 };
 
 static struct clk_lookup db5500_prcmu_clocks[] = {
@@ -793,9 +722,6 @@ static void __init db5500_boot_clk_enable(void)
 
 int __init db5500_clk_init(void)
 {
-	sysclk_ops.enable = NULL;
-	sysclk_ops.disable = NULL;
-
 	if (ux500_is_svp()) {
 		prcmu_clk_ops.enable = NULL;
 		prcmu_clk_ops.disable = NULL;
@@ -812,11 +738,6 @@ int __init db5500_clk_init(void)
 	clks_register(db5500_prcc_clocks, ARRAY_SIZE(db5500_prcc_clocks));
 	clks_register(db5500_clkouts, ARRAY_SIZE(db5500_clkouts));
 	clks_register(u5500_clocks, ARRAY_SIZE(u5500_clocks));
-
-	if (cpu_is_u8500v2()) {
-		clks_register(u8500_v2_sysclks,
-			ARRAY_SIZE(u8500_v2_sysclks));
-	}
 
 	db5500_boot_clk_enable();
 

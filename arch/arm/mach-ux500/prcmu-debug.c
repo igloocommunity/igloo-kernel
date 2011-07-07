@@ -285,24 +285,19 @@ static ssize_t opp_write(struct file *file,
 				   const char __user *user_buf,
 			 size_t count, loff_t *ppos, int prcmu_qos_class)
 {
-	char buf[32];
-	ssize_t buf_size;
-	long unsigned int i;
+	long unsigned i;
+	int err;
 
-	/* Get userspace string and assure termination */
-	buf_size = min(count, (sizeof(buf)-1));
-	if (copy_from_user(buf, user_buf, buf_size))
-		return -EFAULT;
-	buf[buf_size] = 0;
+	err = kstrtoul_from_user(user_buf, count, 0, &i);
 
-	if (strict_strtoul(buf, 0, &i) != 0)
-		return buf_size;
+	if (err)
+		return err;
 
 	prcmu_qos_force_opp(prcmu_qos_class, i);
 
 	pr_info("prcmu debug: forced OPP for %d to %d\n", prcmu_qos_class, (int)i);
 
-	return buf_size;
+	return count;
 }
 
 static ssize_t ddr_opp_write(struct file *file,
@@ -335,20 +330,13 @@ static ssize_t ape_voltage_write(struct file *file,
 				   const char __user *user_buf,
 				   size_t count, loff_t *ppos)
 {
-
-	char buf[32];
-	ssize_t buf_size;
-	long unsigned int i;
+	long unsigned i;
 	int err;
 
-	/* Get userspace string and assure termination */
-	buf_size = min(count, (sizeof(buf)-1));
-	if (copy_from_user(buf, user_buf, buf_size))
-		return -EFAULT;
-	buf[buf_size] = 0;
+	err = kstrtoul_from_user(user_buf, count, 0, &i);
 
-	if (strict_strtoul(buf, 0, &i) != 0)
-		return buf_size;
+	if (err)
+		return err;
 
 	switch (i) {
 	case 0:
@@ -372,33 +360,27 @@ static ssize_t ape_voltage_write(struct file *file,
 	default:
 		pr_info("prcmu debug: value not equal to 0 or 1\n");
 	}
-	return buf_size;
+	return count;
 }
 
 static ssize_t cpufreq_delay_write(struct file *file,
 				   const char __user *user_buf,
 				   size_t count, loff_t *ppos)
 {
+	int err;
+	long unsigned i;
 
-	char buf[32];
-	ssize_t buf_size;
-	long unsigned int i;
+	err = kstrtoul_from_user(user_buf, count, 0, &i);
 
-	/* Get userspace string and assure termination */
-	buf_size = min(count, (sizeof(buf)-1));
-	if (copy_from_user(buf, user_buf, buf_size))
-		return -EFAULT;
-	buf[buf_size] = 0;
-
-	if (strict_strtoul(buf, 0, &i) != 0)
-		return buf_size;
+	if (err)
+		return err;
 
 	prcmu_qos_set_cpufreq_opp_delay(i);
 
 	pr_info("prcmu debug: changed delay between cpufreq change and QoS "
 		 "requirement to %lu.\n", i);
 
-	return buf_size;
+	return count;
 }
 
 static int arm_opp_open_file(struct inode *inode, struct file *file)

@@ -102,22 +102,28 @@ static struct regulator_ops db5500_regulator_ops = {
 static bool epod_on[NUM_EPOD_ID];
 static bool epod_ramret[NUM_EPOD_ID];
 
+static inline int epod_id_to_index(u16 epod_id)
+{
+	return epod_id - DB5500_EPOD_ID_BASE;
+}
+
 static int enable_epod(u16 epod_id, bool ramret)
 {
+	int idx = epod_id_to_index(epod_id);
 	int ret;
 
 	if (ramret) {
-		if (!epod_on[epod_id]) {
+		if (!epod_on[idx]) {
 			ret = prcmu_set_epod(epod_id, EPOD_STATE_RAMRET);
 			if (ret < 0)
 				return ret;
 		}
-		epod_ramret[epod_id] = true;
+		epod_ramret[idx] = true;
 	} else {
 		ret = prcmu_set_epod(epod_id, EPOD_STATE_ON);
 		if (ret < 0)
 			return ret;
-		epod_on[epod_id] = true;
+		epod_on[idx] = true;
 	}
 
 	return 0;
@@ -125,17 +131,18 @@ static int enable_epod(u16 epod_id, bool ramret)
 
 static int disable_epod(u16 epod_id, bool ramret)
 {
+	int idx = epod_id_to_index(epod_id);
 	int ret;
 
 	if (ramret) {
-		if (!epod_on[epod_id]) {
+		if (!epod_on[idx]) {
 			ret = prcmu_set_epod(epod_id, EPOD_STATE_OFF);
 			if (ret < 0)
 				return ret;
 		}
-		epod_ramret[epod_id] = false;
+		epod_ramret[idx] = false;
 	} else {
-		if (epod_ramret[epod_id]) {
+		if (epod_ramret[idx]) {
 			ret = prcmu_set_epod(epod_id, EPOD_STATE_RAMRET);
 			if (ret < 0)
 				return ret;
@@ -144,7 +151,7 @@ static int disable_epod(u16 epod_id, bool ramret)
 			if (ret < 0)
 				return ret;
 		}
-		epod_on[epod_id] = false;
+		epod_on[idx] = false;
 	}
 
 	return 0;
@@ -224,11 +231,11 @@ static struct regulator_ops db5500_regulator_switch_ops = {
 /*
  * Regulator information
  */
-#define U5500_REGULATOR_SWITCH(_name, reg)                               \
-	[U5500_REGULATOR_SWITCH_##reg] = {                               \
+#define DB5500_REGULATOR_SWITCH(_name, reg)                               \
+	[DB5500_REGULATOR_SWITCH_##reg] = {                               \
 		.desc = {                                               \
 			.name   = _name,                                \
-			.id     = U5500_REGULATOR_SWITCH_##reg,          \
+			.id     = DB5500_REGULATOR_SWITCH_##reg,          \
 			.ops    = &db5500_regulator_switch_ops,          \
 			.type   = REGULATOR_VOLTAGE,                    \
 			.owner  = THIS_MODULE,                          \
@@ -237,21 +244,21 @@ static struct regulator_ops db5500_regulator_switch_ops = {
 }
 
 static struct db5500_regulator_info
-		db5500_regulator_info[U5500_NUM_REGULATORS] = {
-	[U5500_REGULATOR_VAPE] = {
+		db5500_regulator_info[DB5500_NUM_REGULATORS] = {
+	[DB5500_REGULATOR_VAPE] = {
 		.desc = {
 			.name	= "db5500-vape",
-			.id	= U5500_REGULATOR_VAPE,
+			.id	= DB5500_REGULATOR_VAPE,
 			.ops	= &db5500_regulator_ops,
 			.type	= REGULATOR_VOLTAGE,
 			.owner	= THIS_MODULE,
 		},
 	},
-	U5500_REGULATOR_SWITCH("u5500-sga", SGA),
-	U5500_REGULATOR_SWITCH("u5500-hva", HVA),
-	U5500_REGULATOR_SWITCH("u5500-sia", SIA),
-	U5500_REGULATOR_SWITCH("u5500-disp", DISP),
-	U5500_REGULATOR_SWITCH("u5500-esram12", ESRAM12),
+	DB5500_REGULATOR_SWITCH("db5500-sga", SGA),
+	DB5500_REGULATOR_SWITCH("db5500-hva", HVA),
+	DB5500_REGULATOR_SWITCH("db5500-sia", SIA),
+	DB5500_REGULATOR_SWITCH("db5500-disp", DISP),
+	DB5500_REGULATOR_SWITCH("db5500-esram12", ESRAM12),
 };
 
 static int __devinit db5500_regulator_probe(struct platform_device *pdev)
