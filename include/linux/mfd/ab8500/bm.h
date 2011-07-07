@@ -394,6 +394,8 @@ struct ab8500_bm_charger_parameters {
  * @temp_low		between this temp and temp_under charging is reduced
  * @temp_high		between this temp and temp_over charging is reduced
  * @temp_over		over this temp, charging is stopped
+ * @temp_interval_chg	temperature measurement interval in s when charging
+ * @temp_interval_nochg	temperature measurement interval in s when not charging
  * @main_safety_tmr_h	safety timer for main charger
  * @usb_safety_tmr_h	safety timer for usb charger
  * @bkup_bat_v		voltage which we charge the backup battery with
@@ -419,6 +421,8 @@ struct ab8500_bm_data {
 	int temp_low;
 	int temp_high;
 	int temp_over;
+	int temp_interval_chg;
+	int temp_interval_nochg;
 	int main_safety_tmr_h;
 	int usb_safety_tmr_h;
 	int bkup_bat_v;

@@ -510,6 +510,7 @@ static int ab8500_btemp_id(struct ab8500_btemp *di)
  */
 static void ab8500_btemp_periodic_work(struct work_struct *work)
 {
+	int interval;
 	struct ab8500_btemp *di = container_of(work,
 		struct ab8500_btemp, btemp_periodic_work.work);
 
@@ -520,10 +521,15 @@ static void ab8500_btemp_periodic_work(struct work_struct *work)
 		power_supply_changed(&di->btemp_psy);
 	}
 
+	if (di->events.ac_conn || di->events.usb_conn)
+		interval = di->bat->temp_interval_chg;
+	else
+		interval = di->bat->temp_interval_nochg;
+
 	/* Schedule a new measurement */
 	queue_delayed_work(di->btemp_wq,
 		&di->btemp_periodic_work,
-		round_jiffies(20 * HZ));
+		round_jiffies(interval * HZ));
 }
 
 /**
@@ -656,11 +662,14 @@ static void ab8500_btemp_periodic(struct ab8500_btemp *di,
 {
 	dev_dbg(di->dev, "Enable periodic temperature measurements: %d\n",
 		enable);
+	/*
+	 * Make sure a new measurement is done directly by cancelling
+	 * any pending work
+	 */
+	cancel_delayed_work_sync(&di->btemp_periodic_work);
 
 	if (enable)
 		queue_delayed_work(di->btemp_wq, &di->btemp_periodic_work, 0);
-	else
-		cancel_delayed_work_sync(&di->btemp_periodic_work);
 }
 
 /**
@@ -795,9 +804,6 @@ static int ab8500_btemp_get_ext_psy_data(struct device *dev, void *data)
 				/* AC disconnected */
 				if (!ret.intval && di->events.ac_conn) {
 					di->events.ac_conn = false;
-					if (!di->events.usb_conn)
-						ab8500_btemp_periodic(di,
-							false);
 				}
 				/* AC connected */
 				else if (ret.intval && !di->events.ac_conn) {
@@ -810,9 +816,6 @@ static int ab8500_btemp_get_ext_psy_data(struct device *dev, void *data)
 				/* USB disconnected */
 				if (!ret.intval && di->events.usb_conn) {
 					di->events.usb_conn = false;
-					if (!di->events.ac_conn)
-						ab8500_btemp_periodic(di,
-							false);
 				}
 				/* USB connected */
 				else if (ret.intval && !di->events.usb_conn) {
@@ -863,8 +866,7 @@ static int ab8500_btemp_resume(struct platform_device *pdev)
 {
 	struct ab8500_btemp *di = platform_get_drvdata(pdev);
 
-	if (di->events.ac_conn || di->events.usb_conn)
-		ab8500_btemp_periodic(di, true);
+	ab8500_btemp_periodic(di, true);
 
 	return 0;
 }
@@ -874,8 +876,7 @@ static int ab8500_btemp_suspend(struct platform_device *pdev,
 {
 	struct ab8500_btemp *di = platform_get_drvdata(pdev);
 
-	if (di->events.ac_conn || di->events.usb_conn)
-		ab8500_btemp_periodic(di, false);
+	ab8500_btemp_periodic(di, false);
 
 	return 0;
 }
@@ -1004,9 +1005,6 @@ static int __devinit ab8500_btemp_probe(struct platform_device *pdev)
 		break;
 	}
 
-	/* Measure temperature once initially */
-	di->bat_temp = ab8500_btemp_measure_temp(di);
-
 	/* Register BTEMP power supply class */
 	ret = power_supply_register(di->dev, &di->btemp_psy);
 	if (ret) {
@@ -1031,6 +1029,9 @@ static int __devinit ab8500_btemp_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, di);
+
+	/* Kick off periodic temperature measurements */
+	ab8500_btemp_periodic(di, true);
 
 	return ret;
 
