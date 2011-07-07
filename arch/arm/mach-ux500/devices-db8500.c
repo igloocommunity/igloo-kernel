@@ -316,7 +316,7 @@ struct platform_device ux500_prcmu_wdt_device = {
 
 #define STE_HSI_PORT0_TX_CHANNEL_CFG(n) { \
        .dir = STEDMA40_MEM_TO_PERIPH, \
-       .high_priority = false, \
+       .high_priority = true, \
        .mode = STEDMA40_MODE_LOGICAL, \
        .mode_opt = STEDMA40_LCHAN_SRC_LOG_DST_LOG, \
        .src_dev_type = STEDMA40_DEV_SRC_MEMORY, \
@@ -329,7 +329,7 @@ struct platform_device ux500_prcmu_wdt_device = {
 
 #define STE_HSI_PORT0_RX_CHANNEL_CFG(n) { \
        .dir = STEDMA40_PERIPH_TO_MEM, \
-       .high_priority = false, \
+       .high_priority = true, \
        .mode = STEDMA40_MODE_LOGICAL, \
        .mode_opt = STEDMA40_LCHAN_SRC_LOG_DST_LOG, \
        .src_dev_type = n,\
