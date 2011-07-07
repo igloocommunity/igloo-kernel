@@ -28,7 +28,8 @@
 #include <linux/spinlock.h>
 #include <linux/mfd/core.h>
 #include <linux/version.h>
-#include <linux/mfd/db5500-prcmu.h>
+#include <linux/io.h>
+#include <mach/prcmu.h>
 
 #define AB5500_NAME_STRING "ab5500"
 #define AB5500_ID_FORMAT_STRING "AB5500 %s"
@@ -48,7 +49,7 @@
 #define AB5500_MASK_BASE (0x60)
 #define AB5500_MASK_END (0x79)
 #define AB5500_CHIP_ID (0x20)
-
+#define AB5500_INTERRUPTS 0x007FFFFF
 /**
  * struct ab5500_bank
  * @slave_addr: I2C slave_addr found in AB5500 specification
@@ -1072,17 +1073,6 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 };
 
 /*
- * This stubbed prcmu functionality should be removed when the prcmu driver
- * implements it.
- */
-static u8 prcmu_event_buf[AB5500_NUM_EVENT_REG];
-
-void prcmu_get_abb_event_buf(u8 **buf)
-{
-	*buf = prcmu_event_buf;
-}
-
-/*
  * Functionality for getting/setting register values.
  */
 static int get_register_interruptible(struct ab5500 *ab, u8 bank, u8 reg,
@@ -1355,19 +1345,20 @@ static irqreturn_t ab5500_irq(int irq, void *data)
 {
 	struct ab5500 *ab = data;
 	u8 i;
+	u8 *pvalue;
+	u8 value;
 
-	/*
-	 * TODO: use the ITMASTER registers to reduce the number of i2c reads.
-	 */
-
+	prcmu_get_abb_event_buffer((void **)&pvalue);
+	if (unlikely(pvalue == NULL)) {
+		dev_err(ab->dev, "PRCMU not enabled!!!\n");
+		goto error_irq;
+	}
 	for (i = 0; i < AB5500_NUM_EVENT_REG; i++) {
-		int status;
-		u8 value;
-
-		status = get_register_interruptible(ab, AB5500_BANK_IT,
-				AB5500_IT_LATCH0_REG + i, &value);
-		if (status < 0 || value == 0)
+		value = readb(pvalue);
+		if (value == 0) {
+			pvalue++;
 			continue;
+		}
 
 		do {
 			int bit = __ffs(value);
@@ -1376,9 +1367,12 @@ static irqreturn_t ab5500_irq(int irq, void *data)
 			handle_nested_irq(ab->irq_base + line);
 			value &= ~(1 << bit);
 		} while (value);
+		pvalue++;
 	}
 
 	return IRQ_HANDLED;
+error_irq:
+	return IRQ_NONE;
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -2416,7 +2410,7 @@ static int __init ab5500_probe(struct platform_device *pdev)
 			goto exit_remove_irq;
 
 	}
-
+	prcmu_config_abb_event_readout(AB5500_INTERRUPTS);
 	/* This real unpredictable IRQ is of course sampled for entropy */
 	rand_initialize_irq(res->start);
 

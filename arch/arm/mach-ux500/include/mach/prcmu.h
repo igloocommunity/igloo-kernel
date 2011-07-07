@@ -23,6 +23,7 @@ enum prcmu_wakeup_index {
 	PRCMU_WAKEUP_INDEX_ABB,
 	PRCMU_WAKEUP_INDEX_ABB_FIFO,
 	PRCMU_WAKEUP_INDEX_ARM,
+	PRCMU_WAKEUP_INDEX_CD_IRQ,
 	NUM_PRCMU_WAKEUP_INDICES
 };
 #define PRCMU_WAKEUP(_name) (BIT(PRCMU_WAKEUP_INDEX_##_name))
@@ -192,12 +193,38 @@ enum ddr_opp {
 	DDR_25_OPP = 0x02,
 };
 
+/*
+ * Definitions for controlling ESRAM0 in deep sleep.
+ */
+#define ESRAM0_DEEP_SLEEP_STATE_OFF 1
+#define ESRAM0_DEEP_SLEEP_STATE_RET 2
+
+/**
+ * enum ddr_pwrst - DDR power states definition
+ * @DDR_PWR_STATE_UNCHANGED: SDRAM and DDR controller state is unchanged
+ * @DDR_PWR_STATE_ON:
+ * @DDR_PWR_STATE_OFFLOWLAT:
+ * @DDR_PWR_STATE_OFFHIGHLAT:
+ */
+enum ddr_pwrst {
+	DDR_PWR_STATE_UNCHANGED     = 0x00,
+	DDR_PWR_STATE_ON            = 0x01,
+	DDR_PWR_STATE_OFFLOWLAT     = 0x02,
+	DDR_PWR_STATE_OFFHIGHLAT    = 0x03
+};
+
 #include <linux/mfd/db8500-prcmu.h>
 #include <linux/mfd/db5500-prcmu.h>
 
 #if defined(CONFIG_UX500_SOC_DB8500) || defined(CONFIG_UX500_SOC_DB5500)
 
-void __init prcmu_early_init(void);
+static inline void __init prcmu_early_init(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_early_init();
+	else
+		return db8500_prcmu_early_init();
+}
 
 static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 		bool keep_ap_pll)
@@ -231,6 +258,22 @@ static inline void prcmu_disable_wakeups(void)
 	prcmu_enable_wakeups(0);
 }
 
+static inline void prcmu_config_abb_event_readout(u32 abb_events)
+{
+	if (machine_is_u5500())
+		db5500_prcmu_config_abb_event_readout(abb_events);
+	else
+		db8500_prcmu_config_abb_event_readout(abb_events);
+}
+
+static inline void prcmu_get_abb_event_buffer(void __iomem **buf)
+{
+	if (machine_is_u5500())
+		db5500_prcmu_get_abb_event_buffer(buf);
+	else
+		db8500_prcmu_get_abb_event_buffer(buf);
+}
+
 int prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size);
 int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
 
@@ -246,10 +289,24 @@ static inline int prcmu_request_clock(u8 clock, bool enable)
 
 int prcmu_set_ape_opp(u8 opp);
 int prcmu_get_ape_opp(void);
-int prcmu_set_arm_opp(u8 opp);
-int prcmu_get_arm_opp(void);
 int prcmu_set_ddr_opp(u8 opp);
 int prcmu_get_ddr_opp(void);
+
+static inline int prcmu_set_arm_opp(u8 opp)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_set_arm_opp(opp);
+	else
+		return db8500_prcmu_set_arm_opp(opp);
+}
+
+static inline int prcmu_get_arm_opp(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_get_arm_opp();
+	else
+		return db8500_prcmu_get_arm_opp();
+}
 
 static inline void prcmu_system_reset(u16 reset_code)
 {
@@ -259,17 +316,56 @@ static inline void prcmu_system_reset(u16 reset_code)
 		return db8500_prcmu_system_reset(reset_code);
 }
 
-u16 prcmu_get_reset_code(void);
+static inline u16 prcmu_get_reset_code(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_get_reset_code();
+	else
+		return db8500_prcmu_get_reset_code();
+}
 
 void prcmu_ac_wake_req(void);
 void prcmu_ac_sleep_req(void);
 void prcmu_modem_reset(void);
-bool prcmu_is_ac_wake_requested(void);
+static inline bool prcmu_is_ac_wake_requested(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_is_ac_wake_requested();
+	else
+		return db8500_prcmu_is_ac_wake_requested();
+}
 
-int prcmu_set_display_clocks(void);
-int prcmu_disable_dsipll(void);
-int prcmu_enable_dsipll(void);
+static inline int prcmu_set_display_clocks(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_set_display_clocks();
+	else
+		return db8500_prcmu_set_display_clocks();
+}
 
+static inline int prcmu_disable_dsipll(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_disable_dsipll();
+	else
+		return db8500_prcmu_disable_dsipll();
+}
+
+static inline int prcmu_enable_dsipll(void)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_enable_dsipll();
+	else
+		return db8500_prcmu_enable_dsipll();
+}
+
+static inline int prcmu_config_esram0_deep_sleep(u8 state)
+{
+	if (machine_is_u5500())
+		return db5500_prcmu_config_esram0_deep_sleep(state);
+	else
+		return db8500_prcmu_config_esram0_deep_sleep(state);
+}
 #else
 
 static inline void __init prcmu_early_init(void) {}
@@ -370,6 +466,18 @@ static inline int prcmu_disable_dsipll(void)
 static inline int prcmu_enable_dsipll(void)
 {
 	return 0;
+}
+
+static inline int prcmu_config_esram0_deep_sleep(u8 state)
+{
+	return 0;
+}
+
+static inline void prcmu_config_abb_event_readout(u32 abb_events) {}
+
+static inline void prcmu_get_abb_event_buffer(void __iomem **buf)
+{
+	*buf = NULL;
 }
 
 #endif

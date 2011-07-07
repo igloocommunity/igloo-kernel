@@ -185,6 +185,11 @@
 #define MB4H_HOTDOG	0x12
 #define MB4H_HOTMON	0x13
 #define MB4H_HOT_PERIOD	0x14
+#define MB4H_A9WDOG_CONF 0x16
+#define MB4H_A9WDOG_EN   0x17
+#define MB4H_A9WDOG_DIS  0x18
+#define MB4H_A9WDOG_LOAD 0x19
+#define MB4H_A9WDOG_KICK 0x20
 
 /* Mailbox 4 Requests */
 #define PRCM_REQ_MB4_DDR_ST_AP_SLEEP_IDLE	(PRCM_REQ_MB4 + 0x0)
@@ -197,6 +202,13 @@
 #define PRCM_REQ_MB4_HOT_PERIOD			(PRCM_REQ_MB4 + 0x0)
 #define HOTMON_CONFIG_LOW			BIT(0)
 #define HOTMON_CONFIG_HIGH			BIT(1)
+#define PRCM_REQ_MB4_A9WDOG_0			(PRCM_REQ_MB4 + 0x0)
+#define PRCM_REQ_MB4_A9WDOG_1			(PRCM_REQ_MB4 + 0x1)
+#define PRCM_REQ_MB4_A9WDOG_2			(PRCM_REQ_MB4 + 0x2)
+#define PRCM_REQ_MB4_A9WDOG_3			(PRCM_REQ_MB4 + 0x3)
+#define A9WDOG_AUTO_OFF_EN			BIT(7)
+#define A9WDOG_AUTO_OFF_DIS			0
+#define A9WDOG_ID_MASK				0xf
 
 /* Mailbox 5 Requests */
 #define PRCM_REQ_MB5_I2C_SLAVE_OP	(PRCM_REQ_MB5 + 0x0)
@@ -527,7 +539,7 @@ static struct {
 } prcmu_version;
 
 
-int prcmu_enable_dsipll(void)
+int db8500_prcmu_enable_dsipll(void)
 {
 	int i;
 	unsigned int plldsifreq;
@@ -562,7 +574,7 @@ int prcmu_enable_dsipll(void)
 	return 0;
 }
 
-int prcmu_disable_dsipll(void)
+int db8500_prcmu_disable_dsipll(void)
 {
 	/* Disable dsi pll */
 	writel(PRCMU_DISABLE_PLLDSI, PRCM_PLLDSI_ENABLE);
@@ -571,7 +583,7 @@ int prcmu_disable_dsipll(void)
 	return 0;
 }
 
-int prcmu_set_display_clocks(void)
+int db8500_prcmu_set_display_clocks(void)
 {
 	unsigned long flags;
 	unsigned int dsiclk;
@@ -832,7 +844,7 @@ void db8500_prcmu_enable_wakeups(u32 wakeups)
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
 }
 
-void prcmu_config_abb_event_readout(u32 abb_events)
+void db8500_prcmu_config_abb_event_readout(u32 abb_events)
 {
 	unsigned long flags;
 
@@ -844,7 +856,7 @@ void prcmu_config_abb_event_readout(u32 abb_events)
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
 }
 
-void prcmu_get_abb_event_buffer(void __iomem **buf)
+void db8500_prcmu_get_abb_event_buffer(void __iomem **buf)
 {
 	if (readb(tcdm_base + PRCM_ACK_MB0_READ_POINTER) & 1)
 		*buf = (tcdm_base + PRCM_ACK_MB0_WAKEUP_1_4500);
@@ -853,13 +865,13 @@ void prcmu_get_abb_event_buffer(void __iomem **buf)
 }
 
 /**
- * prcmu_set_arm_opp - set the appropriate ARM OPP
+ * db8500_prcmu_set_arm_opp - set the appropriate ARM OPP
  * @opp: The new ARM operating point to which transition is to be made
  * Returns: 0 on success, non-zero on failure
  *
  * This function sets the the operating point of the ARM.
  */
-int prcmu_set_arm_opp(u8 opp)
+int db8500_prcmu_set_arm_opp(u8 opp)
 {
 	int r;
 
@@ -890,11 +902,11 @@ int prcmu_set_arm_opp(u8 opp)
 }
 
 /**
- * prcmu_get_arm_opp - get the current ARM OPP
+ * db8500_prcmu_get_arm_opp - get the current ARM OPP
  *
  * Returns: the current ARM OPP
  */
-int prcmu_get_arm_opp(void)
+int db8500_prcmu_get_arm_opp(void)
 {
 	return readb(tcdm_base + PRCM_ACK_MB1_CURRENT_ARM_OPP);
 }
@@ -1438,7 +1450,7 @@ int db8500_prcmu_request_clock(u8 clock, bool enable)
 		return -EINVAL;
 }
 
-int prcmu_config_esram0_deep_sleep(u8 state)
+int db8500_prcmu_config_esram0_deep_sleep(u8 state)
 {
 	if ((state > ESRAM0_DEEP_SLEEP_STATE_RET) ||
 	    (state < ESRAM0_DEEP_SLEEP_STATE_OFF))
@@ -1532,6 +1544,78 @@ int prcmu_start_temp_sense(u16 cycles32k)
 int prcmu_stop_temp_sense(void)
 {
 	return config_hot_period(0xFFFF);
+}
+
+static int prcmu_a9wdog(u8 cmd, u8 d0, u8 d1, u8 d2, u8 d3)
+{
+
+	mutex_lock(&mb4_transfer.lock);
+
+	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(4))
+		cpu_relax();
+
+	writeb(d0, (tcdm_base + PRCM_REQ_MB4_A9WDOG_0));
+	writeb(d1, (tcdm_base + PRCM_REQ_MB4_A9WDOG_1));
+	writeb(d2, (tcdm_base + PRCM_REQ_MB4_A9WDOG_2));
+	writeb(d3, (tcdm_base + PRCM_REQ_MB4_A9WDOG_3));
+
+	writeb(cmd, (tcdm_base + PRCM_MBOX_HEADER_REQ_MB4));
+
+	writel(MBOX_BIT(4), PRCM_MBOX_CPU_SET);
+	wait_for_completion(&mb4_transfer.work);
+
+	mutex_unlock(&mb4_transfer.lock);
+
+	return 0;
+
+}
+
+int prcmu_config_a9wdog(u8 num, bool sleep_auto_off)
+{
+	BUG_ON(num == 0 || num > 0xf);
+	return prcmu_a9wdog(MB4H_A9WDOG_CONF, num, 0, 0,
+			    sleep_auto_off ? A9WDOG_AUTO_OFF_EN :
+			    A9WDOG_AUTO_OFF_DIS);
+}
+
+int prcmu_enable_a9wdog(u8 id)
+{
+	return prcmu_a9wdog(MB4H_A9WDOG_EN, id, 0, 0, 0);
+}
+
+int prcmu_disable_a9wdog(u8 id)
+{
+	return prcmu_a9wdog(MB4H_A9WDOG_DIS, id, 0, 0, 0);
+}
+
+int prcmu_kick_a9wdog(u8 id)
+{
+	return prcmu_a9wdog(MB4H_A9WDOG_KICK, id, 0, 0, 0);
+}
+
+/*
+ * timeout is 28 bit, in ms.
+ */
+#define MAX_WATCHDOG_TIMEOUT 131000
+int prcmu_load_a9wdog(u8 id, u32 timeout)
+{
+	if (timeout > MAX_WATCHDOG_TIMEOUT)
+		/*
+		 * Due to calculation bug in prcmu fw, timeouts
+		 * can't be bigger than 131 seconds.
+		 */
+		return -EINVAL;
+
+	return prcmu_a9wdog(MB4H_A9WDOG_LOAD,
+			    (id & A9WDOG_ID_MASK) |
+			    /*
+			     * Put the lowest 28 bits of timeout at
+			     * offset 4. Four first bits are used for id.
+			     */
+			    (u8)((timeout << 4) & 0xf0),
+			    (u8)((timeout >> 4) & 0xff),
+			    (u8)((timeout >> 12) & 0xff),
+			    (u8)((timeout >> 20) & 0xff));
 }
 
 /**
@@ -1664,6 +1748,7 @@ int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
 void prcmu_ac_wake_req(void)
 {
 	u32 val;
+	u32 status;
 
 	mutex_lock(&mb0_transfer.ac_wake_lock);
 
@@ -1673,11 +1758,34 @@ void prcmu_ac_wake_req(void)
 
 	atomic_set(&ac_wake_req_state, 1);
 
+retry:
 	writel((val | PRCM_HOSTACCESS_REQ_HOSTACCESS_REQ), PRCM_HOSTACCESS_REQ);
 
 	if (!wait_for_completion_timeout(&mb0_transfer.ac_wake_work,
-			msecs_to_jiffies(20000))) {
-		pr_err("prcmu: %s timed out (20 s) waiting for a reply.\n",
+			msecs_to_jiffies(5000))) {
+		panic("prcmu: %s timed out (5 s) waiting for a reply.\n",
+			__func__);
+		goto unlock_and_return;
+	}
+
+	/*
+	 * The modem can generate an AC_WAKE_ACK, and then still go to sleep.
+	 * As a workaround, we wait, and then check that the modem is indeed
+	 * awake (in terms of the value of the PRCM_MOD_AWAKE_STATUS
+	 * register, which may not be the whole truth).
+	 */
+	udelay(400);
+	status = (readl(PRCM_MOD_AWAKE_STATUS) & BITS(0, 2));
+	if (status != (PRCM_MOD_AWAKE_STATUS_PRCM_MOD_AAPD_AWAKE |
+			PRCM_MOD_AWAKE_STATUS_PRCM_MOD_COREPD_AWAKE)) {
+		pr_err("prcmu: %s received ack, but modem not awake (0x%X).\n",
+			__func__, status);
+		udelay(1200);
+		writel(val, PRCM_HOSTACCESS_REQ);
+		if (wait_for_completion_timeout(&mb0_transfer.ac_wake_work,
+				msecs_to_jiffies(5000)))
+			goto retry;
+		panic("prcmu: %s timed out (5 s) waiting for AC_SLEEP_ACK.\n",
 			__func__);
 	}
 
@@ -1702,8 +1810,8 @@ void prcmu_ac_sleep_req()
 		PRCM_HOSTACCESS_REQ);
 
 	if (!wait_for_completion_timeout(&mb0_transfer.ac_wake_work,
-			msecs_to_jiffies(20000))) {
-		pr_err("prcmu: %s timed out (20 s) waiting for a reply.\n",
+			msecs_to_jiffies(5000))) {
+		panic("prcmu: %s timed out (5 s) waiting for a reply.\n",
 			__func__);
 	}
 
@@ -1713,7 +1821,7 @@ unlock_and_return:
 	mutex_unlock(&mb0_transfer.ac_wake_lock);
 }
 
-bool prcmu_is_ac_wake_requested(void)
+bool db8500_prcmu_is_ac_wake_requested(void)
 {
 	return (atomic_read(&ac_wake_req_state) != 0);
 }
@@ -1731,12 +1839,12 @@ void db8500_prcmu_system_reset(u16 reset_code)
 }
 
 /**
- * prcmu_get_reset_code - Retrieve SW reset reason code
+ * db8500_prcmu_get_reset_code - Retrieve SW reset reason code
  *
  * Retrieves the reset reason code stored by prcmu_system_reset() before
  * last restart.
  */
-u16 prcmu_get_reset_code(void)
+u16 db8500_prcmu_get_reset_code(void)
 {
 	return readw(tcdm_base + PRCM_SW_RST_REASON);
 }
@@ -1861,6 +1969,11 @@ static bool read_mailbox_4(void)
 	case MB4H_HOTDOG:
 	case MB4H_HOTMON:
 	case MB4H_HOT_PERIOD:
+	case MB4H_A9WDOG_CONF:
+	case MB4H_A9WDOG_EN:
+	case MB4H_A9WDOG_DIS:
+	case MB4H_A9WDOG_LOAD:
+	case MB4H_A9WDOG_KICK:
 		break;
 	default:
 		print_unknown_header_warning(4, header);
@@ -1986,7 +2099,7 @@ static struct irq_chip prcmu_irq_chip = {
 	.irq_unmask	= prcmu_irq_unmask,
 };
 
-void __init prcmu_early_init(void)
+void __init db8500_prcmu_early_init(void)
 {
 	unsigned int i;
 
