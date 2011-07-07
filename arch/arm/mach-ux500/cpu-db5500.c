@@ -46,7 +46,6 @@ static struct map_desc u5500_io_desc[] __initdata = {
 	__IO_DEV_DESC(U5500_GPIO4_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_PRCMU_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_PRCMU_TCDM_BASE, SZ_4K),
-
 	__IO_DEV_DESC(U5500_CLKRST1_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_CLKRST2_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_CLKRST3_BASE, SZ_4K),
@@ -231,7 +230,7 @@ void __init u5500_init_devices(void)
 {
 #ifdef CONFIG_STM_TRACE
 	/* Early init for STM tracing */
-	platform_device_register(&ux500_stm_device);
+	/* platform_device_register(&u5500_stm_device); */
 #endif
 	db5500_add_gpios();
 	db5500_dma_init();
