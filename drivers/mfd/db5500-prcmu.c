@@ -1048,7 +1048,20 @@ bailout:
  */
 int db5500_prcmu_get_arm_opp(void)
 {
-	return readb(PRCM_ACK_MB1_CURRENT_ARM_OPP);
+	u8 opp = readb(PRCM_ACK_MB1_CURRENT_ARM_OPP);
+
+	switch (opp) {
+	case DB5500_ARM_EXT_OPP:
+		return ARM_EXTCLK;
+	case DB5500_ARM_50_OPP:
+		return ARM_50_OPP;
+	case DB5500_ARM_100_OPP:
+		return ARM_100_OPP;
+	default:
+		pr_err("prcmu: %s() read unknown opp value: %d\n",
+				__func__, opp);
+		return ARM_100_OPP;
+	}
 }
 
 int prcmu_resetout(u8 resoutn, u8 state)
