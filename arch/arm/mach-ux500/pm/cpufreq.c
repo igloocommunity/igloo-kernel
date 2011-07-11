@@ -15,6 +15,8 @@
 #include <mach/prcmu.h>
 #include <mach/prcmu-regs.h>
 
+#include "cpufreq-dbx500.h"
+
 static struct cpufreq_frequency_table *freq_table;
 static enum arm_opp *idx2opp;
 
@@ -76,6 +78,15 @@ static unsigned int ux500_cpufreq_getspeed(unsigned int cpu)
 	for (i = 0; prcmu_get_arm_opp() != idx2opp[i]; i++)
 		;
 	return freq_table[i].frequency;
+}
+
+int ux500_cpufreq_limits(int cpu, int r, unsigned int *min, unsigned int *max)
+{
+	if (cpu_is_u5500())
+		return u5500_cpufreq_limits(cpu, r, min, max);
+	if (cpu_is_u8500())
+		return u8500_cpufreq_limits(cpu, r, min, max);
+	return -EINVAL;
 }
 
 static int __cpuinit ux500_cpufreq_init(struct cpufreq_policy *policy)

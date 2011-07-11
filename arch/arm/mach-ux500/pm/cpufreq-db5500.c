@@ -36,6 +36,23 @@ static enum arm_opp idx2opp[] = {
 	ARM_100_OPP,
 };
 
+int u5500_cpufreq_limits(int cpu, int r, unsigned int *min, unsigned int *max)
+{
+	struct cpufreq_policy p;
+	int ret;
+
+	ret = cpufreq_get_policy(&p, cpu);
+	if (ret) {
+		pr_err("cpufreq-db8500: Failed to get policy.\n");
+		return -EINVAL;
+	}
+
+	(*max) = p.max;
+	(*min) = p.min;
+
+	return 0;
+}
+
 static int __init u5500_cpufreq_register(void)
 {
 	int i = 0;
