@@ -51,6 +51,7 @@ static enum arm_opp idx2opp[] = {
 #include <linux/cpu.h>
 
 #include <mach/irqs.h>
+#include <mach/prcmu-qos.h>
 
 #define WLAN_PROBE_DELAY 3000 /* 3 seconds */
 #define WLAN_LIMIT (3000/3) /* If we have more than 1000 irqs per second */
@@ -116,6 +117,64 @@ void cpufreq_usb_connect_notify(bool connect)
 		cancel_delayed_work_sync(&work_usb_workaround);
 		usb_mode_on = false;
 	}
+}
+
+int u8500_cpufreq_limits(int cpu, int r, unsigned int *min, unsigned int *max)
+{
+	int op;
+	int i;
+	int ret;
+	static int old_freq;
+	struct cpufreq_policy p;
+
+	switch (r) {
+	case 0:
+		/* Fall through */
+	case 25:
+		op = ARM_EXTCLK;
+		break;
+	case 50:
+		op = ARM_50_OPP;
+		break;
+	case 100:
+		op = ARM_100_OPP;
+		break;
+	case 125:
+		if (prcmu_has_arm_maxopp())
+			op = ARM_MAX_OPP;
+		else
+			op = ARM_100_OPP;
+		break;
+	default:
+		pr_err("cpufreq-db8500: Incorrect arm target value (%d).\n",
+		       r);
+		BUG();
+		break;
+	}
+
+
+	for (i = 0; idx2opp[i] != op; i++)
+		;
+
+	if (freq_table[i].frequency == CPUFREQ_TABLE_END) {
+		pr_err("cpufreq-u8500: Minimum frequency does not exist!\n");
+		BUG();
+	}
+
+	if (freq_table[i].frequency != old_freq)
+		pr_debug("cpufreq-db8500: set min arm freq to %d\n",
+			 freq_table[i].frequency);
+
+	(*min) = freq_table[i].frequency;
+
+	ret = cpufreq_get_policy(&p, cpu);
+	if (ret) {
+		pr_err("cpufreq-db8500: Failed to get policy.\n");
+		return -EINVAL;
+	}
+
+	(*max) = p.max;
+	return 0;
 }
 
 static int __init u8500_cpufreq_register(void)
