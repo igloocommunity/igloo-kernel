@@ -154,7 +154,7 @@ static struct usb_configuration android_config_driver = {
 	.unbind		= android_unbind_config,
 	.bConfigurationValue = 1,
 	.bmAttributes	= USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
-	.bMaxPower	= 0xFA, /* 500ma */
+	.bMaxPower	= CONFIG_USB_GADGET_VBUS_DRAW / 2,
 };
 
 static void android_work(struct work_struct *data)
@@ -996,6 +996,19 @@ static int android_bind(struct usb_composite_dev *cdev)
 	strings_dev[STRING_SERIAL_IDX].id = id;
 	device_desc.iSerialNumber = id;
 
+	/*
+	 * As per USB compliance update, a device that is actively drawing
+	 * more than 100mA from USB must report itself as bus-powered in
+	 * the GetStatus(DEVICE) call.
+	 */
+	if (android_config_driver.bMaxPower <=
+			(USB_SELF_POWER_VBUS_MAX_DRAW / 2)) {
+		android_config_driver.bmAttributes =
+			USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER;
+		usb_gadget_set_selfpowered(gadget);
+	} else
+		android_config_driver.bmAttributes = USB_CONFIG_ATT_ONE;
+
 	gcnum = usb_gadget_controller_number(gadget);
 	if (gcnum >= 0)
 		device_desc.bcdDevice = cpu_to_le16(0x0200 + gcnum);
@@ -1012,7 +1025,6 @@ static int android_bind(struct usb_composite_dev *cdev)
 		device_desc.bcdDevice = __constant_cpu_to_le16(0x9999);
 	}
 
-	usb_gadget_set_selfpowered(gadget);
 	dev->cdev = cdev;
 
 	return 0;
