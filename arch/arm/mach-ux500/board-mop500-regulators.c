@@ -98,6 +98,7 @@ static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
 	REGULATOR_SUPPLY("v-ab8500-AV-switch", "mcde_tv_ab8500.2"),
 #endif
 #ifdef CONFIG_DISPLAY_AV8100_TERTIARY
+	REGULATOR_SUPPLY("v-av8100-AV-switch", "av8100_hdmi.0"),
 	REGULATOR_SUPPLY("v-av8100-AV-switch", "av8100_hdmi.1"),
 #endif
 	REGULATOR_SUPPLY_DEBUG("aux2", "reg-virt-consumer.1")
