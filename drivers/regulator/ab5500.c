@@ -20,10 +20,6 @@
 
 #define AB5500_LDO_VDIGMIC_ST	0x50
 
-#define AB5500_LDO_S_ST		0x66
-#define AB5500_LDO_S_PWR1	0x67
-#define AB5500_LDO_S_PWR0	0x68
-
 #define AB5500_LDO_G_ST		0x78
 #define AB5500_LDO_G_PWR1	0x79
 #define AB5500_LDO_G_PWR0	0x7a
@@ -309,17 +305,6 @@ static struct regulator_ops ab5500_regulator_fixed_ops = {
 	.get_mode	= ab5500_regulator_get_mode,
 };
 
-static const int ab5500_ldo_s_voltages[] = {
-	[0x00] = 1200000,
-	[0x01] = 1050000,
-	[0x02] = 1100000,
-	[0x03] = 1500000,
-	[0x04] = 1800000,
-	[0x05] = 2200000,
-	[0x06] = 2500000,
-	[0x07] = 2790000,
-};
-
 static const int ab5500_ldo_lg_voltages[] = {
 	[0x00] = 1200000,
 	[0x01] = 0, /* not used */
@@ -353,22 +338,6 @@ static const int ab5500_ldo_sim_voltages[] = {
 };
 
 static struct ab5500_regulator ab5500_regulators[] = {
-	[AB5500_LDO_S] = {
-		.desc = {
-			.name	= "LDO_S",
-			.id	= AB5500_LDO_S,
-			.ops	= &ab5500_regulator_variable_ops,
-			.type	= REGULATOR_VOLTAGE,
-			.owner	= THIS_MODULE,
-			.n_voltages = ARRAY_SIZE(ab5500_ldo_s_voltages),
-		},
-		.bank		= AB5500_BANK_STARTUP,
-		.reg		= AB5500_LDO_S_ST,
-		.voltages	= ab5500_ldo_s_voltages,
-		.enable_time	= 400,
-		.pwrctrl	= true,
-		.mode		= AB5500_LDO_MODE_FULLPOWER,
-	},
 	[AB5500_LDO_L] = {
 		.desc = {
 			.name	= "LDO_L",
