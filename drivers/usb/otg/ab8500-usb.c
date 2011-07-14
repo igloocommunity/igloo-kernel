@@ -35,6 +35,7 @@
 #include <linux/mfd/ab8500.h>
 #include <linux/regulator/consumer.h>
 #include <mach/prcmu.h>
+#include <mach/usb.h>
 
 #define AB8500_MAIN_WD_CTRL_REG 0x01
 #define AB8500_USB_LINE_STAT_REG 0x80
@@ -99,6 +100,7 @@ struct ab8500_usb {
 	struct regulator *v_ape;
 	struct regulator *v_musb;
 	struct regulator *v_ulpi;
+	struct ab8500_usbgpio_platform_data *usb_gpio;
 };
 
 static inline struct ab8500_usb *xceiv_to_ab(struct otg_transceiver *x)
@@ -168,6 +170,8 @@ static void ab8500_usb_phy_enable(struct ab8500_usb *ab, bool sel_host)
 	bit = sel_host ? AB8500_BIT_PHY_CTRL_HOST_EN :
 			AB8500_BIT_PHY_CTRL_DEVICE_EN;
 
+	ab->usb_gpio->enable();
+
 	clk_enable(ab->sysclk);
 
 	ab8500_usb_regulator_ctrl(ab, sel_host, true);
@@ -214,6 +218,8 @@ static void ab8500_usb_phy_disable(struct ab8500_usb *ab, bool sel_host)
 	clk_disable(ab->sysclk);
 
 	ab8500_usb_regulator_ctrl(ab, sel_host, false);
+
+	ab->usb_gpio->disable();
 
 	prcmu_qos_add_requirement(PRCMU_QOS_APE_OPP,
 				(char *)dev_name(ab->dev), 50);
@@ -354,6 +360,7 @@ static void ab8500_usb_phy_disable_work(struct work_struct *work)
 
 	if (!ab->otg.gadget)
 		ab8500_usb_peri_phy_dis(ab);
+
 }
 
 static unsigned ab8500_eyediagram_workaroud(struct ab8500_usb *ab, unsigned mA)
@@ -621,6 +628,8 @@ irq_fail:
 static int __devinit ab8500_usb_probe(struct platform_device *pdev)
 {
 	struct ab8500_usb	*ab;
+	struct ab8500_platform_data *ab8500_pdata =
+				dev_get_platdata(pdev->dev.parent);
 	int err;
 	int rev;
 
@@ -646,6 +655,7 @@ static int __devinit ab8500_usb_probe(struct platform_device *pdev)
 	ab->otg.set_peripheral	= ab8500_usb_set_peripheral;
 	ab->otg.set_suspend	= ab8500_usb_set_suspend;
 	ab->otg.set_power	= ab8500_usb_set_power;
+	ab->usb_gpio		=	ab8500_pdata->usb;
 
 	platform_set_drvdata(pdev, ab);
 
@@ -685,6 +695,10 @@ static int __devinit ab8500_usb_probe(struct platform_device *pdev)
 	/* Needed to enable ID detection. */
 	ab8500_usb_wd_workaround(ab);
 
+	err = ab->usb_gpio->get(ab->dev);
+	if (err < 0)
+		goto fail3;
+
 	prcmu_qos_add_requirement(PRCMU_QOS_APE_OPP,
 			(char *)dev_name(ab->dev), 50);
 
@@ -722,6 +736,8 @@ static int __devexit ab8500_usb_remove(struct platform_device *pdev)
 	clk_put(ab->sysclk);
 
 	ab8500_usb_regulator_put(ab);
+
+	ab->usb_gpio->put();
 
 	platform_set_drvdata(pdev, NULL);
 
