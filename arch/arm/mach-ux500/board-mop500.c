@@ -63,6 +63,7 @@
 #include "board-mop500-regulators.h"
 #include "board-mop500-bm.h"
 #include "board-mop500-wlan.h"
+#include "board-mop500-usb.h"
 
 #ifdef CONFIG_AB8500_DENC
 static struct ab8500_denc_platform_data ab8500_denc_pdata = {
@@ -260,6 +261,7 @@ static struct ab8500_platform_data ab8500_platdata = {
 	.fg		= &ab8500_fg_plat_data,
 	.chargalg	= &ab8500_chargalg_plat_data,
 	.gpio		= &ab8500_gpio_pdata,
+	.usb		= &ab8500_usbgpio_plat_data,
 #ifdef CONFIG_INPUT_AB8500_ACCDET
 	.accdet = &ab8500_accdet_pdata,
 #endif
