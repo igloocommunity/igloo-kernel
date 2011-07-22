@@ -441,7 +441,7 @@ config GPIO_JANZ_TTL
 	  This driver provides support for driving the pins in output
 	  mode only. Input mode is not supported.
 
-config AB8500_GPIO
+config GPIO_AB8500
 	bool "ST-Ericsson AB8500 Mixed Signal Circuit gpio functions"
 	depends on AB8500_CORE
 	help
