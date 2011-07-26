@@ -19,7 +19,8 @@ DOCBOOKS := z8530book.xml mcabook.xml device-drivers.xml \
 	    tc_keypad.xml prcmu-fw-api.xml cg2900_fm_radio.xml \
 	    synaptics_rmi4_touchp.xml db5500_keypad.xml \
 	    u5500_LogicalMailbox.xml \
-		lsm303dlh.xml
+	    lsm303dlh.xml \
+	    ste_timed_vibra.xml
 
 ###
 # The build process is as follows (targets):

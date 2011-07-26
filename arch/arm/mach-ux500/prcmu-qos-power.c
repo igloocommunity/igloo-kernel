@@ -96,7 +96,10 @@ static struct prcmu_qos_object *prcmu_qos_array[] = {
 	&ddr_opp_qos
 };
 
+static DEFINE_MUTEX(prcmu_qos_mutex);
 static DEFINE_SPINLOCK(prcmu_qos_lock);
+
+static bool ape_opp_forced_to_50_partly_25;
 
 static unsigned long cpufreq_opp_delay = HZ / 5;
 
@@ -140,6 +143,8 @@ static void update_target(int target)
 	unsigned long flags;
 	int update = 0;
 	u8 op;
+
+	mutex_lock(&prcmu_qos_mutex);
 
 	spin_lock_irqsave(&prcmu_qos_lock, flags);
 	extreme_value = prcmu_qos_array[target]->default_value;
@@ -188,7 +193,7 @@ static void update_target(int target)
 			default:
 				pr_err("prcmu qos: Incorrect ddr target value (%d)",
 				       extreme_value);
-				return;
+				goto unlock_and_return;
 			}
 			prcmu_debug_ddr_opp_log(op);
 			prcmu_set_ddr_opp(op);
@@ -205,18 +210,55 @@ static void update_target(int target)
 			default:
 				pr_err("prcmu qos: Incorrect ape target value (%d)",
 				       extreme_value);
-				return;
+				goto unlock_and_return;
 			}
-			prcmu_set_ape_opp(op);
+
+			if (!ape_opp_forced_to_50_partly_25)
+				(void)prcmu_set_ape_opp(op);
+
 			prcmu_debug_ape_opp_log(op);
 		}
 	}
+unlock_and_return:
+	mutex_unlock(&prcmu_qos_mutex);
 }
 
 void prcmu_qos_force_opp(int prcmu_qos_class, s32 i)
 {
 	prcmu_qos_array[prcmu_qos_class]->force_value = i;
 	update_target(prcmu_qos_class);
+}
+
+void prcmu_qos_voice_call_override(bool enable)
+{
+	u8 op;
+
+	mutex_lock(&prcmu_qos_mutex);
+
+	ape_opp_forced_to_50_partly_25 = enable;
+
+	if (enable) {
+		(void)prcmu_set_ape_opp(APE_50_PARTLY_25_OPP);
+		goto unlock_and_return;
+	}
+
+	/* Disable: set the OPP according to the current target value. */
+	switch (atomic_read(
+			&prcmu_qos_array[PRCMU_QOS_APE_OPP]->target_value)) {
+	case 50:
+		op = APE_50_OPP;
+		break;
+	case 100:
+		op = APE_100_OPP;
+		break;
+	default:
+		goto unlock_and_return;
+	}
+
+	(void)prcmu_set_ape_opp(op);
+
+unlock_and_return:
+	mutex_unlock(&prcmu_qos_mutex);
 }
 
 /**

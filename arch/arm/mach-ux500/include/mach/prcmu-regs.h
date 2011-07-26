@@ -17,6 +17,7 @@
 
 #define BITS(_start, _end) ((BIT(_end) - BIT(_start)) + BIT(_end))
 
+#define PRCM_ACLK_MGT_OFF		0x004
 #define PRCM_SVACLK_MGT_OFF		0x008
 #define PRCM_SIACLK_MGT_OFF		0x00C
 #define PRCM_SGACLK_MGT_OFF		0x014

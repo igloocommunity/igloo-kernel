@@ -77,6 +77,7 @@ void __init mop500_u8500uib_init(void);
 void __init mop500_stuib_init(void);
 void __init mop500_msp_init(void);
 void __init mop500_pins_init(void);
+void __init mop500_vibra_init(void);
 
 void mop500_uib_i2c_add(int busnum, struct i2c_board_info const *info,
 		unsigned n);

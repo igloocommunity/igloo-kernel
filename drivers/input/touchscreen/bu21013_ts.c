@@ -5,6 +5,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/earlysuspend.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
@@ -148,6 +149,7 @@
  * @factor_x: x scale factor
  * @factor_y: y scale factor
  * @tpclk: pointer to clock structure
+ * @early_suspend: early_suspend structure variable
  *
  * Touch panel device data structure
  */
@@ -165,9 +167,15 @@ struct bu21013_ts_data {
 	unsigned int factor_x;
 	unsigned int factor_y;
 	struct clk *tpclk;
+	struct early_suspend early_suspend;
 };
 
 static int bu21013_init_chip(struct bu21013_ts_data *data, bool on_ext_clk);
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void bu21013_ts_early_suspend(struct early_suspend *data);
+static void bu21013_ts_late_resume(struct early_suspend *data);
+#endif
 
 /**
  * bu21013_ext_clk() - enable/disable the external clock
@@ -748,6 +756,13 @@ static int __devinit bu21013_probe(struct i2c_client *client,
 		goto err_sysfs_create;
 	}
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	bu21013_data->early_suspend.level =
+				EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	bu21013_data->early_suspend.suspend = bu21013_ts_early_suspend;
+	bu21013_data->early_suspend.resume = bu21013_ts_late_resume;
+	register_early_suspend(&bu21013_data->early_suspend);
+#endif
 	return retval;
 
 err_sysfs_create:
@@ -810,6 +825,7 @@ static int __devexit bu21013_remove(struct i2c_client *client)
 	return 0;
 }
 
+#ifndef CONFIG_HAS_EARLYSUSPEND
 #ifdef CONFIG_PM
 /**
  * bu21013_suspend() - suspend the touch screen controller
@@ -846,6 +862,26 @@ static const struct dev_pm_ops bu21013_dev_pm_ops = {
 	.resume  = bu21013_resume,
 };
 #endif
+#else
+static void bu21013_ts_early_suspend(struct early_suspend *data)
+{
+	struct bu21013_ts_data *bu21013_data =
+		container_of(data, struct bu21013_ts_data, early_suspend);
+	bu21013_disable(bu21013_data);
+}
+
+static void bu21013_ts_late_resume(struct early_suspend *data)
+{
+	struct bu21013_ts_data *bu21013_data =
+		container_of(data, struct bu21013_ts_data, early_suspend);
+	struct i2c_client *client = bu21013_data->client;
+	int retval;
+
+	retval = bu21013_enable(bu21013_data);
+	if (retval < 0)
+		dev_err(&client->dev, "bu21013 enable failed\n");
+}
+#endif
 
 static const struct i2c_device_id bu21013_id[] = {
 	{ DRIVER_TP, 0 },
@@ -857,7 +893,7 @@ static struct i2c_driver bu21013_driver = {
 	.driver	= {
 		.name	=	DRIVER_TP,
 		.owner	=	THIS_MODULE,
-#ifdef CONFIG_PM
+#if !defined(CONFIG_HAS_EARLYSUSPEND) && defined(CONFIG_PM)
 		.pm	=	&bu21013_dev_pm_ops,
 #endif
 	},

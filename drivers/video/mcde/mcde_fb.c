@@ -19,6 +19,8 @@
 #include <linux/hwmem.h>
 #include <linux/io.h>
 
+#include <linux/console.h>
+
 #include <video/mcde_fb.h>
 
 #define MCDE_FB_BPP_MAX		16
@@ -98,10 +100,13 @@ static void early_suspend(struct early_suspend *data)
 	struct mcde_fb *mfb =
 		container_of(data, struct mcde_fb, early_suspend);
 
+	console_lock();
 	for (i = 0; i < mfb->num_ovlys; i++) {
-		if (mfb->ovlys[i])
+		if (mfb->ovlys[i] && mfb->ovlys[i]->ddev &&
+				(mfb->ovlys[i]->ddev->stay_alive == false))
 			mcde_dss_disable_display(mfb->ovlys[i]->ddev);
 	}
+	console_unlock();
 }
 
 static void late_resume(struct early_suspend *data)
@@ -110,12 +115,14 @@ static void late_resume(struct early_suspend *data)
 	struct mcde_fb *mfb =
 		container_of(data, struct mcde_fb, early_suspend);
 
+	console_lock();
 	for (i = 0; i < mfb->num_ovlys; i++) {
 		if (mfb->ovlys[i]) {
 			struct mcde_overlay *ovly = mfb->ovlys[i];
 			(void) mcde_dss_enable_display(ovly->ddev);
 		}
 	}
+	console_unlock();
 }
 #endif
 
@@ -766,6 +773,9 @@ void mcde_fb_destroy(struct mcde_display_device *dev)
 
 	fb_dealloc_cmap(&dev->fbi->cmap);
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	unregister_early_suspend(&mfb->early_suspend);
+#endif
 	unregister_framebuffer(dev->fbi);
 	free_fb_mem(dev->fbi);
 	framebuffer_release(dev->fbi);

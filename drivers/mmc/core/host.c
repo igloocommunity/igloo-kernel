@@ -289,6 +289,10 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	host->pm_notify.notifier_call = mmc_pm_notify;
 #endif
 
+	snprintf(host->wakelock_name, sizeof(host->wakelock_name),
+			"mmc%d_delay_work", host->index);
+	wake_lock_init(&host->wakelock, WAKE_LOCK_SUSPEND, host->wakelock_name);
+
 	/*
 	 * By default, hosts do not support SGIO or large requests.
 	 * They have to set these according to their abilities.
@@ -335,7 +339,8 @@ int mmc_add_host(struct mmc_host *host)
 #endif
 
 	mmc_start_host(host);
-	register_pm_notifier(&host->pm_notify);
+	if (!(host->pm_flags & MMC_PM_IGNORE_PM_NOTIFY))
+		register_pm_notifier(&host->pm_notify);
 
 	return 0;
 }
@@ -352,7 +357,9 @@ EXPORT_SYMBOL(mmc_add_host);
  */
 void mmc_remove_host(struct mmc_host *host)
 {
-	unregister_pm_notifier(&host->pm_notify);
+	if (!(host->pm_flags & MMC_PM_IGNORE_PM_NOTIFY))
+		unregister_pm_notifier(&host->pm_notify);
+
 	mmc_stop_host(host);
 
 #ifdef CONFIG_DEBUG_FS
@@ -376,6 +383,7 @@ EXPORT_SYMBOL(mmc_remove_host);
  */
 void mmc_free_host(struct mmc_host *host)
 {
+	wake_lock_destroy(&host->wakelock);
 	spin_lock(&mmc_host_lock);
 	idr_remove(&mmc_host_idr, host->index);
 	spin_unlock(&mmc_host_lock);

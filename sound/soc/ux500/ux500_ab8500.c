@@ -24,7 +24,6 @@
 #include <sound/pcm.h>
 #include <sound/jack.h>
 #include <sound/pcm_params.h>
-#include <sound/soc-dapm.h>
 #include <mach/hardware.h>
 #include "ux500_pcm.h"
 #include "ux500_msp_dai.h"
@@ -44,6 +43,7 @@
 #define DRIVERMODE_CODEC_ONLY	1
 
 static struct snd_soc_jack jack;
+static bool vibra_on;
 
 /* Power-control */
 static DEFINE_MUTEX(power_lock);
@@ -58,7 +58,7 @@ static struct clk *clk_ptr_sysclk;
 static struct clk *clk_ptr_ulpclk;
 
 /* Regulators */
-static enum regulator_idx {
+enum regulator_idx {
 	REGULATOR_AUDIO,
 	REGULATOR_DMIC,
 	REGULATOR_AMIC1,
@@ -531,6 +531,8 @@ int ux500_ab8500_soc_machine_drv_init(void)
 		return status;
 	}
 
+	vibra_on = false;
+
 	return 0;
 }
 
@@ -551,6 +553,34 @@ void ux500_ab8500_soc_machine_drv_cleanup(void)
 }
 
 /* Extended interface */
+
+void ux500_ab8500_audio_pwm_vibra(unsigned char speed_left_pos,
+			unsigned char speed_left_neg,
+			unsigned char speed_right_pos,
+			unsigned char speed_right_neg)
+{
+	bool vibra_on_new;
+
+	vibra_on_new = speed_left_pos | speed_left_neg | speed_right_pos | speed_right_neg;
+	if ((!vibra_on_new) && (vibra_on)) {
+		pr_debug("%s: PWM-vibra off.\n", __func__);
+		vibra_on = false;
+
+		ux500_ab8500_power_control_dec();
+	}
+
+	if ((vibra_on_new) && (!vibra_on)) {
+		pr_debug("%s: PWM-vibra on.\n", __func__);
+		vibra_on = true;
+
+		ux500_ab8500_power_control_inc();
+	}
+
+	ab8500_audio_pwm_vibra(speed_left_pos,
+			speed_left_neg,
+			speed_right_pos,
+			speed_right_neg);
+}
 
 void ux500_ab8500_jack_report(int value)
 {
