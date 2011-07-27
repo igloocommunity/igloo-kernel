@@ -51,6 +51,18 @@
 #define AB5500_CHIP_ID (0x20)
 #define AB5500_INTERRUPTS 0x01FFFFFF
 
+/* Turn On Status Event */
+#define RTC_ALARM		0x80
+#define POW_KEY_2_ON		0x20
+#define POW_KEY_1_ON		0x08
+#define POR_ON_VBAT		0x01
+#define VBUS_DET		0x02
+#define VBUS_CH_DROP_R		0x08
+#define USB_CH_DET_DONE		0x02
+
+/* Global Variables */
+u8 turn_on_stat = 0x00;
+
 /**
  * struct ab5500_bank
  * @slave_addr: I2C slave_addr found in AB5500 specification
@@ -792,6 +804,34 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			},
 		},
 	},
+};
+
+static ssize_t show_chip_id(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct ab5500 *ab5500;
+
+	ab5500 = dev_get_drvdata(dev);
+	return sprintf(buf, "%#x\n", ab5500 ? ab5500->chip_id : -EINVAL);
+}
+
+static ssize_t show_turn_on_status(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%#x\n", turn_on_stat);
+}
+
+static DEVICE_ATTR(chip_id, S_IRUGO, show_chip_id, NULL);
+static DEVICE_ATTR(turn_on_status, S_IRUGO, show_turn_on_status, NULL);
+
+static struct attribute *ab5500_sysfs_entries[] = {
+	&dev_attr_chip_id.attr,
+	&dev_attr_turn_on_status.attr,
+	NULL,
+};
+
+static struct attribute_group ab5500_attr_group = {
+	.attrs	= ab5500_sysfs_entries,
 };
 
 /*
@@ -2357,6 +2397,7 @@ static int __init ab5500_probe(struct platform_device *pdev)
 	struct resource *res;
 	int err;
 	int i;
+	u8 val;
 
 	ab = kzalloc(sizeof(struct ab5500), GFP_KERNEL);
 	if (!ab) {
@@ -2413,11 +2454,52 @@ static int __init ab5500_probe(struct platform_device *pdev)
 		ab->num_event_reg = AB5500_NUM_IRQ_REGS;
 	else
 		ab->num_event_reg = AB5500_NUM_EVENT_V1_REG;
+
+	/* Read the latch regs to know the reason for turn on */
+	err = get_register_interruptible(ab, AB5500_BANK_IT,
+			AB5500_IT_LATCH0_REG + 1, &val);
+	if (err)
+		goto exit_no_detect;
+	if (val & RTC_ALARM) /* RTCAlarm */
+		turn_on_stat = RTC_ALARM_EVENT;
+	if (val & POW_KEY_2_ON) /* PonKey2dbR */
+		turn_on_stat |= P_ON_KEY2_EVENT;
+	if (val & POW_KEY_1_ON) /* PonKey1dbR */
+		turn_on_stat |= P_ON_KEY1_EVENT;
+
+	err = get_register_interruptible(ab, AB5500_BANK_IT,
+			AB5500_IT_LATCH0_REG + 2, &val);
+	if (err)
+		goto exit_no_detect;
+	if (val & POR_ON_VBAT)
+		/* PORnVbat */
+		turn_on_stat |= POR_ON_VBAT_EVENT ;
+	err = get_register_interruptible(ab, AB5500_BANK_IT,
+			AB5500_IT_LATCH0_REG + 8, &val);
+	if (err)
+		goto exit_no_detect;
+	if (val & VBUS_DET)
+		/* VbusDet */
+		turn_on_stat |= VBUS_DET_EVENT;
+	err = get_register_interruptible(ab, AB5500_BANK_IT,
+			AB5500_IT_LATCH0_REG + 18, &val);
+	if (err)
+		goto exit_no_detect;
+	if (val & VBUS_CH_DROP_R)
+		/* VBUSChDrop */
+		turn_on_stat |= VBUS_DET_EVENT;
+	err = get_register_interruptible(ab, AB5500_BANK_IT,
+			AB5500_IT_LATCH0_REG + 9, &val);
+	if (err)
+		goto exit_no_detect;
+	if (val & USB_CH_DET_DONE)
+		/* VBUSChDrop */
+		turn_on_stat |= VBUS_DET_EVENT;
+
 	/* Clear and mask all interrupts */
 	for (i = 0; i < ab->num_event_reg; i++) {
 		u8 latchreg = AB5500_IT_LATCH0_REG + i;
 		u8 maskreg = AB5500_IT_MASK0_REG + i;
-		u8 val;
 
 		get_register_interruptible(ab, AB5500_BANK_IT, latchreg, &val);
 		set_register_interruptible(ab, AB5500_BANK_IT, maskreg, 0xff);
@@ -2456,17 +2538,26 @@ static int __init ab5500_probe(struct platform_device *pdev)
 		ab5500_plf_data->irq.base);
 	if (err) {
 		dev_err(&pdev->dev, "ab5500_mfd_add_device error\n");
-		goto exit_no_irq;
+		goto exit_no_add_dev;
 	}
 	err = ab5500_setup(ab, ab5500_plf_data->init_settings,
 		ab5500_plf_data->init_settings_sz);
 	if (err) {
 		dev_err(&pdev->dev, "ab5500_setup error\n");
-		goto exit_no_irq;
+		goto exit_no_add_dev;
 	}
 	ab5500_setup_debugfs(ab);
-	return 0;
+	err = sysfs_create_group(&ab->dev->kobj, &ab5500_attr_group);
+	if (err) {
+		dev_err(&pdev->dev, "error creating sysfs entries\n");
+		goto exit_no_debugfs;
+	}
 
+	return 0;
+exit_no_debugfs:
+	ab5500_remove_debugfs();
+exit_no_add_dev:
+	mfd_remove_devices(&pdev->dev);
 exit_no_irq:
 	if (ab->irq_base) {
 		free_irq(ab->ab5500_irq, ab);
@@ -2486,6 +2577,7 @@ static int __exit ab5500_remove(struct platform_device *pdev)
 	 * At this point, all subscribers should have unregistered
 	 * their notifiers so deactivate IRQ
 	 */
+	sysfs_remove_group(&ab->dev->kobj, &ab5500_attr_group);
 	ab5500_remove_debugfs();
 	mfd_remove_devices(&pdev->dev);
 	if (ab->irq_base) {

@@ -99,6 +99,15 @@
  */
 #define AB3100_NUM_REGULATORS				10
 
+/* Turn On Events */
+#define POR_ON_VBAT_EVENT		(0x01 << 0)
+#define P_ON_KEY1_EVENT			(0x01 << 1)
+#define P_ON_KEY2_EVENT			(0x01 << 2)
+#define RTC_ALARM_EVENT			(0x01 << 3)
+#define MAIN_CH_DET_EVENT		(0x01 << 4)
+#define VBUS_DET_EVENT			(0x01 << 5)
+#define USB_ID_DET_EVENT		(0x01 << 6)
+
 /**
  * struct ab3100
  * @access_mutex: lock out concurrent accesses to the AB3100 registers
