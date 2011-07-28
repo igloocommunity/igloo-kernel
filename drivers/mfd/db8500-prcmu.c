@@ -998,13 +998,13 @@ unlock_and_return:
 }
 
 /**
- * set_ape_opp - set the appropriate APE OPP
+ * db8500_set_ape_opp - set the appropriate APE OPP
  * @opp: The new APE operating point to which transition is to be made
  * Returns: 0 on success, non-zero on failure
  *
  * This function sets the operating point of the APE.
  */
-int prcmu_set_ape_opp(u8 opp)
+int db8500_prcmu_set_ape_opp(u8 opp)
 {
 	int r = 0;
 
@@ -1047,11 +1047,11 @@ skip_message:
 }
 
 /**
- * prcmu_get_ape_opp - get the current APE OPP
+ * db8500_prcmu_get_ape_opp - get the current APE OPP
  *
  * Returns: the current APE OPP
  */
-int prcmu_get_ape_opp(void)
+int db8500_prcmu_get_ape_opp(void)
 {
 	return readb(tcdm_base + PRCM_ACK_MB1_CURRENT_APE_OPP);
 }
