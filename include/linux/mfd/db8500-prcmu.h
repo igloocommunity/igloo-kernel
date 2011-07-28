@@ -501,8 +501,6 @@ enum romcode_read prcmu_get_rc_p2a(void);
 enum ap_pwrst prcmu_get_xp70_current_state(void);
 bool prcmu_has_arm_maxopp(void);
 bool prcmu_is_u8400(void);
-int prcmu_set_ape_opp(u8 opp);
-int prcmu_get_ape_opp(void);
 int prcmu_request_ape_opp_100_voltage(bool enable);
 int prcmu_release_usb_wakeup_state(void);
 int prcmu_set_ddr_opp(u8 opp);
@@ -548,6 +546,8 @@ u16 db8500_prcmu_get_reset_code(void);
 bool db8500_prcmu_is_ac_wake_requested(void);
 int db8500_prcmu_set_arm_opp(u8 opp);
 int db8500_prcmu_get_arm_opp(void);
+int db8500_prcmu_set_ape_opp(u8 opp);
+int db8500_prcmu_get_ape_opp(void);
 
 #else /* !CONFIG_MFD_DB8500_PRCMU */
 
@@ -578,12 +578,12 @@ static inline bool prcmu_is_u8400(void)
 	return false;
 }
 
-static inline int prcmu_set_ape_opp(u8 opp)
+static inline int db8500_prcmu_set_ape_opp(u8 opp)
 {
 	return 0;
 }
 
-static inline int prcmu_get_ape_opp(void)
+static inline int db8500_prcmu_get_ape_opp(void)
 {
 	return APE_100_OPP;
 }
