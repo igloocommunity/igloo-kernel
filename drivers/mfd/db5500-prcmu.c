@@ -30,6 +30,7 @@
 #include <mach/db5500-regs.h>
 #include "db5500-prcmu-regs.h"
 
+#define PRCMU_FW_VERSION_OFFSET 0xA4
 #define PRCM_SW_RST_REASON (tcdm_base + 0xFF8) /* 2 bytes */
 
 #define _PRCM_MB_HEADER (tcdm_base + 0xFE8)
@@ -423,6 +424,13 @@ struct clk_mgt {
 	unsigned int offset;
 	u32 pllsw;
 };
+
+/* PRCMU Firmware Details */
+static struct {
+	u16 board;
+	u8 fw_version;
+	u8 api_version;
+} prcmu_version;
 
 static DEFINE_SPINLOCK(clk_mgt_lock);
 
@@ -1507,6 +1515,24 @@ static struct irq_chip prcmu_irq_chip = {
 void __init db5500_prcmu_early_init(void)
 {
 	unsigned int i;
+	void *tcpm_base = ioremap_nocache(U5500_PRCMU_TCPM_BASE, SZ_4K);
+
+	if (tcpm_base != NULL) {
+		int version_high, version_low;
+
+		version_high = readl(tcpm_base + PRCMU_FW_VERSION_OFFSET);
+		version_low = readl(tcpm_base + PRCMU_FW_VERSION_OFFSET + 4);
+		prcmu_version.board = (version_high >> 24) & 0xFF;
+		prcmu_version.fw_version = version_high & 0xFF;
+		prcmu_version.api_version = version_low & 0xFF;
+
+		pr_info("PRCMU Firmware Version: 0x%x\n",
+			prcmu_version.fw_version);
+		pr_info("PRCMU API Version: 0x%x\n",
+			prcmu_version.api_version);
+
+		iounmap(tcpm_base);
+	}
 
 	tcdm_base = __io_address(U5500_PRCMU_TCDM_BASE);
 	spin_lock_init(&mb0_transfer.lock);
