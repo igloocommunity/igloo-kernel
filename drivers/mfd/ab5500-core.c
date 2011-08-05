@@ -2454,7 +2454,6 @@ static int __init ab5500_probe(struct platform_device *pdev)
 		ab->num_event_reg = AB5500_NUM_IRQ_REGS;
 	else
 		ab->num_event_reg = AB5500_NUM_EVENT_V1_REG;
-
 	/* Read the latch regs to know the reason for turn on */
 	err = get_register_interruptible(ab, AB5500_BANK_IT,
 			AB5500_IT_LATCH0_REG + 1, &val);
@@ -2494,6 +2493,13 @@ static int __init ab5500_probe(struct platform_device *pdev)
 		goto exit_no_detect;
 	if (val & USB_CH_DET_DONE)
 		/* VBUSChDrop */
+		turn_on_stat |= VBUS_DET_EVENT;
+	err = get_register_interruptible(ab, AB5500_BANK_IT,
+			AB5500_IT_LATCH0_REG + 22, &val);
+	if (err)
+		goto exit_no_detect;
+	if (val & USB_CH_DET_DONE)
+		/* USBLineStatus Change */
 		turn_on_stat |= VBUS_DET_EVENT;
 
 	/* Clear and mask all interrupts */
