@@ -10,10 +10,15 @@
 /* This defines the NOMADIK_NR_GPIO */
 #include <mach/gpio.h>
 
-/* snowball GPIO for MMC card */
-#define SNOWBALL_SDMMC_EN_GPIO 217
-#define SNOWBALL_SDMMC_1V8_3V_GPIO 228
-#define SNOWBALL_SDMMC_CD_GPIO 218
+/* Snowball GPIO for MMC card */
+#define SNOWBALL_SDMMC_EN_GPIO		217
+#define SNOWBALL_SDMMC_1V8_3V_GPIO	228
+#define SNOWBALL_SDMMC_CD_GPIO		218
+
+/* Snowball specific GPIO assignments, this board has no GPIO expander */
+#define SNOWBALL_ACCEL_INT1_GPIO	163
+#define SNOWBALL_ACCEL_INT2_GPIO	164
+#define SNOWBALL_MAGNET_DRDY_GPIO	165
 
 /* HREFv60-specific GPIO assignments, this board has no GPIO expander */
 #define HREFV60_TOUCH_RST_GPIO		143
