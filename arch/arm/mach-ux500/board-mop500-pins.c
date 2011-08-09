@@ -232,6 +232,11 @@ static pin_cfg_t snowball_pins[] = {
 	/* RSTn_LAN */
 	GPIO141_GPIO		| PIN_OUTPUT_HIGH,
 
+	/*  Accelerometer/Magnetometer */
+	GPIO163_GPIO		| PIN_INPUT_PULLUP, /* ACCEL_IRQ1 */
+	GPIO164_GPIO		| PIN_INPUT_PULLUP, /* ACCEL_IRQ2 */
+	GPIO165_GPIO		| PIN_INPUT_PULLUP, /* MAG_DRDY */
+
 	/* WLAN/GBF */
 	GPIO171_GPIO		| PIN_OUTPUT_HIGH,/* GBF_ENA */
 	GPIO215_GPIO		| PIN_OUTPUT_LOW,/* WLAN_ENA */
@@ -899,6 +904,9 @@ void __init mop500_pins_init(void)
 {
 	nmk_config_pins(mop500_pins_common,
 				ARRAY_SIZE(mop500_pins_common));
+
+	ux500_pins_add(mop500_pins, ARRAY_SIZE(mop500_pins));
+
 	if (machine_is_hrefv60())
 		nmk_config_pins(mop500_pins_hrefv60,
 				ARRAY_SIZE(mop500_pins_hrefv60));
@@ -908,8 +916,6 @@ void __init mop500_pins_init(void)
 	else
 		nmk_config_pins(mop500_pins_default,
 				ARRAY_SIZE(mop500_pins_default));
-
-	ux500_pins_add(mop500_pins, ARRAY_SIZE(mop500_pins));
 
 	switch (pinsfor) {
 	case PINS_FOR_U9500_21:
