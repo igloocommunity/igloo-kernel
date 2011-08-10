@@ -330,6 +330,7 @@ struct ieee80211_work {
 			u8 key_len, key_idx;
 			bool privacy;
 			bool synced;
+			struct cfg80211_bss *bss;
 		} probe_auth;
 		struct {
 			struct cfg80211_bss *bss;
