@@ -1027,7 +1027,8 @@ void cw1200_join_work(struct work_struct *work)
 	cancel_delayed_work_sync(&priv->join_timeout);
 
 	priv->join_pending_frame = NULL;
-	bss = cfg80211_get_bss(priv->hw->wiphy, NULL, bssid, NULL, 0, 0, 0);
+	bss = cfg80211_get_bss(priv->hw->wiphy, priv->channel,
+			bssid, NULL, 0, 0, 0);
 	if (!bss) {
 		cw1200_queue_remove(&priv->tx_queue[queueId],
 			priv, __le32_to_cpu(wsm->packetID));
