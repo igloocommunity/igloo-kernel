@@ -178,6 +178,14 @@ enum db5500_prcmu_pll {
 	DB5500_NUM_PLL_ID,
 };
 
+enum db5500_prcmu_clk {
+	DB5500_MSP1CLK,
+	DB5500_CDCLK,
+	DB5500_IRDACLK,
+	DB5500_TVCLK,
+	DB5500_NUM_CLK_CLIENTS,
+};
+
 enum on_off_ret {
 	OFF_ST,
 	RET_ST,
@@ -504,6 +512,40 @@ static int request_timclk(bool enable)
 	return 0;
 }
 
+static int request_clk(u8 clock, bool enable)
+{
+	int r = 0;
+
+	BUG_ON(clock >= DB5500_NUM_CLK_CLIENTS);
+
+	mutex_lock(&mb2_transfer.lock);
+
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(2))
+		cpu_relax();
+
+	/* fill in mailbox */
+	writeb(clock, PRCM_REQ_MB2_CLK_CLIENT);
+	writeb(enable, PRCM_REQ_MB2_CLK_STATE);
+
+	writeb(MB2H_CLK_REQUEST, PRCM_REQ_MB2_HEADER);
+
+	writel(MBOX_BIT(2), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
+	if (!wait_for_completion_timeout(&mb2_transfer.work,
+		msecs_to_jiffies(500))) {
+		pr_err("prcmu: request_clk() failed.\n");
+		r = -EIO;
+		WARN(1, "Failed in request_clk");
+		goto unlock_and_return;
+	}
+	if (mb2_transfer.ack.status != RC_SUCCESS ||
+		mb2_transfer.ack.header != MB2H_CLK_REQUEST)
+		r = -EIO;
+
+unlock_and_return:
+	mutex_unlock(&mb2_transfer.lock);
+	return r;
+}
+
 static int request_reg_clock(u8 clock, bool enable)
 {
 	u32 val;
@@ -589,7 +631,12 @@ unlock_and_return:
  */
 int db5500_prcmu_request_clock(u8 clock, bool enable)
 {
-	if (clock < PRCMU_NUM_REG_CLOCKS)
+	/* MSP1 & CD clocks are handled by FW */
+	if (clock == PRCMU_MSP1CLK)
+		return request_clk(DB5500_MSP1CLK, enable);
+	else if (clock == PRCMU_CDCLK)
+		return request_clk(DB5500_CDCLK, enable);
+	else if (clock < PRCMU_NUM_REG_CLOCKS)
 		return request_reg_clock(clock, enable);
 	else if (clock == PRCMU_TIMCLK)
 		return request_timclk(enable);
