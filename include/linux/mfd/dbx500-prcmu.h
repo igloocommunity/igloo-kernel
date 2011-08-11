@@ -240,7 +240,7 @@ static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
 {
 	if (machine_is_u5500())
-		return -EINVAL;
+		return db5500_prcmu_set_epod(epod_id, epod_state);
 	else
 		return db8500_prcmu_set_epod(epod_id, epod_state);
 }
