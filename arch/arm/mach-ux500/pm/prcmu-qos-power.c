@@ -21,6 +21,7 @@
 #include <linux/uaccess.h>
 #include <linux/cpufreq.h>
 #include <linux/mfd/dbx500-prcmu.h>
+#include <linux/cpufreq-dbx500.h>
 
 #include <mach/prcmu-debug.h>
 
@@ -146,7 +147,52 @@ void prcmu_qos_set_cpufreq_opp_delay(unsigned long n)
 	}
 	cpufreq_opp_delay = n;
 }
+#ifdef CONFIG_CPU_FREQ
+static void update_cpu_limits(s32 extreme_value)
+{
+	int cpu;
+	struct cpufreq_policy policy;
+	int ret;
+	int min_freq, max_freq;
 
+	for_each_online_cpu(cpu) {
+		ret = cpufreq_get_policy(&policy, cpu);
+		if (ret) {
+			pr_err("prcmu qos: get cpufreq policy failed (cpu%d)\n",
+			       cpu);
+			continue;
+		}
+
+		ret = dbx500_cpufreq_get_limits(cpu, extreme_value,
+					       &min_freq, &max_freq);
+		if (ret)
+			continue;
+		/*
+		 * cpufreq fw does not allow frequency change if
+		 * "current min freq" > "new max freq" or
+		 * "current max freq" < "new min freq".
+		 * Thus the intermediate steps below.
+		 */
+		if (policy.min > max_freq) {
+			ret = cpufreq_update_freq(cpu, min_freq, policy.max);
+			if (ret)
+				pr_err("prcmu qos: update min cpufreq failed (1)\n");
+		}
+		if (policy.max < min_freq) {
+			ret = cpufreq_update_freq(cpu, policy.min, max_freq);
+			if (ret)
+				pr_err("prcmu qos: update max cpufreq failed (2)\n");
+		}
+
+		ret = cpufreq_update_freq(cpu, min_freq, max_freq);
+		if (ret)
+			pr_err("prcmu qos: update max cpufreq failed (3)\n");
+	}
+
+}
+#else
+static inline void update_cpu_limits(s32 extreme_value) { }
+#endif
 /* static helper function */
 static s32 max_compare(s32 v1, s32 v2)
 {
@@ -240,8 +286,18 @@ static void update_target(int target)
 		prcmu_debug_ape_opp_log(op);
 		break;
 	case PRCMU_QOS_ARM_OPP:
-		/* TODO: Shall force_value != 0 actually set arm opp? */
+	{
+		mutex_unlock(&prcmu_qos_mutex);
+		/*
+		 * We can't hold the mutex since changing cpufreq
+		 * will trigger an prcmu fw callback.
+		 */
+		update_cpu_limits(extreme_value);
+		/* Return since the lock is unlocked */
+		return;
+
 		break;
+	}
 	default:
 		pr_err("prcmu qos: Incorrect target\n");
 		break;
