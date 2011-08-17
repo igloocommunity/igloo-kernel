@@ -606,6 +606,7 @@ int caif_shmcore_probe(struct shmdev_layer *pshm_dev)
 		pshm_drv->shm_rx_addr = pshm_dev->shm_base_addr +
 						(NR_TX_BUF * TX_BUF_SZ);
 
+	spin_lock_init(&pshm_drv->lock);
 	INIT_LIST_HEAD(&pshm_drv->tx_empty_list);
 	INIT_LIST_HEAD(&pshm_drv->tx_pend_list);
 	INIT_LIST_HEAD(&pshm_drv->tx_full_list);
