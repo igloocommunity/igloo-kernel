@@ -74,6 +74,7 @@ struct ab8500_btemp_ranges {
  * @prev_bat_temp	Last dispatched battery temperature
  * @parent:		Pointer to the struct ab8500
  * @gpadc:		Pointer to the struct gpadc
+ * @fg:			Pointer to the struct fg
  * @pdata:		Pointer to the ab8500_btemp platform data
  * @bat:		Pointer to the ab8500_bm platform data
  * @btemp_psy:		Structure for BTEMP specific battery properties
@@ -91,6 +92,7 @@ struct ab8500_btemp {
 	int prev_bat_temp;
 	struct ab8500 *parent;
 	struct ab8500_gpadc *gpadc;
+	struct ab8500_fg *fg;
 	struct ab8500_btemp_platform_data *pdata;
 	struct ab8500_bm_data *bat;
 	struct power_supply btemp_psy;
@@ -126,13 +128,14 @@ struct ab8500_btemp *ab8500_btemp_get(void)
  * ab8500_btemp_batctrl_volt_to_res() - convert batctrl voltage to resistance
  * @di:		pointer to the ab8500_btemp structure
  * @v_batctrl:	measured batctrl voltage
+ * @inst_curr:	measured instant current
  *
  * This function returns the battery resistance that is
  * derived from the BATCTRL voltage.
  * Returns value in Ohms.
  */
 static int ab8500_btemp_batctrl_volt_to_res(struct ab8500_btemp *di,
-	int v_batctrl)
+	int v_batctrl, int inst_curr)
 {
 	int rbs;
 
@@ -151,7 +154,9 @@ static int ab8500_btemp_batctrl_volt_to_res(struct ab8500_btemp *di,
 			 * If the battery has internal NTC, we use the current
 			 * source to calculate the resistance, 7uA or 20uA
 			 */
-			rbs = v_batctrl * 1000 / di->curr_source;
+			rbs = (v_batctrl * 1000
+			       - di->bat->gnd_lift_resistance * inst_curr)
+			      / di->curr_source;
 		} else {
 			/*
 			 * BAT_CTRL is internally
@@ -342,8 +347,10 @@ disable_force_comp:
 static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
 {
 	int ret;
-	int batctrl;
+	int batctrl = 0;
 	int res;
+	int inst_curr;
+	int i = 0;
 
 	/*
 	 * BATCTRL current sources are included on AB8500 cut2.0
@@ -355,8 +362,18 @@ static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
 		return ret;
 	}
 
-	batctrl = ab8500_btemp_read_batctrl_voltage(di);
-	res = ab8500_btemp_batctrl_volt_to_res(di, batctrl);
+	if (!di->fg)
+		di->fg = ab8500_fg_get();
+	if (!di->fg || ab8500_fg_inst_curr_nonblocking(di->fg, &inst_curr))
+			inst_curr = 0;
+	do {
+		batctrl += ab8500_btemp_read_batctrl_voltage(di);
+		i++;
+		msleep(1);
+		barrier();
+	} while (inst_curr == INVALID_CURRENT);
+	batctrl /= i;
+	res = ab8500_btemp_batctrl_volt_to_res(di, batctrl, inst_curr);
 
 	ret = ab8500_btemp_curr_source_enable(di, false);
 	if (ret) {
@@ -364,8 +381,8 @@ static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
 		return ret;
 	}
 
-	dev_dbg(di->dev, "%s batctrl: %d res: %d ",
-		__func__, batctrl, res);
+	dev_dbg(di->dev, "%s batctrl: %d res: %d inst_curr: %d\n",
+		__func__, batctrl, res, inst_curr);
 
 	return res;
 }
