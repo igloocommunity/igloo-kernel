@@ -264,8 +264,16 @@ void __init mop500_sdi_init(void)
 		db8500_add_sdi2(&mop500_sdi2_data, periphid);
 
 	/* On-board eMMC */
-	db8500_add_sdi4(&mop500_sdi4_data, periphid);
 
+	/* HACK Aleft - This needs to be reverted !
+	 * This kernel has problem discovering the SD card when it's 
+	 * assigned to mmc1, yielding an unusable android image.  
+	 * Disabling the emmc is not the right fix but allowing the
+	 * SD card to be discovered earlier seems to help.
+	 */ 
+#ifndef CONFIG_MACH_SNOWBALL 
+	db8500_add_sdi4(&mop500_sdi4_data, periphid);
+#endif
 	if (machine_is_hrefv60() || machine_is_snowball()) {
 		if (machine_is_hrefv60()) {
 			mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;
