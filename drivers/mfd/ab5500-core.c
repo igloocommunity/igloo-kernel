@@ -55,8 +55,8 @@
 #define RTC_ALARM		0x80
 #define POW_KEY_2_ON		0x20
 #define POW_KEY_1_ON		0x08
-#define POR_ON_VBAT		0x01
-#define VBUS_DET		0x02
+#define POR_ON_VBAT		0x10
+#define VBUS_DET		0x20
 #define VBUS_CH_DROP_R		0x08
 #define USB_CH_DET_DONE		0x02
 
