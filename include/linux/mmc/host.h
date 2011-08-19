@@ -13,6 +13,7 @@
 #include <linux/leds.h>
 #include <linux/sched.h>
 #include <linux/wakelock.h>
+#include <linux/fault-inject.h>
 
 #include <linux/mmc/core.h>
 #include <linux/mmc/pm.h>
@@ -314,6 +315,10 @@ struct mmc_host {
 		struct sdio_embedded_func	*funcs;
 		int				num_funcs;
 	} embedded_sdio_data;
+#endif
+
+#ifdef CONFIG_FAIL_MMC_REQUEST
+	struct fault_attr	fail_mmc_request;
 #endif
 
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
