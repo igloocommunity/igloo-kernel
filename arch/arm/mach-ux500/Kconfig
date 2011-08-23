@@ -6,6 +6,7 @@ config UX500_SOC_COMMON
 	select ARM_GIC
 	select NOMADIK_GPIO
 	select ARM_ERRATA_753970
+	select ARM_ERRATA_754322
 	select SYS_SOC
 
 config UX500_SOC_DBX500
