@@ -13,4 +13,4 @@ do_doc_package	= false
 do_source_package	= false
 do_common_headers_indep = false
 do_libc_dev_package	= false
-do_tools		= false
+do_tools		= true
