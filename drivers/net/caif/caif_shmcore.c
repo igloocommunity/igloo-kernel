@@ -472,6 +472,8 @@ static void shm_tx_work_func(struct work_struct *tx_work)
 			}
 
 			skb = skb_dequeue(&pshm_drv->sk_qhead);
+			if (skb == NULL)
+				break;
 			/* Copy in CAIF frame. */
 			skb_copy_bits(skb, 0, pbuf->desc_vptr +
 					pbuf->frm_ofs + SHM_HDR_LEN +
