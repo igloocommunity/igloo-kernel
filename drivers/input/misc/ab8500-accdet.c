@@ -28,6 +28,7 @@
 #include <linux/mfd/ab8500/gpadc.h>
 #include <linux/mfd/ab8500/gpio.h>
 #include <linux/gpio.h>
+#include <linux/switch.h>
 #include <mach/ab8500-accdet.h>
 #ifdef CONFIG_SND_SOC_UX500_AB8500
 #include <sound/ux500_ab8500.h>
@@ -256,6 +257,7 @@ struct accessory_detect_task {
  * @accdet2_th_set flag to indicate whether accdet2 thresholds are configured
  * @gpio35_dir_set flag to indicate whether GPIO35 (VIDEOCTRL) direction
  * has been configured.
+ * @ab_switch userspace android switch interface
  */
 struct ab8500_ad {
 	struct platform_device *pdev;
@@ -282,6 +284,7 @@ struct ab8500_ad {
 	int accdet1_th_set;
 	int accdet2_th_set;
 	int gpio35_dir_set;
+	struct switch_dev ab_switch;
 };
 
 /* Forward declarations */
@@ -656,6 +659,11 @@ static void report_jack_status(struct ab8500_ad *dd)
 		value |= SND_JACK_VIDEOOUT;
 		set_av_switch(dd, VIDEO_OUT);
 	}
+
+	if (dd->jack_type == JACK_TYPE_DISCONNECTED)
+		switch_set_state(&dd->ab_switch, 0);
+	else
+		switch_set_state(&dd->ab_switch, 1);
 
 	ux500_ab8500_jack_report(value);
 
@@ -1194,6 +1202,7 @@ static int ab8500_accessory_init(struct platform_device *pdev)
 {
 	struct ab8500_ad *dd;
 	struct ab8500_platform_data *plat;
+	int ret;
 
 	dev_dbg(&pdev->dev, "Enter: %s\n", __func__);
 
@@ -1259,8 +1268,15 @@ static int ab8500_accessory_init(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, dd);
 
-	return 0;
+	/* Android switch interface */
+	dd->ab_switch.name = "h2w";
+	ret = switch_dev_register(&dd->ab_switch);
+	if (ret < 0)
+		goto fail_switch;
 
+	return 0;
+fail_switch:
+	destroy_workqueue(dd->irq_work_queue);
 fail_no_mem_for_wq:
 	free_regulators();
 fail_no_regulators:
@@ -1294,6 +1310,7 @@ static void ab8500_accessory_cleanup(struct ab8500_ad *dd)
 	cancel_delayed_work(&dd->init_work);
 	flush_workqueue(dd->irq_work_queue);
 	destroy_workqueue(dd->irq_work_queue);
+	switch_dev_unregister(&dd->ab_switch);
 
 	kfree(dd);
 }
