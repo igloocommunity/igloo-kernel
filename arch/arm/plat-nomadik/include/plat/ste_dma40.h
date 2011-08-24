@@ -12,14 +12,8 @@
 #include <linux/dmaengine.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
-
-/*
- * Maxium size for a single dma descriptor
- * Size is limited to 16 bits.
- * Size is in the units of addr-widths (1,2,4,8 bytes)
- * Larger transfers will be split up to multiple linked desc
- */
-#define STEDMA40_MAX_SEG_SIZE 0xFFFF
+#include <linux/dmaengine.h>
+#include <linux/version.h>
 
 /* dev types for memcpy */
 #define STEDMA40_DEV_DST_MEMORY (-1)
@@ -70,9 +64,9 @@ enum stedma40_flow_ctrl {
 };
 
 enum stedma40_periph_data_width {
-	STEDMA40_BYTE_WIDTH = STEDMA40_ESIZE_8_BIT,
-	STEDMA40_HALFWORD_WIDTH = STEDMA40_ESIZE_16_BIT,
-	STEDMA40_WORD_WIDTH = STEDMA40_ESIZE_32_BIT,
+	STEDMA40_BYTE_WIDTH       = STEDMA40_ESIZE_8_BIT,
+	STEDMA40_HALFWORD_WIDTH   = STEDMA40_ESIZE_16_BIT,
+	STEDMA40_WORD_WIDTH       = STEDMA40_ESIZE_32_BIT,
 	STEDMA40_DOUBLEWORD_WIDTH = STEDMA40_ESIZE_64_BIT
 };
 
@@ -83,21 +77,21 @@ enum stedma40_xfer_dir {
 	STEDMA40_PERIPH_TO_PERIPH
 };
 
-
 /**
- * struct stedma40_chan_cfg - dst/src channel configuration
+ * struct stedma40_chan_cfg - dst/src channel configurration
  *
- * @big_endian: true if the src/dst should be read as big endian
+ * @big_endian: true if src/dst should be read as big_endian
  * @data_width: Data width of the src/dst hardware
- * @p_size: Burst size
+ * @psize: Burst size
  * @flow_ctrl: Flow control on/off.
  */
 struct stedma40_half_channel_info {
-	bool big_endian;
+	bool				big_endian;
 	enum stedma40_periph_data_width data_width;
-	int psize;
-	enum stedma40_flow_ctrl flow_ctrl;
+	int				psize;
+	enum stedma40_flow_ctrl		flow_ctrl;
 };
+
 
 /**
  * struct stedma40_chan_cfg - Structure to be filled by client drivers.
@@ -112,7 +106,8 @@ struct stedma40_half_channel_info {
  * @dst_dev_type: Dst device type
  * @src_info: Parameters for dst half channel
  * @dst_info: Parameters for dst half channel
- *
+ * @use_fixed_channel: if true, use the physical channel specified by phy_channel
+ * @phy_channel: physical channel to use, only if use_fixed_channel is true
  *
  * This structure has to be filled by the client drivers.
  * It is recommended to do all dma configurations for clients in the machine.
@@ -120,14 +115,19 @@ struct stedma40_half_channel_info {
  */
 struct stedma40_chan_cfg {
 	enum stedma40_xfer_dir			 dir;
+
 	bool					 high_priority;
 	bool					 realtime;
 	enum stedma40_mode			 mode;
 	enum stedma40_mode_opt			 mode_opt;
+
 	int					 src_dev_type;
 	int					 dst_dev_type;
 	struct stedma40_half_channel_info	 src_info;
 	struct stedma40_half_channel_info	 dst_info;
+
+	bool					 use_fixed_channel;
+	int					 phy_channel;
 };
 
 /**
@@ -154,7 +154,102 @@ struct stedma40_platform_data {
 	int				 disabled_channels[STEDMA40_MAX_PHYS];
 };
 
-#ifdef CONFIG_STE_DMA40
+struct d40_desc;
+
+/**
+ * struct stedma40_cyclic_desc - Cyclic DMA descriptor
+ * @d40d: DMA driver internal descriptor
+ * @period_callback: callback to be called after every link/period if
+ *		     the DMA_PREP_INTERRUPT flag is used when preparing
+ *		     the transaction
+ * @period_callback_param: handle passed to the period_callback
+ *
+ * A pointer to a structure of this type is returned from the
+ * stedma40_cyclic_prep_sg() function.  The period_callback and
+ * period_callback_param members can be set by the client.
+ */
+struct stedma40_cyclic_desc {
+	struct d40_desc *d40d;
+	dma_async_tx_callback period_callback;
+	void *period_callback_param;
+};
+
+int stedma40_set_dev_addr(struct dma_chan *chan,
+			  dma_addr_t src_dev_addr,
+			  dma_addr_t dst_dev_addr);
+
+/*
+ * stedma40_get_src_addr - get current source address
+ * @chan: the DMA channel
+ *
+ * Returns the physical address of the current source element to be read by the
+ * DMA.
+ */
+dma_addr_t stedma40_get_src_addr(struct dma_chan *chan);
+
+/*
+ * stedma40_get_dst_addr - get current destination address
+ * @chan: the DMA channel
+ *
+ * Returns the physical address of the current destination element to be
+ * written by the DMA.
+ */
+dma_addr_t stedma40_get_dst_addr(struct dma_chan *chan);
+
+/**
+ * stedma40_cyclic_prep_sg - prepare a cyclic DMA transfer
+ * @chan: the DMA channel to prepare
+ * @sgl: scatter list
+ * @sg_len: number of links in the scatter list
+ * @direction: transfer direction, to or from device
+ * @dma_flags: DMA_PREP_INTERRUPT if a callback is required after every link.
+ *	       See period_callback in struct stedma40_cyclic_desc.
+ *
+ * Must be called before trying to start a cyclic DMA transfer.  Returns
+ * ERR_PTR(-errno) on failure.
+ */
+struct stedma40_cyclic_desc *
+stedma40_cyclic_prep_sg(struct dma_chan *chan,
+			struct scatterlist *sgl,
+			unsigned int sg_len,
+			enum dma_data_direction direction,
+			unsigned long dma_flags);
+
+/**
+ * stedma40_cyclic_start - start the cyclic DMA transfer
+ * @chan: the DMA channel to start
+ *
+ * The cyclic DMA must have been prepared earlier with
+ * stedma40_cyclic_prep_sg().
+ */
+int stedma40_cyclic_start(struct dma_chan *chan);
+
+/**
+ * stedma40_cyclic_stop() - stop the cyclic DMA transfer
+ * @chan: the DMA channel to stop
+ *
+ * Stops a cyclic DMA transfer which was previously started with
+ * stedma40_cyclic_start().
+ */
+void stedma40_cyclic_stop(struct dma_chan *chan);
+
+/**
+ * stedma40_cyclic_free() - free cyclic DMA resources
+ * @chan: the DMA channel
+ *
+ * Must be called to free any resources used for cyclic DMA which have been
+ * allocated in stedma40_cyclic_prep_sg().
+ */
+void stedma40_cyclic_free(struct dma_chan *chan);
+
+/**
+ * setdma40_residue() - Returna the remaining bytes to transfer.
+ *
+ * @chan: dmaengine handle
+ *
+ * returns 0 or positive number of remaning bytes.
+ */
+u32 stedma40_residue(struct dma_chan *chan);
 
 /**
  * stedma40_filter() - Provides stedma40_chan_cfg to the
@@ -168,51 +263,24 @@ struct stedma40_platform_data {
  *
  *
  */
-
 bool stedma40_filter(struct dma_chan *chan, void *data);
 
 /**
- * stedma40_slave_mem() - Transfers a raw data buffer to or from a slave
- * (=device)
+ * stedma40_memcpy_sg() - extension of the dma framework, memcpy to/from
+ * scattergatter lists.
  *
  * @chan: dmaengine handle
- * @addr: source or destination physicall address.
- * @size: bytes to transfer
- * @direction: direction of transfer
+ * @sgl_dst: Destination scatter list
+ * @sgl_src: Source scatter list
+ * @sgl_len: The length of each scatterlist. Both lists must be of equal length
+ * and each element must match the corresponding element in the other scatter
+ * list.
  * @flags: is actually enum dma_ctrl_flags. See dmaengine.h
  */
-
-static inline struct
-dma_async_tx_descriptor *stedma40_slave_mem(struct dma_chan *chan,
-					    dma_addr_t addr,
-					    unsigned int size,
-					    enum dma_data_direction direction,
-					    unsigned long flags)
-{
-	struct scatterlist sg;
-	sg_init_table(&sg, 1);
-	sg.dma_address = addr;
-	sg.length = size;
-
-	return chan->device->device_prep_slave_sg(chan, &sg, 1,
-						  direction, flags);
-}
-
-#else
-static inline bool stedma40_filter(struct dma_chan *chan, void *data)
-{
-	return false;
-}
-
-static inline struct
-dma_async_tx_descriptor *stedma40_slave_mem(struct dma_chan *chan,
-					    dma_addr_t addr,
-					    unsigned int size,
-					    enum dma_data_direction direction,
-					    unsigned long flags)
-{
-	return NULL;
-}
-#endif
+struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
+						   struct scatterlist *sgl_dst,
+						   struct scatterlist *sgl_src,
+						   unsigned int sgl_len,
+						   unsigned long flags);
 
 #endif
