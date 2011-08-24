@@ -44,6 +44,7 @@ static DEFINE_MUTEX(soc1_pll_mutex);
 static DEFINE_MUTEX(sysclk_mutex);
 static DEFINE_MUTEX(ab_ulpclk_mutex);
 static DEFINE_MUTEX(ab_intclk_mutex);
+static DEFINE_MUTEX(clkout0_mutex);
 
 static struct delayed_work sysclk_disable_work;
 
@@ -294,7 +295,7 @@ static int clkout0_enable(struct clk *clk)
 	r = regulator_enable(clk->regulator);
 	if (r)
 		goto regulator_failed;
-	r = prcmu_config_clkout(0, PRCMU_CLKSRC_SYSCLK, 4);
+	r = prcmu_config_clkout(0, PRCMU_CLKSRC_CLK38M, 4);
 	if (r)
 		goto config_failed;
 	r = nmk_config_pin(GPIO227_CLKOUT1, false);
@@ -303,7 +304,7 @@ static int clkout0_enable(struct clk *clk)
 	return r;
 
 gpio_failed:
-	(void)prcmu_config_clkout(0, PRCMU_CLKSRC_SYSCLK, 0);
+	(void)prcmu_config_clkout(0, PRCMU_CLKSRC_CLK38M, 0);
 config_failed:
 	(void)regulator_disable(clk->regulator);
 regulator_failed:
@@ -317,7 +318,7 @@ static void clkout0_disable(struct clk *clk)
 	r = nmk_config_pin((GPIO227_GPIO | PIN_OUTPUT_LOW), false);
 	if (r)
 		goto disable_failed;
-	(void)prcmu_config_clkout(0, PRCMU_CLKSRC_SYSCLK, 0);
+	(void)prcmu_config_clkout(0, PRCMU_CLKSRC_CLK38M, 0);
 	(void)regulator_disable(clk->regulator);
 	return;
 
@@ -471,9 +472,9 @@ static struct clk rtc32k = {
 static struct clk clkout0 = {
 	.name = "clkout0",
 	.ops = &clkout0_ops,
-	.parent = &sysclk,
+	.parent = &ulp38m4,
 	.rate = 9600000,
-	.mutex = &sysclk_mutex,
+	.mutex = &clkout0_mutex,
 };
 
 static struct clk clkout1 = {
