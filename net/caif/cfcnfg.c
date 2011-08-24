@@ -521,6 +521,8 @@ got_phyid:
 	frml = cffrml_create(phyid, fcs);
 
 	if (!frml) {
+		if (phy_driver)
+			cfserl_destroy(phy_driver);
 		pr_warn("Out of memory\n");
 		kfree(phyinfo);
 		goto out;
