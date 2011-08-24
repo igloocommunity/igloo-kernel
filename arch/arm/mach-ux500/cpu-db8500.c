@@ -121,7 +121,6 @@ static struct platform_device db8500_prcmu_device = {
 };
 
 static struct platform_device *platform_devs[] __initdata = {
-	&u8500_dma40_device,
 	&db8500_pmu_device,
 	&ux500_prcmu_wdt_device,
 	&db8500_prcmu_device,
@@ -184,6 +183,7 @@ void __init u8500_init_devices(void)
 	platform_device_register(&ux500_stm_device);
 #endif
 
+	db8500_dma_init();
 	db8500_add_rtc();
 	db8500_add_gpios();
 	db8500_add_usb(usb_db8500_rx_dma_cfg, usb_db8500_tx_dma_cfg);
