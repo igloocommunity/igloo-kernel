@@ -190,3 +190,9 @@ static void cfserl_ctrlcmd(struct cflayer *layr, enum caif_ctrlcmd ctrl,
 {
 	layr->up->ctrlcmd(layr->up, ctrl, phyid);
 }
+
+void cfserl_destroy(struct cflayer *layer)
+{
+	struct cfserl *cfserl = container_obj(layer);
+	kfree(cfserl);
+}
