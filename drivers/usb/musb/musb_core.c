@@ -2355,7 +2355,7 @@ static int musb_suspend(struct device *dev)
 	return 0;
 }
 
-static int musb_resume_noirq(struct device *dev)
+static int musb_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct musb	*musb = dev_to_musb(&pdev->dev);
@@ -2401,7 +2401,7 @@ static int musb_runtime_resume(struct device *dev)
 
 static const struct dev_pm_ops musb_dev_pm_ops = {
 	.suspend	= musb_suspend,
-	.resume_noirq	= musb_resume_noirq,
+	.resume		= musb_resume,
 	.runtime_suspend = musb_runtime_suspend,
 	.runtime_resume = musb_runtime_resume,
 };
