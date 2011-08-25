@@ -67,6 +67,7 @@ struct ab8500_btemp_ranges {
 /**
  * struct ab8500_btemp - ab8500 BTEMP device information
  * @dev:		Pointer to the structure device
+ * @node:		List of AB8500 BTEMPs, hence prepared for reentrance
  * @chip_id:		Chip-Id of the AB8500
  * @curr_source:	What current source we use, in uA
  * @bat_temp:		Battery temperature in degree Celcius
@@ -83,6 +84,7 @@ struct ab8500_btemp_ranges {
  */
 struct ab8500_btemp {
 	struct device *dev;
+	struct list_head node;
 	u8 chip_id;
 	int curr_source;
 	int bat_temp;
@@ -105,6 +107,20 @@ static enum power_supply_property ab8500_btemp_props[] = {
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 	POWER_SUPPLY_PROP_TEMP,
 };
+
+static LIST_HEAD(ab8500_btemp_list);
+
+/**
+ * ab8500_btemp_get() - returns a reference to the primary AB8500 BTEMP
+ * (i.e. the first BTEMP in the instance list)
+ */
+struct ab8500_btemp *ab8500_btemp_get(void)
+{
+	struct ab8500_btemp *btemp;
+	btemp = list_first_entry(&ab8500_btemp_list, struct ab8500_btemp, node);
+
+	return btemp;
+}
 
 /**
  * ab8500_btemp_batctrl_volt_to_res() - convert batctrl voltage to resistance
@@ -723,6 +739,17 @@ static int ab8500_btemp_get_temp(struct ab8500_btemp *di)
 }
 
 /**
+ * ab8500_btemp_get_batctrl_temp() - get the temperature
+ * @btemp:      pointer to the btemp structure
+ *
+ * Returns the batctrl temperature in millidegrees
+ */
+int ab8500_btemp_get_batctrl_temp(struct ab8500_btemp *btemp)
+{
+	return btemp->bat_temp * 1000;
+}
+
+/**
  * ab8500_btemp_get_property() - get the btemp properties
  * @psy:        pointer to the power_supply structure
  * @psp:        pointer to the power_supply_property structure
@@ -1032,6 +1059,7 @@ static int __devinit ab8500_btemp_probe(struct platform_device *pdev)
 
 	/* Kick off periodic temperature measurements */
 	ab8500_btemp_periodic(di, true);
+	list_add_tail(&di->node, &ab8500_btemp_list);
 
 	return ret;
 
