@@ -1368,32 +1368,7 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 		limit = 65535;		/* Should really be FSG_BUFLEN */
 	}
 
-	/* No block descriptors */
-
-	/*
-	 * The mode pages, in numerical order.  The only page we support
-	 * is the Caching page.
-	 */
-	if (page_code == 0x08 || all_pages) {
-		valid_page = 1;
-		buf[0] = 0x08;		/* Page code */
-		buf[1] = 10;		/* Page length */
-		memset(buf+2, 0, 10);	/* None of the fields are changeable */
-
-		if (!changeable_values) {
-			buf[2] = 0x04;	/* Write cache enable, */
-					/* Read cache not disabled */
-					/* No cache retention priorities */
-			put_unaligned_be16(0xffff, &buf[4]);
-					/* Don't disable prefetch */
-					/* Minimum prefetch = 0 */
-			put_unaligned_be16(0xffff, &buf[8]);
-					/* Maximum prefetch */
-			put_unaligned_be16(0xffff, &buf[10]);
-					/* Maximum prefetch ceiling */
-		}
-		buf += 12;
-	}
+	valid_page = 1;
 
 	/*
 	 * Check that a valid page was requested and the mode data length
