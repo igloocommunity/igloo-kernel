@@ -15,9 +15,10 @@
 #include <linux/mutex.h>
 #include <linux/debugfs.h>
 #include <linux/module.h>
-#include <linux/gpio/nomadik.h>
+#include <linux/gpio.h>
 #include <linux/mfd/ab8500/sysctrl.h>
 #include <linux/workqueue.h>
+#include <linux/gpio/nomadik.h>
 #include <linux/regulator/consumer.h>
 #include <linux/mfd/abx500.h>
 
@@ -25,10 +26,10 @@
 
 #include <mach/hardware.h>
 #include <mach/prcmu.h>
-#include <mach/prcmu-regs.h>
 
 #include "clock.h"
 #include "pins-db5500.h"
+#include "prcmu-regs-db5500.h"
 
 static DEFINE_MUTEX(sysclk_mutex);
 static DEFINE_MUTEX(pll_mutex);
@@ -163,13 +164,6 @@ static pin_cfg_t clkout1_pins[] = {
 
 static int clkout0_enable(struct clk *clk)
 {
-	unsigned int val = readl(PRCM_CLKOCR);
-
-	val &= ~PRCM_CLKOCR_CLKOUT0_MASK;
-	val |= PRCM_CLKOCR_CLKOUT0_REF_CLK;
-
-	writel(val, PRCM_CLKOCR);
-
 	return nmk_config_pins(clkout0_pins, ARRAY_SIZE(clkout0_pins));
 }
 
@@ -186,13 +180,6 @@ static void clkout0_disable(struct clk *clk)
 
 static int clkout1_enable(struct clk *clk)
 {
-	unsigned int val = readl(PRCM_CLKOCR);
-
-	val &= ~PRCM_CLKOCR_CLKOUT1_MASK;
-	val |= PRCM_CLKOCR_CLKOUT1_REF_CLK;
-
-	writel(val, PRCM_CLKOCR);
-
 	return nmk_config_pins(clkout1_pins, ARRAY_SIZE(clkout0_pins));
 }
 
@@ -295,11 +282,6 @@ static struct clk clk_dummy = {
 	.name = "dummy",
 };
 
-static struct clk clk_msp1 = {
-	.name = "msp1",
-	.rate = 26000000,
-};
-
 static struct clk rtc_clk1 = {
 	.name	= "rtc_clk1",
 	.ops	= &rtc_clk_ops,
@@ -338,17 +320,43 @@ static struct clk audioclk = {
 	.parents = audioclk_parents,
 };
 
+static DEFINE_MUTEX(parented_prcmu_mutex);
+
+#define DEF_PRCMU_CLK_PARENT(_name, _cg_sel, _rate, _parent) \
+	struct clk _name = { \
+		.name = #_name, \
+		.ops = &prcmu_clk_ops, \
+		.cg_sel = _cg_sel, \
+		.rate = _rate, \
+		.parent = _parent, \
+		.mutex = &parented_prcmu_mutex, \
+	}
+
+static DEFINE_MUTEX(prcmu_client_mutex);
+
+#define DEF_PRCMU_CLIENT_CLK(_name, _cg_sel, _rate) \
+	struct clk _name = { \
+		.name = #_name, \
+		.ops = &prcmu_clk_ops, \
+		.cg_sel = _cg_sel, \
+		.rate = _rate, \
+		.mutex = &prcmu_client_mutex, \
+	}
+
 static DEF_PRCMU_CLK(dmaclk, PRCMU_DMACLK, 200000000);
 static DEF_PRCMU_CLK(b2r2clk, PRCMU_B2R2CLK, 200000000);
 static DEF_PRCMU_CLK(sgaclk, PRCMU_SGACLK, 199900000);
 static DEF_PRCMU_CLK(uartclk, PRCMU_UARTCLK, 36360000);
 static DEF_PRCMU_CLK(msp02clk, PRCMU_MSP02CLK, 13000000);
+static DEF_PRCMU_CLIENT_CLK(msp1clk, PRCMU_MSP1CLK, 26000000);
+static DEF_PRCMU_CLIENT_CLK(cdclk, PRCMU_CDCLK, 26000000);
 static DEF_PRCMU_CLK(i2cclk, PRCMU_I2CCLK, 24000000);
 static DEF_PRCMU_CLK(irdaclk, PRCMU_IRDACLK, 48000000);
 static DEF_PRCMU_CLK(irrcclk, PRCMU_IRRCCLK, 48000000);
 static DEF_PRCMU_CLK(rngclk, PRCMU_RNGCLK, 26000000);
 static DEF_PRCMU_CLK(pwmclk, PRCMU_PWMCLK, 26000000);
 static DEF_PRCMU_CLK(sdmmcclk, PRCMU_SDMMCCLK, 100000000);
+static DEF_PRCMU_CLK(spare1clk, PRCMU_SPARE1CLK, 100000000);
 static DEF_PRCMU_CLK(per1clk, PRCMU_PER1CLK, 133330000);
 static DEF_PRCMU_CLK(per2clk, PRCMU_PER2CLK, 133330000);
 static DEF_PRCMU_CLK(per3clk, PRCMU_PER3CLK, 133330000);
@@ -361,7 +369,7 @@ static DEF_PRCMU_CLK(mcdeclk, PRCMU_MCDECLK, 160000000);
 static DEF_PRCMU_CLK(tvclk, PRCMU_TVCLK, 40000000);
 static DEF_PRCMU_CLK(dsialtclk, PRCMU_DSIALTCLK, 400000000);
 static DEF_PRCMU_CLK(timclk, PRCMU_TIMCLK, 3250000);
-static DEF_PRCMU_CLK(svaclk, PRCMU_SVACLK, 156000000);
+static DEF_PRCMU_CLK_PARENT(svaclk, PRCMU_SVACLK, 156000000, &soc1_pll);
 static DEF_PRCMU_CLK(siaclk, PRCMU_SIACLK, 133330000);
 
 /* PRCC PClocks */
@@ -412,7 +420,7 @@ static DEF_PER1_KCLK(0, p1_msp0_kclk, &msp02clk);
 static DEF_PER_CLK(p1_msp0_clk, &p1_pclk0, &p1_msp0_kclk);
 
 /* SDI0 */
-static DEF_PER1_KCLK(1, p1_sdi0_kclk, &sdmmcclk);
+static DEF_PER1_KCLK(1, p1_sdi0_kclk, &spare1clk); /* &sdmmcclk on v1 */
 static DEF_PER_CLK(p1_sdi0_clk, &p1_pclk1, &p1_sdi0_kclk);
 
 /* SDI2 */
@@ -506,10 +514,13 @@ static struct clk *db5500_dbg_clks[] __initdata = {
 	&svaclk,
 	&uartclk,
 	&msp02clk,
+	&msp1clk,
+	&cdclk,
 	&i2cclk,
 	&irdaclk,
 	&irrcclk,
 	&sdmmcclk,
+	&spare1clk,
 	&per1clk,
 	&per2clk,
 	&per3clk,
@@ -596,6 +607,8 @@ static struct clk_lookup db5500_prcmu_clocks[] = {
 	CLK_LOOKUP(svaclk, "hva", NULL),
 	CLK_LOOKUP(uartclk, "UART", NULL),
 	CLK_LOOKUP(msp02clk, "MSP02", NULL),
+	CLK_LOOKUP(msp1clk, "MSP_I2S.1", NULL),
+	CLK_LOOKUP(cdclk, "cable_detect.0", NULL),
 	CLK_LOOKUP(i2cclk, "I2C", NULL),
 	CLK_LOOKUP(sdmmcclk, "sdmmc", NULL),
 	CLK_LOOKUP(per1clk, "PERIPH1", NULL),
@@ -626,7 +639,7 @@ static struct clk_lookup db5500_prcc_clocks[] = {
 	CLK_LOOKUP(p1_pclk5, "gpio.1", NULL),
 	CLK_LOOKUP(p1_pclk6, "fsmc", NULL),
 
-	CLK_LOOKUP(p2_pclk0, "musb_hdrc.0", NULL),
+	CLK_LOOKUP(p2_pclk0, "musb_hdrc.0", "usb"),
 	CLK_LOOKUP(p2_pclk1, "gpio.2", NULL),
 
 	CLK_LOOKUP(p3_keypad_clk, "db5500-keypad", NULL),
@@ -662,11 +675,9 @@ static struct clk_lookup db5500_prcc_clocks[] = {
 	CLK_LOOKUP(p6_mtu1_clk, "mtu1", NULL),
 
 	/*
-	 * TODO: Clarify whether MSP1 need to be accessed from Linux, and who
-	 * sets up the GPIOs.
+	 * Dummy clock sets up the GPIOs.
 	 */
 	CLK_LOOKUP(clk_dummy, "gpio.3", NULL),
-	CLK_LOOKUP(clk_msp1, "MSP_I2S.1", NULL),
 };
 
 static struct clk_lookup db5500_clkouts[] = {
@@ -720,6 +731,15 @@ static void __init db5500_boot_clk_enable(void)
 	}
 }
 
+static void configure_clkouts(void)
+{
+	/* div parameter does not matter for sel0 REF_CLK */
+	WARN_ON(prcmu_config_clkout(DB5500_CLKOUT0,
+		DB5500_CLKOUT_REF_CLK_SEL0, 0));
+	WARN_ON(prcmu_config_clkout(DB5500_CLKOUT1,
+		DB5500_CLKOUT_REF_CLK_SEL0, 0));
+}
+
 int __init db5500_clk_init(void)
 {
 	if (ux500_is_svp()) {
@@ -730,6 +750,9 @@ int __init db5500_clk_init(void)
 		prcc_kclk_ops.enable = NULL;
 		prcc_kclk_ops.disable = NULL;
 	}
+
+	if (cpu_is_u5500v1())
+		p1_sdi0_kclk.parent = &sdmmcclk;
 
 	clks_register(u8500_common_clock_sources,
 		ARRAY_SIZE(u8500_common_clock_sources));
@@ -750,6 +773,8 @@ int __init db5500_clk_init(void)
 	clk_enable(&p6_pclk2);
 	clk_enable(&p6_pclk3);
 	clk_enable(&p6_rng_clk);
+
+	configure_clkouts();
 
 	return 0;
 }
