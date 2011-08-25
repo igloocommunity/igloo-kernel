@@ -18,6 +18,7 @@
 
 #include <mach/prcmu.h>
 #include <mach/prcmu-regs.h>
+#include <mach/prcmu-qos.h>
 
 #include "context.h"
 #include "pm.h"
@@ -210,17 +211,34 @@ static void ux500_suspend_wake(void)
 	(void)prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
 }
 
+static int ux500_suspend_begin(suspend_state_t state)
+{
+	prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
+				     "suspend", 100);
+	return ux500_suspend_dbg_begin(state);
+}
+
+static void ux500_suspend_end(void)
+{
+	prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
+				     "suspend", 25);
+}
+
 static struct platform_suspend_ops ux500_suspend_ops = {
 	.enter	      = ux500_suspend_enter,
 	.valid	      = ux500_suspend_valid,
 	.prepare_late = ux500_suspend_prepare_late,
 	.wake	      = ux500_suspend_wake,
-	.begin	      = ux500_suspend_dbg_begin,
+	.begin	      = ux500_suspend_begin,
+	.end	      = ux500_suspend_end,
 };
 
 static __init int ux500_suspend_init(void)
 {
 	ux500_suspend_dbg_init();
+
+	prcmu_qos_add_requirement(PRCMU_QOS_ARM_OPP, "suspend", 25);
+
 	suspend_set_ops(&ux500_suspend_ops);
 	return 0;
 }

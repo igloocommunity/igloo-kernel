@@ -53,7 +53,10 @@ static inline bool ux500_suspend_deepsleep_enabled(void)
 static inline void ux500_suspend_dbg_sleep_status(bool is_deepsleep) { }
 static inline void ux500_suspend_dbg_init(void) { }
 
-#define ux500_suspend_dbg_begin NULL
+static inline int ux500_suspend_dbg_begin(suspend_state_t state)
+{
+	return 0;
+}
 
 #endif
 
