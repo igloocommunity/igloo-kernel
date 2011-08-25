@@ -12,9 +12,9 @@
 
 #include <linux/suspend.h>
 #include <linux/gpio.h>
-#include <linux/gpio/nomadik.h>
 #include <linux/delay.h>
 #include <linux/regulator/ab8500-debug.h>
+#include <linux/gpio/nomadik.h>
 
 #include <mach/prcmu.h>
 #include <mach/prcmu-regs.h>
@@ -59,6 +59,8 @@ static int suspend(bool do_deepsleep)
 		return -EBUSY;
 	}
 
+	nmk_gpio_clocks_enable();
+
 	ux500_suspend_dbg_add_wake_on_uart();
 	nmk_gpio_wakeups_suspend();
 
@@ -85,9 +87,6 @@ static int suspend(bool do_deepsleep)
 
 	ux500_pm_gic_decouple();
 
-	/* TODO: decouple gic should look at status bit.*/
-	udelay(100);
-
 	if (ux500_pm_gic_pending_interrupt()) {
 		pr_info("suspend/resume: pending interrupt\n");
 
@@ -102,6 +101,7 @@ static int suspend(bool do_deepsleep)
 	if (do_deepsleep) {
 		context_varm_save_common();
 		context_varm_save_core();
+		context_gic_dist_disable_unneeded_irqs();
 		context_save_cpu_registers();
 
 		/*
@@ -114,7 +114,7 @@ static int suspend(bool do_deepsleep)
 
 		(void) prcmu_set_power_state(PRCMU_AP_DEEP_SLEEP,
 					     false, false);
-		context_save_to_sram_and_wfi(true, true);
+		context_save_to_sram_and_wfi(true);
 
 		context_restore_cpu_registers();
 		context_varm_restore_core();
@@ -154,6 +154,8 @@ exit:
 
 	nmk_gpio_wakeups_resume();
 	ux500_suspend_dbg_remove_wake_on_uart();
+
+	nmk_gpio_clocks_disable();
 
 	return ret;
 }

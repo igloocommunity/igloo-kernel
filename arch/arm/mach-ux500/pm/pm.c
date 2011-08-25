@@ -12,9 +12,9 @@
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/gpio/nomadik.h>
-#include <asm/processor.h>
 
 #include <asm/hardware/gic.h>
+#include <asm/processor.h>
 
 #include <mach/hardware.h>
 #include <mach/prcmu-regs.h>
@@ -22,6 +22,7 @@
 #include "pm.h"
 
 #define STABILIZATION_TIME 30 /* us */
+#define GIC_FREEZE_DELAY 1 /* us */
 
 #define PRCM_ARM_WFI_STANDBY_CPU0_WFI 0x8
 #define PRCM_ARM_WFI_STANDBY_CPU1_WFI 0x10
@@ -62,6 +63,7 @@ void ux500_pm_gic_decouple(void)
 		cpu_relax();
 
 	/* TODO: Use the ack bit when possible */
+	udelay(GIC_FREEZE_DELAY); /* Wait for the GIC to freeze */
 }
 
 /* Recouple GIC with the interrupt bus */
@@ -148,8 +150,12 @@ void ux500_pm_gpio_save_wake_up_status(void)
 		banks = u8500_gpio_banks;
 	}
 
+	nmk_gpio_clocks_enable();
+
 	for (i = 0; i < num_banks; i++)
 		ux500_gpio_wks[i] = readl(__io_address(banks[i]) + NMK_GPIO_WKS);
+
+	nmk_gpio_clocks_disable();
 }
 
 u32 ux500_pm_gpio_read_wake_up_status(unsigned int bank_num)

@@ -1,0 +1,46 @@
+/*
+ * Copyright (C) ST-Ericsson SA 2010
+ *
+ * License Terms: GNU General Public License v2
+ *
+ * Author: Bengt Jonsson <bengt.g.jonsson@stericsson.com> for ST-Ericsson
+ *
+ * Interface to platform specific regulators on U8500
+ */
+
+#ifndef __REGULATOR_H__
+#define __REGULATOR_H__
+
+/* Number of U8500 regulators and regulator enumeration */
+enum u8500_regulator_id {
+	U8500_REGULATOR_VAPE,
+	U8500_REGULATOR_VARM,
+	U8500_REGULATOR_VMODEM,
+	U8500_REGULATOR_VPLL,
+	U8500_REGULATOR_VSMPS1,
+	U8500_REGULATOR_VSMPS2,
+	U8500_REGULATOR_VSMPS3,
+	U8500_REGULATOR_VRF1,
+	U8500_REGULATOR_SWITCH_SVAMMDSP,
+	U8500_REGULATOR_SWITCH_SVAMMDSPRET,
+	U8500_REGULATOR_SWITCH_SVAPIPE,
+	U8500_REGULATOR_SWITCH_SIAMMDSP,
+	U8500_REGULATOR_SWITCH_SIAMMDSPRET,
+	U8500_REGULATOR_SWITCH_SIAPIPE,
+	U8500_REGULATOR_SWITCH_SGA,
+	U8500_REGULATOR_SWITCH_B2R2_MCDE,
+	U8500_REGULATOR_SWITCH_ESRAM12,
+	U8500_REGULATOR_SWITCH_ESRAM12RET,
+	U8500_REGULATOR_SWITCH_ESRAM34,
+	U8500_REGULATOR_SWITCH_ESRAM34RET,
+	U8500_NUM_REGULATORS
+};
+
+/*
+ * Exported interface for CPUIdle only. This function is called with all
+ * interrupts turned off.
+ */
+int power_state_active_is_enabled(void);
+
+#endif
+

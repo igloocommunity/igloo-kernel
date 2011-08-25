@@ -67,11 +67,12 @@ static unsigned long max_instant = 85;
 static u32 exit_irq_per_s = 1000;
 static u64 old_num_irqs;
 
-static DEFINE_MUTEX(user_config_mutex);
+static DEFINE_MUTEX(usecase_mutex);
 static bool user_config_updated;
 static enum ux500_uc current_uc = UX500_UC_MAX;
 static bool is_work_scheduled;
 static bool is_early_suspend;
+static bool uc_master_enable = true;
 
 static unsigned int cpuidle_deepest_state;
 
@@ -112,8 +113,8 @@ static struct usecase_config usecase_conf[UX500_UC_MAX] = {
 	},
 	[UX500_UC_VC] = {
 		.name			= "voice-call",
-		.max_freq		= 200000,
-		.min_freq		= 200000,
+		.max_freq		= 400000,
+		.min_freq		= 400000,
 		.cpuidle_multiplier	= 0,
 		.second_cpu_online	= false,
 		.l2_prefetch_en		= false,
@@ -404,6 +405,44 @@ exit:
 	user_config_updated = false;
 }
 
+void usecase_update_governor_state(void)
+{
+	bool cancel_work = false;
+
+	mutex_lock(&usecase_mutex);
+
+	if (uc_master_enable && (usecase_conf[UX500_UC_AUTO].enable ||
+		usecase_conf[UX500_UC_USER].enable)) {
+		/*
+		 * Usecases are enabled. If we are in early suspend put
+		 * governor to work.
+		 */
+		if (is_early_suspend && !is_work_scheduled) {
+			schedule_delayed_work_on(0, &work_usecase,
+				msecs_to_jiffies(CPULOAD_MEAS_DELAY));
+			is_work_scheduled = true;
+		} else if (!is_early_suspend && is_work_scheduled) {
+			/* Exiting from early suspend. */
+			cancel_work = true;
+		}
+
+	} else if (is_work_scheduled) {
+		/* No usecase enabled or governor is not enabled. */
+		cancel_work =  true;
+	}
+
+	if (cancel_work) {
+		cancel_delayed_work_sync(&work_usecase);
+		is_work_scheduled = false;
+
+		/* Set the default settings before exiting. */
+		set_cpu_config(UX500_UC_NORMAL);
+	}
+
+	mutex_unlock(&usecase_mutex);
+
+}
+
 /*
  * Start load measurment every 6 s in order detrmine if can unplug one CPU.
  * In order to not corrupt measurment, the first load average is not done
@@ -413,37 +452,17 @@ static void usecase_earlysuspend_callback(struct early_suspend *h)
 {
 	init_cpu_load_trend();
 
-	mutex_lock(&user_config_mutex);
-
 	is_early_suspend = true;
 
-	if (usecase_conf[UX500_UC_AUTO].enable ||
-		usecase_conf[UX500_UC_USER].enable) {
-
-		is_work_scheduled = true;
-
-		schedule_delayed_work_on(0, &work_usecase,
-				msecs_to_jiffies(CPULOAD_MEAS_DELAY));
-	}
-
-	mutex_unlock(&user_config_mutex);
+	usecase_update_governor_state();
 }
 
 /* Stop measurement, call LCD early resume */
 static void usecase_lateresume_callback(struct early_suspend *h)
 {
-	mutex_lock(&user_config_mutex);
-
-	if (is_work_scheduled) {
-		cancel_delayed_work_sync(&work_usecase);
-		is_work_scheduled = false;
-	}
-
 	is_early_suspend = false;
 
-	set_cpu_config(UX500_UC_NORMAL);
-
-	mutex_unlock(&user_config_mutex);
+	usecase_update_governor_state();
 }
 
 static void delayed_usecase_work(struct work_struct *work)
@@ -475,7 +494,7 @@ static void delayed_usecase_work(struct work_struct *work)
 	irqs_per_s = get_num_interrupts_per_s();
 
 	/* Dont let configuration change in the middle of our calculations. */
-	mutex_lock(&user_config_mutex);
+	mutex_lock(&usecase_mutex);
 
 	/* detect "instant" load increase */
 	if (load > max_instant || irqs_per_s > exit_irq_per_s) {
@@ -516,7 +535,7 @@ static void delayed_usecase_work(struct work_struct *work)
 		set_cpu_config(UX500_UC_NORMAL);
 	}
 
-	mutex_unlock(&user_config_mutex);
+	mutex_unlock(&usecase_mutex);
 
 	/* reprogramm scheduled work */
 	schedule_delayed_work_on(0, &work_usecase,
@@ -663,7 +682,7 @@ static void usecase_update_user_config(void)
 	bool config_enable = false;
 	struct usecase_config *user_conf = &usecase_conf[UX500_UC_USER];
 
-	mutex_lock(&user_config_mutex);
+	mutex_lock(&usecase_mutex);
 
 	user_conf->max_freq = 0;
 	user_conf->min_freq = 0;
@@ -711,7 +730,7 @@ static void usecase_update_user_config(void)
 	user_conf->enable = config_enable;
 	user_config_updated = true;
 
-	mutex_unlock(&user_config_mutex);
+	mutex_unlock(&usecase_mutex);
 }
 
 struct usecase_devclass_attr {
@@ -719,9 +738,14 @@ struct usecase_devclass_attr {
 	u32 index;
 };
 
-static struct usecase_devclass_attr usecase_dc_attr[UX500_UC_MAX];
+/* One for each usecase except "user" + current + enable */
+#define UX500_NUM_SYSFS_NODES (UX500_UC_USER + 2)
+#define UX500_CURRENT_NODE_INDEX (UX500_NUM_SYSFS_NODES - 1)
+#define UX500_ENABLE_NODE_INDEX (UX500_NUM_SYSFS_NODES - 2)
 
-static struct attribute *dbs_attributes[UX500_UC_MAX + 1] = {NULL};
+static struct usecase_devclass_attr usecase_dc_attr[UX500_NUM_SYSFS_NODES];
+
+static struct attribute *dbs_attributes[UX500_NUM_SYSFS_NODES + 1] = {NULL};
 
 static struct attribute_group dbs_attr_group = {
 	.attrs = dbs_attributes,
@@ -735,17 +759,43 @@ static ssize_t show_current(struct sysdev_class *class,
 					UX500_UC_NORMAL : current_uc;
 
 	return sprintf(buf, "max_freq: %ld\n"
+		"min_freq: %ld\n"
 		"cpuidle_multiplier: %ld\n"
 		"second_cpu_online: %s\n"
 		"l2_prefetch_en: %s\n"
 		"forced_state: %d\n"
 		"vc_override: %s\n",
 		usecase_conf[display_uc].max_freq,
+		usecase_conf[display_uc].min_freq,
 		usecase_conf[display_uc].cpuidle_multiplier,
 		usecase_conf[display_uc].second_cpu_online ? "true" : "false",
 		usecase_conf[display_uc].l2_prefetch_en ? "true" : "false",
 		usecase_conf[display_uc].forced_state,
 		usecase_conf[display_uc].vc_override ? "true" : "false");
+}
+
+static ssize_t show_enable(struct sysdev_class *class,
+			struct sysdev_class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", uc_master_enable);
+}
+
+static ssize_t store_enable(struct sysdev_class *class,
+					struct sysdev_class_attribute *attr,
+				    const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	uc_master_enable = (bool) input;
+
+	usecase_update_governor_state();
+
+	return count;
 }
 
 static ssize_t show_dc_attr(struct sysdev_class *class,
@@ -778,22 +828,7 @@ static ssize_t store_dc_attr(struct sysdev_class *class,
 
 	usecase_update_user_config();
 
-	mutex_lock(&user_config_mutex);
-
-	if (usecase_conf[UX500_UC_AUTO].enable ||
-		usecase_conf[UX500_UC_USER].enable) {
-		if (is_early_suspend && !is_work_scheduled) {
-			schedule_delayed_work_on(0, &work_usecase,
-				msecs_to_jiffies(CPULOAD_MEAS_DELAY));
-			is_work_scheduled = true;
-		}
-	} else if (is_work_scheduled) {
-		cancel_delayed_work_sync(&work_usecase);
-		is_work_scheduled = false;
-		set_cpu_config(UX500_UC_NORMAL);
-	}
-
-	mutex_unlock(&user_config_mutex);
+	usecase_update_governor_state();
 
 	return count;
 }
@@ -803,7 +838,8 @@ static int usecase_sysfs_init(void)
 	int err;
 	int i;
 
-	for (i = 0; i < (ARRAY_SIZE(usecase_conf) - 1); i++) {
+	/* Last two nodes are not based on usecase configurations */
+	for (i = 0; i < (UX500_NUM_SYSFS_NODES - 2); i++) {
 		usecase_dc_attr[i].class_attr.attr.name = usecase_conf[i].name;
 		usecase_dc_attr[i].class_attr.attr.mode = 0644;
 		usecase_dc_attr[i].class_attr.show = show_dc_attr;
@@ -812,13 +848,34 @@ static int usecase_sysfs_init(void)
 
 		dbs_attributes[i] = &(usecase_dc_attr[i].class_attr.attr);
 	}
-	usecase_dc_attr[UX500_UC_USER].class_attr.attr.name = "current";
-	usecase_dc_attr[UX500_UC_USER].class_attr.attr.mode = 0644;
-	usecase_dc_attr[UX500_UC_USER].class_attr.show = show_current;
-	usecase_dc_attr[UX500_UC_USER].class_attr.store = NULL;
-	usecase_dc_attr[UX500_UC_USER].index = UX500_UC_USER;
-	dbs_attributes[UX500_UC_USER] =
-		&(usecase_dc_attr[UX500_UC_USER].class_attr.attr);
+
+	/* sysfs current */
+	usecase_dc_attr[UX500_CURRENT_NODE_INDEX].class_attr.attr.name =
+		"current";
+	usecase_dc_attr[UX500_CURRENT_NODE_INDEX].class_attr.attr.mode =
+		0644;
+	usecase_dc_attr[UX500_CURRENT_NODE_INDEX].class_attr.show =
+		show_current;
+	usecase_dc_attr[UX500_CURRENT_NODE_INDEX].class_attr.store =
+		NULL;
+	usecase_dc_attr[UX500_CURRENT_NODE_INDEX].index =
+		0;
+	dbs_attributes[UX500_CURRENT_NODE_INDEX] =
+		&(usecase_dc_attr[UX500_CURRENT_NODE_INDEX].class_attr.attr);
+
+	/* sysfs enable */
+	usecase_dc_attr[UX500_ENABLE_NODE_INDEX].class_attr.attr.name =
+		"enable";
+	usecase_dc_attr[UX500_ENABLE_NODE_INDEX].class_attr.attr.mode =
+		0644;
+	usecase_dc_attr[UX500_ENABLE_NODE_INDEX].class_attr.show =
+		show_enable;
+	usecase_dc_attr[UX500_ENABLE_NODE_INDEX].class_attr.store =
+		store_enable;
+	usecase_dc_attr[UX500_ENABLE_NODE_INDEX].index =
+		0;
+	dbs_attributes[UX500_ENABLE_NODE_INDEX] =
+		&(usecase_dc_attr[UX500_ENABLE_NODE_INDEX].class_attr.attr);
 
 	err = sysfs_create_group(&(cpu_sysdev_class.kset.kobj),
 						&dbs_attr_group);

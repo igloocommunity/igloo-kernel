@@ -15,8 +15,7 @@
 #include <linux/sched.h>
 #include <linux/tick.h>
 #include <linux/clockchips.h>
-#include <linux/gpio.h>
-#include <linux/regulator/db8500-prcmu.h>
+#include <linux/gpio/nomadik.h>
 
 #include <mach/prcmu.h>
 
@@ -25,6 +24,7 @@
 #include "context.h"
 #include "pm.h"
 #include "timer.h"
+#include "../regulator-u8500.h"
 
 /*
  * All measurements are with two cpus online (worst case) and at
@@ -57,7 +57,6 @@ static struct cstate cstates[] = {
 		.power_usage = 1000,
 		.APE = APE_ON,
 		.ARM = ARM_ON,
-		.ARM_PLL = ARM_PLL_ON,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
 		.pwrst = PRCMU_AP_NO_CHANGE,
@@ -72,7 +71,6 @@ static struct cstate cstates[] = {
 		.power_usage = 10,
 		.APE = APE_ON,
 		.ARM = ARM_ON,
-		.ARM_PLL = ARM_PLL_ON,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
 		.pwrst = PRCMU_AP_NO_CHANGE,
@@ -81,13 +79,12 @@ static struct cstate cstates[] = {
 		.desc = "Wait for interrupt     ",
 	},
 	{
-		.enter_latency = 60,
-		.exit_latency = 60,
-		.threshold = 150,
-		.power_usage = 5,
+		.enter_latency = 170,
+		.exit_latency = 70,
+		.threshold = 260,
+		.power_usage = 4,
 		.APE = APE_ON,
 		.ARM = ARM_RET,
-		.ARM_PLL = ARM_PLL_ON,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
 		.pwrst = PRCMU_AP_IDLE,
@@ -96,32 +93,16 @@ static struct cstate cstates[] = {
 		.desc = "ApIdle                 ",
 	},
 	{
-		.enter_latency = 70,
-		.exit_latency = 70,
-		.threshold = 160,
-		.power_usage = 4,
-		.APE = APE_ON,
-		.ARM = ARM_RET,
-		.ARM_PLL = ARM_PLL_OFF,
-		.UL_PLL = UL_PLL_ON,
-		.ESRAM = ESRAM_RET,
-		.pwrst = PRCMU_AP_IDLE,
-		.flags = CPUIDLE_FLAG_TIME_VALID,
-		.state = CI_IDLE,
-		.desc = "ApIdle, ARM PLL off    ",
-	},
-	{
-		.enter_latency = 250,
+		.enter_latency = 350,
 		.exit_latency = MAX_SLEEP_WAKE_UP_LATENCY + 200,
 		/*
 		 * Note: Sleep time must be longer than 120 us or else
 		 * there might be issues with the RTC-RTT block.
 		 */
-		.threshold = MAX_SLEEP_WAKE_UP_LATENCY + 250 + 200,
+		.threshold = MAX_SLEEP_WAKE_UP_LATENCY + 350 + 200,
 		.power_usage = 3,
 		.APE = APE_OFF,
 		.ARM = ARM_RET,
-		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
 		.pwrst = PRCMU_AP_SLEEP,
@@ -130,15 +111,14 @@ static struct cstate cstates[] = {
 		.desc = "ApSleep                ",
 	},
 	{
-		.enter_latency = 250,
+		.enter_latency = 350,
 		.exit_latency = (MAX_SLEEP_WAKE_UP_LATENCY +
 				 UL_PLL_START_UP_LATENCY + 200),
 		.threshold = (MAX_SLEEP_WAKE_UP_LATENCY +
-			      UL_PLL_START_UP_LATENCY + 250 + 200),
+			      UL_PLL_START_UP_LATENCY + 350 + 200),
 		.power_usage = 2,
 		.APE = APE_OFF,
 		.ARM = ARM_RET,
-		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_OFF,
 		.ESRAM = ESRAM_RET,
 		.pwrst = PRCMU_AP_SLEEP,
@@ -148,13 +128,12 @@ static struct cstate cstates[] = {
 	},
 #ifdef CONFIG_U8500_CPUIDLE_APDEEPIDLE
 	{
-		.enter_latency = 300,
+		.enter_latency = 400,
 		.exit_latency = DEEP_SLEEP_WAKE_UP_LATENCY + 400,
-		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 300 + 400,
+		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 400 + 400,
 		.power_usage = 2,
 		.APE = APE_ON,
 		.ARM = ARM_OFF,
-		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_ON,
 		.ESRAM = ESRAM_RET,
 		.pwrst = PRCMU_AP_DEEP_IDLE,
@@ -164,13 +143,12 @@ static struct cstate cstates[] = {
 	},
 #endif
 	{
-		.enter_latency = 310,
+		.enter_latency = 410,
 		.exit_latency = DEEP_SLEEP_WAKE_UP_LATENCY + 420,
-		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 310 + 420,
+		.threshold = DEEP_SLEEP_WAKE_UP_LATENCY + 410 + 420,
 		.power_usage = 1,
 		.APE = APE_OFF,
 		.ARM = ARM_OFF,
-		.ARM_PLL = ARM_PLL_OFF,
 		.UL_PLL = UL_PLL_OFF,
 		.ESRAM = ESRAM_RET,
 		.pwrst = PRCMU_AP_DEEP_SLEEP,
@@ -184,6 +162,7 @@ struct cpu_state {
 	int gov_cstate;
 	ktime_t sched_wake_up;
 	struct cpuidle_device dev;
+	bool restore_arm_core;
 };
 
 static DEFINE_PER_CPU(struct cpu_state, *cpu_state);
@@ -196,6 +175,7 @@ static ktime_t time_next;  /* protected by cpuidle_lock */
 extern struct clock_event_device u8500_mtu_clkevt;
 
 static atomic_t idle_cpus_counter = ATOMIC_INIT(0);
+static atomic_t master_counter = ATOMIC_INIT(0);
 
 struct cstate *ux500_ci_get_cstates(int *len)
 {
@@ -204,9 +184,18 @@ struct cstate *ux500_ci_get_cstates(int *len)
 	return cstates;
 }
 
-static void restore_sequence(ktime_t now)
+static void restore_sequence(struct cpu_state *state, ktime_t now)
 {
 	spin_lock(&cpuidle_lock);
+
+	smp_rmb();
+	if (state->restore_arm_core) {
+		state->restore_arm_core = false;
+		smp_wmb();
+
+		context_restore_cpu_registers();
+		context_varm_restore_core();
+	}
 
 	smp_rmb();
 	if (restore_arm) {
@@ -242,13 +231,13 @@ static void restore_sequence(ktime_t now)
 		 * If we're returning from ApSleep and the RTC timer
 		 * caused the wake up, program the MTU to trigger.
 		 */
-		if ((ktime_to_us(now) > ktime_to_us(time_next)))
+		if ((ktime_to_us(now) >= ktime_to_us(time_next)))
 			time_next = ktime_add(now, ktime_set(0, 1000));
 
 		/* Make sure have an MTU interrupt waiting for us */
-		clockevents_program_event(&u8500_mtu_clkevt,
+		WARN_ON(clockevents_program_event(&u8500_mtu_clkevt,
 					  time_next,
-					  now);
+					  now));
 	}
 
 	spin_unlock(&cpuidle_lock);
@@ -290,6 +279,7 @@ static u32 get_remaining_sleep_time(ktime_t *next, int *on_cpu)
 
 static bool is_last_cpu_running(void)
 {
+	smp_rmb();
 	return atomic_read(&idle_cpus_counter) == num_online_cpus();
 }
 
@@ -369,8 +359,9 @@ static int enter_sleep(struct cpuidle_device *dev,
 	int target;
 	struct cpu_state *state;
 	bool slept_well = false;
-	bool restore_local_arm = false;
 	int this_cpu = smp_processor_id();
+	bool migrate_timer;
+	bool master = false;
 
 	local_irq_disable();
 
@@ -391,6 +382,11 @@ static int enter_sleep(struct cpuidle_device *dev,
 	if (state->gov_cstate > ux500_ci_dbg_deepest_state())
 		state->gov_cstate = ux500_ci_dbg_deepest_state();
 
+	if (cstates[state->gov_cstate].ARM != ARM_ON)
+		migrate_timer = true;
+	else
+		migrate_timer = false;
+
 	spin_unlock(&cpuidle_lock);
 
 	atomic_inc(&idle_cpus_counter);
@@ -405,36 +401,55 @@ static int enter_sleep(struct cpuidle_device *dev,
 		/* "target" will be last_state in the cpuidle framework */
 		goto exit_fast;
 
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &this_cpu);
-
+	/* Only one CPU should master the sleeping sequence */
 	if (cstates[target].ARM != ARM_ON) {
+		smp_mb();
+		if (atomic_inc_return(&master_counter) == 1)
+			master = true;
+		else
+			atomic_dec(&master_counter);
+		smp_mb();
+	}
 
-		/* Decouple GIC from the interrupt bus */
+	if (migrate_timer)
+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER,
+				   &this_cpu);
+
+
+	if (master && (cstates[target].ARM != ARM_ON)) {
+
 		ux500_pm_gic_decouple();
 
-		if (!ux500_pm_other_cpu_wfi())
-			/* Other CPU was not in WFI => abort */
-			goto exit;
 		/*
-		 * Check if we have a pending interrupt or if sleep
-		 * state has changed after GIC has been frozen
+		 * Check if sleep state has changed after GIC has been frozen
 		 */
-		if (ux500_pm_gic_pending_interrupt())
+		if (target != determine_sleep_state(&sleep_time)) {
+			atomic_dec(&master_counter);
+			goto exit;
+		}
+
+		/* Copy GIC interrupt settings to PRCMU interrupt settings */
+		ux500_pm_prcmu_copy_gic_settings();
+
+		if (ux500_pm_gic_pending_interrupt()) {
+			/* An interrupt found => abort */
+			atomic_dec(&master_counter);
+			goto exit;
+		}
+
+		if (ux500_pm_prcmu_pending_interrupt()) {
+			/* An interrupt found => abort */
+			atomic_dec(&master_counter);
 			goto exit;
 
-		if (ux500_pm_prcmu_pending_interrupt())
-			/* An interrupt found => abort */
-			goto exit;
+		}
 		/*
 		 * No PRCMU interrupt was pending => continue the
 		 * sleeping stages
 		 */
-
-		/* Copy GIC interrupt settings to PRCMU interrupt settings */
-		ux500_pm_prcmu_copy_gic_settings();
 	}
 
-	if (cstates[target].APE == APE_OFF) {
+	if (master && (cstates[target].APE == APE_OFF)) {
 		ktime_t est_wake_time;
 		int wake_cpu;
 
@@ -445,18 +460,20 @@ static int enter_sleep(struct cpuidle_device *dev,
 		sleep_time = get_remaining_sleep_time(&est_wake_time,
 						      &wake_cpu);
 
-		if (sleep_time == UINT_MAX)
+		if (sleep_time == UINT_MAX) {
+			atomic_dec(&master_counter);
 			goto exit;
+		}
 
 		if (cstates[target].UL_PLL == UL_PLL_OFF)
 			/* Compensate for ULPLL start up time */
 			sleep_time -= UL_PLL_START_UP_LATENCY;
 
-			/*
-			 * Not checking for negative sleep time since
-			 * determine_sleep_state has already checked that
-			 * there is enough time.
-			 */
+		/*
+		 * Not checking for negative sleep time since
+		 * determine_sleep_state has already checked that
+		 * there is enough time.
+		 */
 
 		/* Adjust for exit latency */
 		sleep_time -= MIN_SLEEP_WAKE_UP_LATENCY;
@@ -480,17 +497,25 @@ static int enter_sleep(struct cpuidle_device *dev,
 		spin_unlock(&cpuidle_lock);
 	}
 
-	if (cstates[target].ARM == ARM_OFF) {
+	if (master && (cstates[target].ARM == ARM_OFF)) {
+		int cpu;
+
 		context_varm_save_common();
+
 		spin_lock(&cpuidle_lock);
 		restore_arm = true;
+		for_each_possible_cpu(cpu) {
+			(per_cpu(cpu_state, cpu))->restore_arm_core = true;
+		}
 		spin_unlock(&cpuidle_lock);
 	}
 
-	if (cstates[target].ARM == ARM_OFF ||
-	    cstates[state->gov_cstate].ARM == ARM_OFF) {
-		restore_local_arm = true;
+	if (cstates[state->gov_cstate].ARM == ARM_OFF) {
 		context_varm_save_core();
+
+		if (master && (cstates[target].ARM == ARM_OFF))
+			context_gic_dist_disable_unneeded_irqs();
+
 		context_save_cpu_registers();
 
 		/*
@@ -500,43 +525,38 @@ static int enter_sleep(struct cpuidle_device *dev,
 		 * has as little as possible to do.
 		 */
 		context_clean_l1_cache_all();
-
 	}
 
 	ux500_ci_dbg_log(target, time_enter);
 
-	if (is_last_cpu_running() && cstates[target].ARM != ARM_ON)
+	if (master && cstates[target].ARM != ARM_ON)
 		prcmu_set_power_state(cstates[target].pwrst,
 				      cstates[target].UL_PLL,
 				      /* Is actually the AP PLL */
 				      cstates[target].UL_PLL);
+
+	if (master)
+		atomic_dec(&master_counter);
 
 	/*
 	 * If deepsleep/deepidle, Save return address to SRAM and set
 	 * this CPU in WFI. This is last core to enter sleep, so we need to
 	 * clean both L2 and L1 caches
 	 */
-	if (cstates[state->gov_cstate].ARM == ARM_ON)
+	if (cstates[state->gov_cstate].ARM == ARM_OFF)
+		context_save_to_sram_and_wfi(cstates[target].ARM == ARM_OFF);
+	else
 		__asm__ __volatile__
 			("dsb\n\t" "wfi\n\t" : : : "memory");
-	else
-		context_save_to_sram_and_wfi(cstates[state->gov_cstate].ARM == ARM_OFF,
-					     cstates[target].ARM == ARM_OFF);
 
 	if (is_last_cpu_running())
 		ux500_ci_dbg_wake_latency(target, sleep_time);
 
 	time_wake = ktime_get();
 
-	/* The PRCMU restores ARM PLL and recouples the GIC */
-	if (restore_local_arm) {
-		context_restore_cpu_registers();
-		context_varm_restore_core();
-	}
-
 	slept_well = true;
 
-	restore_sequence(time_wake);
+	restore_sequence(state, time_wake);
 
 exit:
 	if (!slept_well)
@@ -544,9 +564,12 @@ exit:
 		ux500_pm_gic_recouple();
 
 	/* Use the ARM local timer for this cpu */
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,
-			   &this_cpu);
+	if (migrate_timer)
+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,
+				   &this_cpu);
 exit_fast:
+
+	atomic_dec(&idle_cpus_counter);
 
 	if (target < 0)
 		target = CI_RUNNING;
@@ -583,8 +606,6 @@ exit_fast:
 					  time_enter); /* enter cpuidle */
 
 	ux500_ci_dbg_log(CI_RUNNING, time_exit);
-
-	atomic_dec(&idle_cpus_counter);
 
 	local_irq_enable();
 
@@ -681,7 +702,7 @@ static void __exit cpuidle_driver_exit(void)
 	cpuidle_unregister_driver(&cpuidle_drv);
 }
 
-module_init(cpuidle_driver_init);
+late_initcall(cpuidle_driver_init);
 module_exit(cpuidle_driver_exit);
 
 MODULE_DESCRIPTION("U8500 cpuidle driver");
