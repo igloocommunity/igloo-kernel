@@ -17,6 +17,7 @@
 #include <linux/regulator/ab8500-debug.h>
 #include <linux/io.h>
 #include <mach/db8500-regs.h> /* U8500_BACKUPRAM1_BASE */
+#include <mach/hardware.h>
 
 /* board profile address - to determine if suspend-force is default */
 #define BOOT_INFO_BACKUPRAM1 (U8500_BACKUPRAM1_BASE + 0xffc)
@@ -1731,17 +1732,17 @@ static int __devinit ab8500_regulator_debug_probe(struct platform_device *plf)
 	if (ret < 0)
 		dev_err(&plf->dev, "Failed to record init state.\n");
 
-	/* remove force of external regulators on AB8500 3.0 */
-	if (abx500_get_chip_id(&pdev->dev) >= 0x30) {
+	/* remove force of external regulators if AB8500 3.0 and DB8500 v2.2 */
+	if ((abx500_get_chip_id(&pdev->dev) >= 0x30) && cpu_is_u8500v22()) {
 		/*
 		 * find ExtSupplyRegu register (bank 0x04, addr 0x08)
-		 * and reset mask and value
+		 * and update value (Vext1 in low-power, Vext2 and Vext3
+		 * off).
 		 */
 		for (i = 0; i < ARRAY_SIZE(ab8500_force_reg); i++) {
 			if (ab8500_force_reg[i].bank == 0x04 &&
 			    ab8500_force_reg[i].addr == 0x08) {
-				ab8500_force_reg[i].mask = 0x00;
-				ab8500_force_reg[i].val = 0x00;
+				ab8500_force_reg[i].val = 0x03;
 			}
 		}
 	}
