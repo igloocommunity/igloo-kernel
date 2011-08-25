@@ -90,10 +90,27 @@ static struct prcmu_qos_object ddr_opp_qos = {
 	.comparitor = max_compare
 };
 
+static struct prcmu_qos_object arm_opp_qos = {
+	.requirements =	{
+		LIST_HEAD_INIT(arm_opp_qos.requirements.list)
+	},
+	/*
+	 * No notifier on ARM opp qos request, since this won't actually
+	 * do anything, except changing limits for cpufreq
+	 */
+	.name = "arm_opp",
+	/* Target value in % ARM OPP, note can be 125% */
+	.default_value = 25,
+	.force_value = 0,
+	.target_value = ATOMIC_INIT(0),
+	.comparitor = max_compare
+};
+
 static struct prcmu_qos_object *prcmu_qos_array[] = {
 	&null_qos,
 	&ape_opp_qos,
-	&ddr_opp_qos
+	&ddr_opp_qos,
+	&arm_opp_qos,
 };
 
 static DEFINE_MUTEX(prcmu_qos_mutex);
@@ -141,7 +158,7 @@ static void update_target(int target)
 	s32 extreme_value;
 	struct requirement_list *node;
 	unsigned long flags;
-	int update = 0;
+	bool update = false;
 	u8 op;
 
 	mutex_lock(&prcmu_qos_mutex);
@@ -151,7 +168,7 @@ static void update_target(int target)
 
 	if (prcmu_qos_array[target]->force_value != 0) {
 		extreme_value = prcmu_qos_array[target]->force_value;
-		update = 1;
+		update = true;
 	} else {
 		list_for_each_entry(node,
 				    &prcmu_qos_array[target]->requirements.list,
@@ -161,7 +178,7 @@ static void update_target(int target)
 		}
 		if (atomic_read(&prcmu_qos_array[target]->target_value)
 		    != extreme_value) {
-			update = 1;
+			update = true;
 			atomic_set(&prcmu_qos_array[target]->target_value,
 				   extreme_value);
 			pr_debug("prcmu qos: new target for qos %d is %d\n",
@@ -172,53 +189,65 @@ static void update_target(int target)
 	}
 	spin_unlock_irqrestore(&prcmu_qos_lock, flags);
 
-	if (update) {
+	if (!update)
+		goto unlock_and_return;
+
+	if (prcmu_qos_array[target]->notifiers)
 		blocking_notifier_call_chain(prcmu_qos_array[target]->notifiers,
-			(unsigned long)extreme_value, NULL);
+					     (unsigned long)extreme_value,
+					     NULL);
 
-		if (target == PRCMU_QOS_DDR_OPP) {
-			switch (extreme_value) {
-			case 25:
-				op = DDR_25_OPP;
-				pr_debug("prcmu qos: set ddr opp to 25%%\n");
-				break;
-			case 50:
-				op = DDR_50_OPP;
-				pr_debug("prcmu qos: set ddr opp to 50%%\n");
-				break;
-			case 100:
-				op = DDR_100_OPP;
-				pr_debug("prcmu qos: set ddr opp to 100%%\n");
-				break;
-			default:
-				pr_err("prcmu qos: Incorrect ddr target value (%d)",
-				       extreme_value);
-				goto unlock_and_return;
-			}
-			prcmu_debug_ddr_opp_log(op);
-			prcmu_set_ddr_opp(op);
-		} else {
-			switch (extreme_value) {
-			case 50:
-				op = APE_50_OPP;
-				pr_debug("prcmu qos: set ape opp to 50%%\n");
-				break;
-			case 100:
-				op = APE_100_OPP;
-				pr_debug("prcmu qos: set ape opp to 100%%\n");
-				break;
-			default:
-				pr_err("prcmu qos: Incorrect ape target value (%d)",
-				       extreme_value);
-				goto unlock_and_return;
-			}
-
-			if (!ape_opp_forced_to_50_partly_25)
-				(void)prcmu_set_ape_opp(op);
-
-			prcmu_debug_ape_opp_log(op);
+	switch (target) {
+	case PRCMU_QOS_DDR_OPP:
+		switch (extreme_value) {
+		case 25:
+			op = DDR_25_OPP;
+			pr_debug("prcmu qos: set ddr opp to 25%%\n");
+			break;
+		case 50:
+			op = DDR_50_OPP;
+			pr_debug("prcmu qos: set ddr opp to 50%%\n");
+			break;
+		case 100:
+			op = DDR_100_OPP;
+			pr_debug("prcmu qos: set ddr opp to 100%%\n");
+			break;
+		default:
+			pr_err("prcmu qos: Incorrect ddr target value (%d)",
+			       extreme_value);
+			goto unlock_and_return;
 		}
+		prcmu_debug_ddr_opp_log(op);
+		prcmu_set_ddr_opp(op);
+		break;
+	case PRCMU_QOS_APE_OPP:
+		switch (extreme_value) {
+		case 50:
+			op = APE_50_OPP;
+			pr_debug("prcmu qos: set ape opp to 50%%\n");
+			break;
+		case 100:
+			op = APE_100_OPP;
+			pr_debug("prcmu qos: set ape opp to 100%%\n");
+			break;
+		default:
+			pr_err("prcmu qos: Incorrect ape target value (%d)",
+			       extreme_value);
+			goto unlock_and_return;
+		}
+
+		if (!ape_opp_forced_to_50_partly_25)
+			(void)prcmu_set_ape_opp(op);
+		prcmu_debug_ape_opp_log(op);
+		break;
+	case PRCMU_QOS_ARM_OPP:
+		/* TODO: Shall force_value != 0 actually set arm opp? */
+		break;
+	default:
+		pr_err("prcmu qos: Incorrect target\n");
+		break;
 	}
+
 unlock_and_return:
 	mutex_unlock(&prcmu_qos_mutex);
 }
@@ -393,9 +422,10 @@ EXPORT_SYMBOL_GPL(prcmu_qos_remove_requirement);
  */
 int prcmu_qos_add_notifier(int prcmu_qos_class, struct notifier_block *notifier)
 {
-	int retval;
+	int retval = -EINVAL;
 
-	retval = blocking_notifier_chain_register(
+	if (prcmu_qos_array[prcmu_qos_class]->notifiers)
+		retval = blocking_notifier_chain_register(
 			prcmu_qos_array[prcmu_qos_class]->notifiers, notifier);
 
 	return retval;
@@ -413,9 +443,9 @@ EXPORT_SYMBOL_GPL(prcmu_qos_add_notifier);
 int prcmu_qos_remove_notifier(int prcmu_qos_class,
 			      struct notifier_block *notifier)
 {
-	int retval;
-
-	retval = blocking_notifier_chain_unregister(
+	int retval = -EINVAL;
+	if (prcmu_qos_array[prcmu_qos_class]->notifiers)
+		retval = blocking_notifier_chain_unregister(
 			prcmu_qos_array[prcmu_qos_class]->notifiers, notifier);
 
 	return retval;

@@ -72,10 +72,9 @@
 #define US_TO_TICKS(x) ((u32)((1000 * x) / 30512))
 
 static void __iomem *rtc_base;
+static bool measure_latency;
 
 #ifdef CONFIG_U8500_CPUIDLE_DEBUG
-
-static bool measure_latency;
 
 /*
  * The plan here is to be able to measure the ApSleep/ApDeepSleep exit latency
@@ -159,12 +158,9 @@ static inline void ux500_rtcrtt_measure_latency(bool enable) { }
 
 void ux500_rtcrtt_off(void)
 {
-#ifdef CONFIG_U8500_CPUIDLE_DEBUG
 	if (measure_latency) {
 		measure_latency_start();
-	} else
-#endif
-	{
+	} else {
 		/* Clear eventual interrupts */
 		if (readl(rtc_base + RTC_MIS) & RTC_MIS_RTCTMIS)
 			writel(RTC_ICR_TIC, rtc_base + RTC_ICR);
@@ -189,9 +185,7 @@ static int __init ux500_rtcrtt_init(void)
 		pr_err("timer-rtt: Unknown DB Asic!\n");
 		return -EINVAL;
 	}
-#ifdef CONFIG_U8500_CPUIDLE_DEBUG
 	ux500_rtcrtt_measure_latency(false);
-#endif
 	return 0;
 }
 subsys_initcall(ux500_rtcrtt_init);

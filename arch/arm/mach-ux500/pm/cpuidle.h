@@ -22,11 +22,6 @@ enum APE {
 	APE_ON
 };
 
-enum ARM_PLL {
-	ARM_PLL_OFF = 0,
-	ARM_PLL_ON = 1
-};
-
 enum UL_PLL {
 	UL_PLL_OFF,
 	UL_PLL_ON
@@ -50,7 +45,6 @@ struct cstate {
 	/* Required state of different hardwares */
 	enum ARM ARM;
 	enum APE APE;
-	enum ARM_PLL ARM_PLL;
 	enum UL_PLL UL_PLL;
 	/* ESRAM = ESRAM_RET means that ESRAM context to be kept */
 	enum ESRAM ESRAM;

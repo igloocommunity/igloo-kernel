@@ -41,6 +41,8 @@ void context_gpio_restore(void);
 void context_gpio_restore_mux(void);
 void context_gpio_mux_safe_switch(bool begin);
 
+void context_gic_dist_disable_unneeded_irqs(void);
+
 void context_varm_save_common(void);
 void context_varm_restore_common(void);
 
@@ -50,8 +52,7 @@ void context_varm_restore_core(void);
 void context_save_cpu_registers(void);
 void context_restore_cpu_registers(void);
 
-void context_save_to_sram_and_wfi(bool cleanL1cache,
-				  bool cleanL2cache);
+void context_save_to_sram_and_wfi(bool cleanL2cache);
 
 void context_clean_l1_cache_all(void);
 void context_save_arm_registers(u32 **backup_stack);
@@ -61,7 +62,6 @@ void context_save_cp15_registers(u32 **backup_stack);
 void context_restore_cp15_registers(u32 **backup_stack);
 
 void context_save_to_sram_and_wfi_internal(u32 backup_sram_storage,
-					   bool cleanL1cache,
 					   bool cleanL2cache);
 
 /* DB specific functions in either context-db8500 or context-db5500 */
@@ -77,8 +77,7 @@ void u5500_context_init(void);
 
 static inline void context_varm_save_core(void) {}
 static inline void context_save_cpu_registers(void) {}
-static inline void context_save_to_sram_and_wfi(bool cleanL1cache,
-						bool cleanL2cache) {}
+static inline void context_save_to_sram_and_wfi(bool cleanL2cache) {}
 static inline void context_restore_cpu_registers(void) {}
 static inline void context_varm_restore_core(void) {}
 

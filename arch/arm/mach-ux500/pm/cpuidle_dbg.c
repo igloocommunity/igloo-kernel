@@ -18,9 +18,9 @@
 #include <linux/uaccess.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#include <linux/gpio/nomadik.h>
 #include <linux/amba/serial.h>
 
-#include <linux/gpio.h>
 #include <asm/hardware/gic.h>
 
 #include "cpuidle.h"
@@ -48,8 +48,8 @@ struct state_history_state {
 	u32 hit_rate;
 	u32 state_ok;
 	u32 state_error;
-	u32 state_int;
-	u32 sga;
+	u32 prcmu_int;
+	u32 pending_int;
 
 	u32 latency_count[NUM_LATENCY];
 	ktime_t latency_sum[NUM_LATENCY];
@@ -114,8 +114,8 @@ void ux500_ci_dbg_console_handle_ape_suspend(void)
 	if (!dbg_console_enable)
 		return;
 
-	set_irq_wake(NOMADIK_GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 1);
-	set_irq_type(NOMADIK_GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN),
+	irq_set_irq_wake(GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 1);
+	irq_set_irq_type(GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN),
 		     IRQ_TYPE_EDGE_BOTH);
 }
 
@@ -134,7 +134,7 @@ void ux500_ci_dbg_console_handle_ape_resume(void)
 		reset_timer = true;
 		spin_unlock_irqrestore(&dbg_lock, flags);
 	}
-	set_irq_wake(NOMADIK_GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 0);
+	irq_set_irq_wake(GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 0);
 
 }
 
@@ -258,11 +258,11 @@ void ux500_ci_dbg_exit_latency(int ctarget, ktime_t now, ktime_t exit,
 		if (cstates[ctarget].state == CI_DEEP_IDLE)
 			sh->states[ctarget].state_ok++;
 		break;
-	case ARM2PRCMUPENDINGIT_ER:
-		sh->states[ctarget].state_int++;
+	case PRCMU2ARMPENDINGIT_ER:
+		sh->states[ctarget].prcmu_int++;
 		break;
-	case HWACFCT_IN_SGA:
-		sh->states[ctarget].sga++;
+	case ARMPENDINGIT_ER:
+		sh->states[ctarget].pending_int++;
 		break;
 	default:
 		pr_info("cpuidle: unknown prcmu exit code: 0x%x state: %d\n",
@@ -438,8 +438,8 @@ static void state_history_reset(void)
 			sh->states[i].hit_rate = 0;
 			sh->states[i].state_ok = 0;
 			sh->states[i].state_error = 0;
-			sh->states[i].state_int = 0;
-			sh->states[i].sga = 0;
+			sh->states[i].prcmu_int = 0;
+			sh->states[i].pending_int = 0;
 
 			sh->states[i].time = ktime_set(0, 0);
 
@@ -596,10 +596,10 @@ static void stats_disp_one(struct seq_file *s, struct state_history *sh,
 		return;
 
 	if (i > CI_WFI && verbose)
-		seq_printf(s, " (%u int:%u sga: %u err:%u)",
+		seq_printf(s, " (%u prcmu_int:%u int:%u err:%u)",
 			   sh->states[i].state_ok,
-			   sh->states[i].state_int,
-			   sh->states[i].sga,
+			   sh->states[i].prcmu_int,
+			   sh->states[i].pending_int,
 			   sh->states[i].state_error);
 
 	seq_printf(s, " in %d ms %d%%",

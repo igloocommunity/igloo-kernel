@@ -16,14 +16,10 @@ menu "Ux500 SoC"
 
 config UX500_SOC_DB5500
 	bool "DB5500"
-	select MFD_DB5500_PRCMU
-	select REGULATOR_DB5500_PRCMU
 	select UX500_SOC_DBX500
 
 config UX500_SOC_DB8500
 	bool "DB8500"
-	select MFD_DB8500_PRCMU
-	select REGULATOR_DB8500_PRCMU
 	select UX500_SOC_DBX500
 
 endmenu
@@ -96,15 +92,31 @@ config UX500_MTU_TIMER
 
 endchoice
 
+config U8500_PRCMU
+	bool "U8500 PRCMU support"
+	depends on UX500_SOC_DB8500
+	default n
+	help
+	  Add support for PRCMU for U8500
+
+config U5500_PRCMU
+	bool "U5500 PRCMU support"
+	depends on UX500_SOC_DB5500
+	default y
+	help
+	  Add support for PRCMU for U5500
+
 config UX500_PRCMU_QOS_POWER
 	bool "UX500 PRCMU power QoS support"
+	depends on (U5500_PRCMU || U8500_PRCMU)
 	default y
 	help
 	  Add support for PRCMU power Quality of Service
 
 config UX500_PRCMU_DEBUG
 	bool "PRCMU debug"
-	depends on DEBUG_FS
+	depends on ((U5500_PRCMU || U8500_PRCMU) && DEBUG_FS)
+	default n
 	help
 	  Add support for PRCMU debug
 

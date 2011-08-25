@@ -1,6 +1,15 @@
+config UX500_CPUFREQ
+	tristate "CPUFreq support"
+	depends on (UX500_SOC_DB8500 || UX500_SOC_DB5500) && CPU_FREQ && PM
+	default y
+	help
+	  Add support for CPU Frequency scaling for Ux500 SOCs.
+	  ARM power domains operating points can be set
+	  dynamically. It depends on CPUfreq and PM subsystem.
+
 config U8500_CPUIDLE
 	tristate "CPUIdle support"
-	depends on (UX500_SOC_DB8500 || UX500_SOC_DB5500) && CPU_IDLE && !RTC_DRV_PL031 && PM
+	depends on CPU_IDLE && (U5500_PRCMU || U8500_PRCMU) && !RTC_DRV_PL031 && PM
 	default y
 	select GENERIC_CLOCKEVENTS_BROADCAST
 	select UX500_CONTEXT
@@ -44,7 +53,7 @@ config UX500_SUSPEND_STANDBY
 
 config UX500_SUSPEND_MEM
 	bool "Suspend Mem goes to ApDeepSleep"
-	depends on UX500_SUSPEND && UX500_SOC_DB8500
+	depends on UX500_SUSPEND
 	help
 	  If yes, echo mem > /sys/power/state puts the system into ApDeepSleep else
 	  it will do the same as echo standby > /sys/power/state.

@@ -12,6 +12,7 @@
 #define PRCMU_DEBUG_H
 
 #ifdef CONFIG_UX500_PRCMU_DEBUG
+void prcmu_debug_arm_opp_log(u8 opp);
 void prcmu_debug_ape_opp_log(u8 opp);
 void prcmu_debug_ddr_opp_log(u8 opp);
 int prcmu_debug_init(void);

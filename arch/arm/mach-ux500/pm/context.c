@@ -18,18 +18,16 @@
 #include <linux/notifier.h>
 #include <linux/clk.h>
 #include <linux/err.h>
-
+#include <linux/gpio/nomadik.h>
 #include <asm/hardware/gic.h>
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
 #include <mach/scu.h>
 
-#include <linux/gpio/nomadik.h>
-#include <linux/gpio.h>
-
 #include "context.h"
 #include "pm.h"
+#include "../product.h"
 
 #define GPIO_NUM_BANKS 9
 #define GPIO_NUM_SAVE_REGISTERS 7
@@ -42,17 +40,16 @@
 #define U8500_BACKUPRAM_SIZE SZ_64K
 
 #define U8500_PUBLIC_BOOT_ROM_BASE (U8500_BOOT_ROM_BASE + 0x17000)
+#define U5500_PUBLIC_BOOT_ROM_BASE (U5500_BOOT_ROM_BASE + 0x18000)
 
-/* Special dedicated addresses in backup RAM */
+/*
+ * Special dedicated addresses in backup RAM.  The 5500 addresses are identical
+ * to the 8500 ones.
+ */
 #define U8500_EXT_RAM_LOC_BACKUPRAM_ADDR		0x80151FDC
 #define U8500_CPU0_CP15_CR_BACKUPRAM_ADDR		0x80151F80
 #define U8500_CPU1_CP15_CR_BACKUPRAM_ADDR		0x80151FA0
 
-/* For v1.x */
-#define U8500_CPU0_BACKUPRAM_ADDR_BACKUPRAM_LOG_ADDR	0x80151FD8
-#define U8500_CPU1_BACKUPRAM_ADDR_BACKUPRAM_LOG_ADDR	0x80151FE0
-
-/* For v2.0 and later */
 #define U8500_CPU0_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR	0x80151FD8
 #define U8500_CPU1_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR	0x80151FE0
 
@@ -64,6 +61,12 @@
 #define GIC_DIST_ENABLE_SET_CPU_NUM (IRQ_SHPI_START / 32)
 #define GIC_DIST_ENABLE_SET_SPI0 GIC_DIST_ENABLE_SET
 #define GIC_DIST_ENABLE_SET_SPI32 (GIC_DIST_ENABLE_SET + IRQ_SHPI_START / 8)
+
+#define GIC_DIST_ENABLE_CLEAR_0 GIC_DIST_ENABLE_CLEAR
+#define GIC_DIST_ENABLE_CLEAR_32 (GIC_DIST_ENABLE_CLEAR + 4)
+#define GIC_DIST_ENABLE_CLEAR_64 (GIC_DIST_ENABLE_CLEAR + 8)
+#define GIC_DIST_ENABLE_CLEAR_96 (GIC_DIST_ENABLE_CLEAR + 12)
+#define GIC_DIST_ENABLE_CLEAR_128 (GIC_DIST_ENABLE_CLEAR + 16)
 
 #define GIC_DIST_PRI_COMMON_NUM ((DBX500_NR_INTERNAL_IRQS - IRQ_SHPI_START) / 4)
 #define GIC_DIST_PRI_CPU_NUM (IRQ_SHPI_START / 4)
@@ -198,10 +201,10 @@ static u32 gpio_save[GPIO_NUM_BANKS][GPIO_NUM_SAVE_REGISTERS];
 /*
  * Stacks and stack pointers
  */
-static DEFINE_PER_CPU(u32, varm_registers_backup_stack[1024]);
+static DEFINE_PER_CPU(u32[128], varm_registers_backup_stack);
 static DEFINE_PER_CPU(u32 *, varm_registers_pointer);
 
-static DEFINE_PER_CPU(u32, varm_cp15_backup_stack[1024]);
+static DEFINE_PER_CPU(u32[128], varm_cp15_backup_stack);
 static DEFINE_PER_CPU(u32 *, varm_cp15_pointer);
 
 
@@ -307,12 +310,18 @@ static void restore_stm_ape(void)
 
 static bool tpiu_clocked(void)
 {
-	if (cpu_is_u5500()) {
+#ifdef CONFIG_UX500_DEBUG_NO_LAUTERBACH
+	return false;
+#else
+	if (cpu_is_u5500())
 		return readl_relaxed(__io_address(U5500_PRCMU_DBG_PWRCTRL))
 			& PRCMU_DBG_PWRCTRL_A9DBGCLKEN;
-	}
+
+	if (cpu_is_u8500())
+		return ux500_jtag_enabled();
 
 	return true;
+#endif
 }
 
 /*
@@ -533,6 +542,37 @@ static void restore_gic_dist_cpu(struct context_gic_dist_cpu *c_gic)
 		       c_gic->base +
 		       GIC_DIST_ENABLE_SET_SPI0 +  i * 4);
 }
+
+/*
+ * Disable interrupts that are not necessary
+ * to have turned on during ApDeepSleep.
+ */
+void context_gic_dist_disable_unneeded_irqs(void)
+{
+
+	writel(0xffffffff,
+	       context_gic_dist_common.base +
+	       GIC_DIST_ENABLE_CLEAR_0);
+
+	writel(0xffffffff,
+	       context_gic_dist_common.base +
+	       GIC_DIST_ENABLE_CLEAR_32);
+
+	/* Leave PRCMU IRQ 0 and 1 enabled */
+	writel(0xffff3fff,
+	       context_gic_dist_common.base +
+	       GIC_DIST_ENABLE_CLEAR_64);
+
+	writel(0xffffffff,
+	       context_gic_dist_common.base +
+	       GIC_DIST_ENABLE_CLEAR_96);
+
+	writel(0xffffffff,
+	       context_gic_dist_common.base +
+	       GIC_DIST_ENABLE_CLEAR_128);
+
+}
+
 static void save_scu(void)
 {
 	context_scu.ctrl =
@@ -841,17 +881,12 @@ void context_restore_cpu_registers(void)
  * and return address for the PC in backup SRAM and
  * does wait for interrupt.
  */
-void context_save_to_sram_and_wfi(bool cleanL1cache,
-				  bool cleanL2cache)
+void context_save_to_sram_and_wfi(bool cleanL2cache)
 {
 	int cpu = smp_processor_id();
 
-	if (cpu_is_u8500())
-		context_save_to_sram_and_wfi_internal(backup_sram_storage[cpu],
-						      cleanL1cache,
-						      cleanL2cache);
-	else if (cpu_is_u5500())
-		__asm__ __volatile__("wfi\n" : : : "memory");
+	context_save_to_sram_and_wfi_internal(backup_sram_storage[cpu],
+					      cleanL2cache);
 }
 
 static int __init context_init(void)
@@ -877,6 +912,12 @@ static int __init context_init(void)
 
 
 	if (cpu_is_u5500()) {
+		writel(IO_ADDRESS(U5500_PUBLIC_BOOT_ROM_BASE),
+		       IO_ADDRESS(U8500_CPU0_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR));
+
+		writel(IO_ADDRESS(U5500_PUBLIC_BOOT_ROM_BASE),
+		       IO_ADDRESS(U8500_CPU1_BACKUPRAM_ADDR_PUBLIC_BOOT_ROM_LOG_ADDR));
+
 		context_tpiu.base = ioremap(U5500_TPIU_BASE, SZ_4K);
 		context_stm_ape.base = ioremap(U5500_STM_REG_BASE, SZ_4K);
 		context_scu.base = ioremap(U5500_SCU_BASE, SZ_4K);
