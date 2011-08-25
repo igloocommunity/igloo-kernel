@@ -2107,7 +2107,6 @@ exit_no_detect:
 static int __exit ab5500_remove(struct platform_device *pdev)
 {
 	struct ab5500 *ab = platform_get_drvdata(pdev);
-	struct resource *res;
 
 	/*
 	 * At this point, all subscribers should have unregistered
@@ -2119,7 +2118,6 @@ static int __exit ab5500_remove(struct platform_device *pdev)
 		free_irq(ab->ab5500_irq, ab);
 		ab5500_irq_remove(ab);
 	}
-	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	kfree(ab);
 	return 0;
 }
