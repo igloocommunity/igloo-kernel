@@ -23,7 +23,6 @@
 #include <linux/mfd/ab8500.h>
 #include <linux/regulator/ab8500.h>
 #include <linux/mfd/tc3589x.h>
-#include <linux/mfd/tps6105x.h>
 #include <linux/mfd/ab8500/gpio.h>
 #include <linux/regulator/fixed.h>
 #include <linux/leds-lp5521.h>
@@ -63,6 +62,7 @@
 #include "devices-db8500.h"
 #include "board-mop500.h"
 #include "board-mop500-regulators.h"
+#include "regulator-u8500.h"
 #include "board-mop500-bm.h"
 #include "board-mop500-wlan.h"
 #include "board-mop500-usb.h"
@@ -237,6 +237,38 @@ static struct platform_device snowball_sbnet_dev = {
 	},
 };
 
+static struct regulator_init_data *u8500_regulators[U8500_NUM_REGULATORS] = {
+	[U8500_REGULATOR_VAPE]			= &u8500_vape_regulator,
+	[U8500_REGULATOR_VARM]			= &u8500_varm_regulator,
+	[U8500_REGULATOR_VMODEM]		= &u8500_vmodem_regulator,
+	[U8500_REGULATOR_VPLL]			= &u8500_vpll_regulator,
+	[U8500_REGULATOR_VSMPS1]		= &u8500_vsmps1_regulator,
+	[U8500_REGULATOR_VSMPS2]		= &u8500_vsmps2_regulator,
+	[U8500_REGULATOR_VSMPS3]		= &u8500_vsmps3_regulator,
+	[U8500_REGULATOR_VRF1]			= &u8500_vrf1_regulator,
+	[U8500_REGULATOR_SWITCH_SVAMMDSP]	= &u8500_svammdsp_regulator,
+	[U8500_REGULATOR_SWITCH_SVAMMDSPRET]	= &u8500_svammdspret_regulator,
+	[U8500_REGULATOR_SWITCH_SVAPIPE]	= &u8500_svapipe_regulator,
+	[U8500_REGULATOR_SWITCH_SIAMMDSP]	= &u8500_siammdsp_regulator,
+	[U8500_REGULATOR_SWITCH_SIAMMDSPRET]	= &u8500_siammdspret_regulator,
+	[U8500_REGULATOR_SWITCH_SIAPIPE]	= &u8500_siapipe_regulator,
+	[U8500_REGULATOR_SWITCH_SGA]		= &u8500_sga_regulator,
+	[U8500_REGULATOR_SWITCH_B2R2_MCDE]	= &u8500_b2r2_mcde_regulator,
+	[U8500_REGULATOR_SWITCH_ESRAM12]	= &u8500_esram12_regulator,
+	[U8500_REGULATOR_SWITCH_ESRAM12RET]	= &u8500_esram12ret_regulator,
+	[U8500_REGULATOR_SWITCH_ESRAM34]	= &u8500_esram34_regulator,
+	[U8500_REGULATOR_SWITCH_ESRAM34RET]	= &u8500_esram34ret_regulator,
+};
+
+static struct platform_device u8500_regulator_dev = {
+	.name = "u8500-regulators",
+	.id   = 0,
+	.dev  = {
+		.platform_data = u8500_regulators,
+	},
+};
+
+
 #ifdef CONFIG_MODEM_U8500
 static struct platform_device u8500_modem_dev = {
 	.name = "u8500-modem",
@@ -288,28 +320,6 @@ struct platform_device ab8500_device = {
 	},
 	.num_resources = 1,
 	.resource = ab8500_resources,
-};
-
-/*
- * TPS61052
- */
-
-static struct tps6105x_platform_data mop500_tps61052_data = {
-	.mode = TPS6105X_MODE_VOLTAGE,
-	.regulator_data = &tps61052_regulator,
-};
-
-/*
- * GPIO-regulator wlan vbat data
- */
-
-static struct fixed_voltage_config snowball_gpio_wlan_vbat_data = {
-	.supply_name 		= "WLAN-VBAT",
-	.gpio			= SNOWBALL_EN_3V6_GPIO,
-	.microvolts		= 3600000,
-	.enable_high		= 1,
-	.init_data		= &gpio_wlan_vbat_regulator,
-	.startup_delay		= 3500, /* Startup time */
 };
 
 /*
@@ -403,10 +413,6 @@ static struct i2c_board_info __initdata mop500_i2c0_devices[] = {
 		.platform_data = &av8100_plat_data,
 	},
 	/* I2C0 devices only available prior to HREFv60 */
-	{
-		I2C_BOARD_INFO("tps61052", 0x33),
-		.platform_data  = &mop500_tps61052_data,
-	},
 };
 
 #define NUM_PRE_V60_I2C0_DEVICES 1
@@ -500,14 +506,6 @@ static struct platform_device mop500_gpio_keys_device = {
 	.id	= 0,
 	.dev	= {
 		.platform_data	= &mop500_gpio_keys_data,
-	},
-};
-
-static struct platform_device snowball_gpio_wlan_vbat_regulator_device = {
-	.name	= "reg-fixed-voltage",
-	.id	= 0,
-	.dev	= {
-		.platform_data	= &snowball_gpio_wlan_vbat_data,
 	},
 };
 
@@ -940,7 +938,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
 	&snowball_led_dev,
 	&snowball_key_dev,
 	&snowball_sbnet_dev,
-	&snowball_gpio_wlan_vbat_regulator_device,
 	&u8500_mcde_device,
 	&u8500_b2r2_device,
 };
@@ -962,6 +959,10 @@ static void accessory_detect_config(void)
 static void __init mop500_init_machine(void)
 {
 	int i2c0_devs;
+
+#ifdef CONFIG_REGULATOR
+	platform_device_register(&u8500_regulator_dev);
+#endif
 
 	/*
 	 * The HREFv60 board removed a GPIO expander and routed
@@ -1010,9 +1011,6 @@ static void __init mop500_init_machine(void)
 	platform_device_register(&ab8500_device);
 
 	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
-	if (machine_is_hrefv60())
-		i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
-
 	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
 	i2c_register_board_info(2, mop500_i2c2_devices,
 				ARRAY_SIZE(mop500_i2c2_devices));
