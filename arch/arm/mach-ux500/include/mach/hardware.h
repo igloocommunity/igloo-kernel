@@ -53,6 +53,14 @@ extern void __iomem *_PRCMU_BASE;
 
 #define ARRAY_AND_SIZE(x)	(x), ARRAY_SIZE(x)
 
+
+#ifdef CONFIG_UX500_SOC_DB5500
+bool cpu_is_u5500v1(void);
+bool cpu_is_u5500v2(void);
+#else
+static inline bool cpu_is_u5500v1(void) { return false; }
+static inline bool cpu_is_u5500v2(void) { return false; }
 #endif
 
+#endif				/* __ASSEMBLY__ */
 #endif				/* __MACH_HARDWARE_H */
