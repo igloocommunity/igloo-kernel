@@ -311,6 +311,7 @@ enum ab5500_banks_addr {
  * @chip_name: name of this chip variant
  * @chip_id: 8 bit chip ID for this chip variant
  * @irq_lock: a lock to protect the mask
+ * @num_event_reg: number events registered
  * @abb_events: a local bit mask of the prcmu wakeup events
  * @event_mask: a local copy of the mask event registers
  * @last_event_mask: a copy of the last event_mask written to hardware
@@ -325,6 +326,7 @@ struct ab5500 {
 	char chip_name[32];
 	u8 chip_id;
 	struct mutex irq_lock;
+	u32 num_event_reg;
 	u32 abb_events;
 	u8 mask[AB5500_NUM_IRQ_REGS];
 	u8 oldmask[AB5500_NUM_IRQ_REGS];
