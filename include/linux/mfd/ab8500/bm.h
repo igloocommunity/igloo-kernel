@@ -462,5 +462,20 @@ struct ab8500_fg_platform_data {
 struct ab8500_chargalg_platform_data {
 	char **supplied_to;
 	size_t num_supplicants;
-};
+}
+
+struct ab8500_btemp;
+#ifdef CONFIG_AB8500_BM
+struct ab8500_btemp *ab8500_btemp_get(void);
+int ab8500_btemp_get_batctrl_temp(struct ab8500_btemp *btemp);
+#else
+static struct ab8500_btemp *ab8500_btemp_get(void)
+{
+	return 0;
+}
+static int ab8500_btemp_get_batctrl_temp(struct ab8500_btemp *btemp)
+{
+	return 0;
+}
+#endif
 #endif /* _AB8500_BM_H */
