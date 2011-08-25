@@ -79,14 +79,11 @@ static ssize_t clk_enable_write(struct file *file, const char __user *user_buf,
 
 	cdi = ((struct seq_file *)(file->private_data))->private;
 
-	buf_size = min(count, (sizeof(buf) - 1));
-	if (copy_from_user(buf, user_buf, buf_size))
-		return -EFAULT;
-	buf[buf_size] = '\0';
+	err = kstrtol_from_user(user_buf, count, 0, &user_val);
 
-	err = strict_strtol(buf, 0, &user_val);
 	if (err)
-		return -EINVAL;
+		return err;
+
 	if ((user_val > 0) && (!cdi->enabled)) {
 		err = clk_enable(cdi->clk);
 		if (err) {
@@ -99,7 +96,7 @@ static ssize_t clk_enable_write(struct file *file, const char __user *user_buf,
 		clk_disable(cdi->clk);
 		cdi->enabled = 0;
 	}
-	return buf_size;
+	return count;
 }
 
 static int clk_requests_print(struct seq_file *s, void *p)

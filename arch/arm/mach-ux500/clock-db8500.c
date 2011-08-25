@@ -24,7 +24,6 @@
 #include <linux/workqueue.h>
 #include <linux/regulator/consumer.h>
 
-#include <asm/mach-types.h>
 #include <plat/pincfg.h>
 
 #include <mach/hardware.h>
@@ -32,6 +31,7 @@
 
 #include "clock.h"
 #include "pins-db8500.h"
+#include "product.h"
 
 #define PRCM_SDMMCCLK_MGT	0x024
 #define PRCM_TCR		0x1C8
@@ -314,7 +314,7 @@ static void clkout0_disable(struct clk *clk)
 {
 	int r;
 
-	r = nmk_config_pin(GPIO227_GPIO, false);
+	r = nmk_config_pin((GPIO227_GPIO | PIN_OUTPUT_LOW), false);
 	if (r)
 		goto disable_failed;
 	(void)prcmu_config_clkout(0, PRCMU_CLKSRC_SYSCLK, 0);
@@ -361,7 +361,7 @@ static void clkout1_disable(struct clk *clk)
 {
 	int r;
 
-	r = nmk_config_pin(GPIO228_GPIO, false);
+	r = nmk_config_pin((GPIO228_GPIO | PIN_OUTPUT_LOW), false);
 	if (r)
 		goto disable_failed;
 	(void)prcmu_config_clkout(1, PRCMU_CLKSRC_SYSCLK, 0);
@@ -542,7 +542,6 @@ static DEF_PRCMU_CLK(sspclk, PRCMU_SSPCLK, 24000000);
 static DEF_PRCMU_CLK(rngclk, PRCMU_RNGCLK, 19200000);
 static DEF_PRCMU_CLK(uiccclk, PRCMU_UICCCLK, 48000000);
 static DEF_PRCMU_CLK(timclk, PRCMU_TIMCLK, 2400000);
-/* 100 MHz until 3.0.1, 50 MHz Since PRCMU FW 3.0.2 */
 static DEF_PRCMU_CLK(sdmmcclk, PRCMU_SDMMCCLK, 50000000);
 
 /* PRCC PClocks */
@@ -708,6 +707,7 @@ struct clk_debug_info {
 	struct dentry *dir;
 	struct dentry *enable;
 	struct dentry *requests;
+	const char *name;
 	int enabled;
 };
 
@@ -756,6 +756,15 @@ static struct clk_debug_info dbg_clks[] = {
 	{ .clk = &sysclk2, },
 	{ .clk = &clkout0, },
 	{ .clk = &clkout1, },
+	{ .clk = &p1_pclk9, .name = "gpio0clk", },
+	{ .clk = &p1_pclk9, .name = "gpio1clk", },
+	{ .clk = &p3_pclk8, .name = "gpio2clk", },
+	{ .clk = &p3_pclk8, .name = "gpio3clk", },
+	{ .clk = &p3_pclk8, .name = "gpio4clk", },
+	{ .clk = &p3_pclk8, .name = "gpio5clk", },
+	{ .clk = &p2_pclk11, .name = "gpio6clk", },
+	{ .clk = &p2_pclk11, .name = "gpio7clk", },
+	{ .clk = &p5_pclk1, .name = "gpio8clk", },
 };
 
 static int clk_show_print(struct seq_file *s, void *p)
@@ -767,11 +776,20 @@ static int clk_show_print(struct seq_file *s, void *p)
 	for (i = 0; i < ARRAY_SIZE(dbg_clks); i++) {
 		if (enabled_only && !dbg_clks[i].clk->enabled)
 			continue;
-		seq_printf(s,
-			   "%-20s %5d + %d\n",
-			   dbg_clks[i].clk->name,
-			   dbg_clks[i].clk->enabled - dbg_clks[i].enabled,
-			   dbg_clks[i].enabled);
+		if (dbg_clks[i].name)
+			seq_printf(s,
+				   "%-20s %5d + %d\n",
+				   dbg_clks[i].name,
+				   dbg_clks[i].clk->enabled
+						- !!dbg_clks[i].enabled,
+				   dbg_clks[i].enabled);
+		else
+			seq_printf(s,
+				   "%-20s %5d + %d\n",
+				   dbg_clks[i].clk->name,
+				   dbg_clks[i].clk->enabled
+						- !!dbg_clks[i].enabled,
+				   dbg_clks[i].enabled);
 	}
 
 	return 0;
@@ -798,34 +816,33 @@ static ssize_t clk_enable_write(struct file *file, const char __user *user_buf,
 	size_t count, loff_t *ppos)
 {
 	struct clk_debug_info *cdi;
-	char buf[32];
-	ssize_t buf_size;
 	long user_val;
 	int err;
 
 	cdi = ((struct seq_file *)(file->private_data))->private;
 
-	buf_size = min(count, (sizeof(buf) - 1));
-	if (copy_from_user(buf, user_buf, buf_size))
-		return -EFAULT;
-	buf[buf_size] = '\0';
+	err = kstrtol_from_user(user_buf, count, 0, &user_val);
 
-	err = strict_strtol(buf, 0, &user_val);
 	if (err)
-		return -EINVAL;
-	if ((user_val > 0) && (!cdi->enabled)) {
-		err = clk_enable(cdi->clk);
-		if (err) {
-			pr_err("clock: clk_enable(%s) failed.\n",
-				cdi->clk->name);
-			return -EFAULT;
+		return err;
+
+	if (user_val > 0) {
+		if (!cdi->enabled) {
+			err = clk_enable(cdi->clk);
+			if (err) {
+				pr_err("clock: clk_enable(%s) failed.\n",
+					cdi->clk->name);
+				return -EFAULT;
+			}
 		}
-		cdi->enabled = 1;
-	} else if ((user_val <= 0) && (cdi->enabled)) {
-		clk_disable(cdi->clk);
-		cdi->enabled = 0;
+		cdi->enabled++;
+	} else if (cdi->enabled) {
+		cdi->enabled--;
+		if (!cdi->enabled)
+			clk_disable(cdi->clk);
 	}
-	return buf_size;
+
+	return count;
 }
 
 static int clk_requests_print(struct seq_file *s, void *p)
@@ -870,7 +887,11 @@ static int create_clk_dirs(struct clk_debug_info *cdi, int size)
 	int i;
 
 	for (i = 0; i < size; i++) {
-		cdi[i].dir = debugfs_create_dir(cdi[i].clk->name, clk_dir);
+		if (cdi[i].name)
+			cdi[i].dir = debugfs_create_dir(cdi[i].name, clk_dir);
+		else
+			cdi[i].dir =
+				debugfs_create_dir(cdi[i].clk->name, clk_dir);
 		if (!cdi[i].dir)
 			goto no_dir;
 	}
@@ -890,6 +911,7 @@ static int create_clk_dirs(struct clk_debug_info *cdi, int size)
 		if (!cdi[i].requests)
 			goto no_requests;
 	}
+
 	return 0;
 
 no_requests:
@@ -1203,17 +1225,10 @@ static void u8500_amba_clk_enable(void)
 					       + 0x04));
 	writel(~0x0, __io_address(U8500_PER2_BASE + 0xF000 + 0x0C));
 
-	if(machine_is_snowball()){
-		/* Leave FSMC alone, it is needed for ethernet controller */
-		writel(0xFE, __io_address(U8500_PER3_BASE + 0xF000 + 0x04));
-		writel(~0x0 & ~(1 << 1), __io_address(U8500_PER3_BASE + 0xF000
-							      + 0x0C));
-	} else {
-		/* GPIO,UART2 are enabled for booting */
-		writel(0xBF, __io_address(U8500_PER3_BASE + 0xF000 + 0x04));
-		writel(~0x0 & ~(1 << 6), __io_address(U8500_PER3_BASE + 0xF000
-							      + 0x0C));
-	}
+	/*GPIO,UART2 are enabled for booting*/
+	writel(0xBF, __io_address(U8500_PER3_BASE + 0xF000 + 0x04));
+	writel(~0x0 & ~(1 << 6), __io_address(U8500_PER3_BASE + 0xF000
+					      + 0x0C));
 
 	for (i = 0; i < ARRAY_SIZE(u8500_boot_clk); i++) {
 		boot_clks[i] = clk_get_sys(u8500_boot_clk[i], NULL);
@@ -1249,18 +1264,26 @@ static int __init init_clock_states(void)
 		clk_disable(&lcdclk);
 	if (!clk_enable(&per7clk))
 		clk_disable(&per7clk);
+	if (!clk_enable(&b2r2clk))
+		clk_disable(&b2r2clk);
 	/*
 	 * APEATCLK and APETRACECLK are enabled at boot and needed
-	 * in order to debug with lauterbach
+	 * in order to debug with Lauterbach
 	 */
 	if (!clk_enable(&apeatclk)) {
 #ifdef CONFIG_UX500_DEBUG_NO_LAUTERBACH
 		clk_disable(&apeatclk);
+#else
+		if (!ux500_jtag_enabled())
+			clk_disable(&apeatclk);
 #endif
 	}
 	if (!clk_enable(&apetraceclk)) {
 #ifdef CONFIG_UX500_DEBUG_NO_LAUTERBACH
 		clk_disable(&apetraceclk);
+#else
+		if (!ux500_jtag_enabled())
+			clk_disable(&apetraceclk);
 #endif
 	}
 	return 0;

@@ -49,10 +49,6 @@ struct clk {
 	struct regulator *regulator;
 	struct clk *clock;
 	struct list_head list;
-#if defined(CONFIG_DEBUG_FS)
-	struct dentry		*dent;	/* For visible tree hierarchy */
-	struct dentry		*dent_bus;	/* For visible tree hierarchy */
-#endif
 };
 
 /**
