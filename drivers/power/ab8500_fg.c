@@ -175,6 +175,7 @@ struct inst_curr_result_list {
  * @fg_wq:		Work queue for running the FG algorithm
  * @fg_periodic_work:	Work to run the FG algorithm periodically
  * @fg_low_bat_work:	Work to check low bat condition
+ * @fg_reinit_work	Work used to reset and reinitialise the FG algorithm
  * @fg_work:		Work to run the FG algorithm instantly
  * @fg_acc_cur_work:	Work to read the FG accumulator
  * @cc_lock:		Mutex for locking the CC
@@ -223,6 +224,7 @@ struct ab8500_fg {
 	struct workqueue_struct *fg_wq;
 	struct delayed_work fg_periodic_work;
 	struct delayed_work fg_low_bat_work;
+	struct delayed_work fg_reinit_work;
 	struct work_struct fg_work;
 	struct work_struct fg_acc_cur_work;
 	struct mutex cc_lock;
@@ -401,6 +403,28 @@ static int ab8500_fg_add_cap_sample(struct ab8500_fg *di, int sample)
 	avg->avg = avg->sum / avg->nbr_samples;
 
 	return avg->avg;
+}
+
+/**
+ * ab8500_fg_clear_cap_samples() - Clear average filter
+ * @di:		pointer to the ab8500_fg structure
+ *
+ * The capacity filter is is reset to zero.
+ */
+static void ab8500_fg_clear_cap_samples(struct ab8500_fg *di)
+{
+	int i;
+	struct ab8500_fg_avg_cap *avg = &di->avg_cap;
+
+	avg->pos = 0;
+	avg->nbr_samples = 0;
+	avg->sum = 0;
+	avg->avg = 0;
+
+	for (i = 0; i < NBR_AVG_SAMPLES; i++) {
+		avg->samples[i] = 0;
+		avg->time_stamps[i] = 0;
+	}
 }
 
 /**
@@ -752,8 +776,7 @@ exit:
 	dev_err(di->dev,
 		"Failed to read or write gas gauge registers\n");
 	mutex_unlock(&di->cc_lock);
-	queue_work(di->fg_wq,
-		&di->fg_work);
+	queue_work(di->fg_wq, &di->fg_work);
 }
 
 /**
@@ -1332,8 +1355,7 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
 					AB8500_FG_DISCHARGE_RECOVERY);
 
 				queue_delayed_work(di->fg_wq,
-					&di->fg_periodic_work,
-					0);
+					&di->fg_periodic_work, 0);
 
 				break;
 			}
@@ -1860,6 +1882,50 @@ static void ab8500_fg_external_power_changed(struct power_supply *psy)
 		&di->fg_psy, ab8500_fg_get_ext_psy_data);
 }
 
+/**
+ * abab8500_fg_reinit_work() - work to reset the FG algorithm
+ * @work:	pointer to the work_struct structure
+ *
+ * Used to reset the current battery capacity to be able to
+ * retrigger a new voltage base capacity calculation. For
+ * test and verification purpose.
+ */
+static void ab8500_fg_reinit_work(struct work_struct *work)
+{
+	struct ab8500_fg *di = container_of(work, struct ab8500_fg,
+		fg_reinit_work.work);
+
+	if (di->flags.calibrate == false) {
+		dev_dbg(di->dev, "Resetting FG state machine to init.\n");
+		ab8500_fg_clear_cap_samples(di);
+		ab8500_fg_calc_cap_discharge_voltage(di, true);
+		ab8500_fg_charge_state_to(di, AB8500_FG_CHARGE_INIT);
+		ab8500_fg_discharge_state_to(di, AB8500_FG_DISCHARGE_INIT);
+		queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
+
+	} else {
+		dev_err(di->dev, "Residual offset calibration ongoing "
+			"retrying..\n");
+		/* Wait one second until next try*/
+		queue_delayed_work(di->fg_wq, &di->fg_reinit_work,
+			round_jiffies(1));
+	}
+}
+
+/**
+ * ab8500_fg_reinit() - forces FG algorithm to reinitialize with current values
+ *
+ * This function can be used to force the FG algorithm to recalculate a new
+ * voltage based battery capacity.
+ */
+void ab8500_fg_reinit(void)
+{
+	struct ab8500_fg *di = ab8500_fg_get();
+	/* User won't be notified if a null pointer returned. */
+	if (di != NULL)
+		queue_delayed_work(di->fg_wq, &di->fg_reinit_work, 0);
+}
+
 /* Exposure to the sysfs interface */
 
 struct ab8500_fg_sysfs_entry {
@@ -1887,7 +1953,6 @@ static ssize_t charge_full_store(struct ab8500_fg *di, const char *buf,
 		di->bat_cap.max_mah = (int) charge_full;
 		ret = count;
 	}
-
 	return ret;
 }
 static struct ab8500_fg_sysfs_entry charge_full_attr =
@@ -1907,7 +1972,6 @@ ab8500_fg_show(struct kobject *kobj, struct attribute *attr, char *buf)
 
 	return entry->show(di, buf);
 }
-
 static ssize_t
 ab8500_fg_store(struct kobject *kobj, struct attribute *attr, const char *buf,
 		size_t count)
@@ -2134,6 +2198,10 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 	/* Init work for getting the battery accumulated current */
 	INIT_WORK(&di->fg_acc_cur_work, ab8500_fg_acc_cur_work);
 
+	/* Init work for reinitialising the fg algorithm */
+	INIT_DELAYED_WORK_DEFERRABLE(&di->fg_reinit_work,
+		ab8500_fg_reinit_work);
+
 	/* Work delayed Queue to run the state machine */
 	INIT_DELAYED_WORK_DEFERRABLE(&di->fg_periodic_work,
 		ab8500_fg_periodic_work);
@@ -2189,6 +2257,7 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 	/* Calibrate the fg first time */
 	di->flags.calibrate = true;
 	di->calib_state = AB8500_FG_CALIB_INIT;
+
 	/* Run the FG algorithm */
 	queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
 
