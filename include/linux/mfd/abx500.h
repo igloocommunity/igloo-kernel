@@ -369,6 +369,9 @@ struct ab5500_platform_data {
 	struct ab5500_regulator_platform_data *regulator;
 };
 
+struct ab5500_ponkey_platform_data {
+	u8 shutdown_secs;
+};
 
 int abx500_set_register_interruptible(struct device *dev, u8 bank, u8 reg,
 	u8 value);
