@@ -2473,6 +2473,7 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 	di->otg = otg_get_transceiver();
 	if (!di->otg) {
 		dev_err(di->dev, "failed to get otg transceiver\n");
+		ret = -EINVAL;
 		goto free_usb;
 	}
 	di->nb.notifier_call = ab8500_charger_usb_notifier_call;
