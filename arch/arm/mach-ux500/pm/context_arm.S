@@ -330,42 +330,6 @@ lineLoopL1clean:
 
 ENDPROC(context_clean_l1_cache_all)
 
-
-/*
- * L2 cache clean function. Commit from PL310 L2 cache
- * controller to DDR SDRAM.
- *
- * r0, r2 used locally
- *
- */
-	.align 4
-	.section ".text", "ax"
-ENTRY(ux500_clean_l2_cache_all)
-
-	ldr r0, =IO_ADDRESS(U8500_L2CC_BASE)
-
-	ldr r1, =0xff				@ TODO: Ok to assume 8-way cache
-	                                        @ on Ux500?
-	str r1, [r0, #L2X0_CLEAN_WAY]
-	L2busywaitLoopClean:
-	ldr r1, [r0, #L2X0_CLEAN_WAY]
-	cmp r1, #0				@ All bits in L2X0_CLEAN_WAY
-	                                        @ will be zero once clean is
-	                                        @ finished
-	bne L2busywaitLoopClean
-
-	ldr r1, =0x0
-	str r1, [r0, #L2X0_CACHE_SYNC]
-						@ l2x0 C code busy-wait here to
-	                                        @ ensure no background op is
-	                                        @ running.
-						@ In our case we have already
-	                                        @ checked this after the cache
-	                                        @ clean and CACHE_SYNC is atomic
-	                                        @ according to refman
-	mov	pc, lr
-
-
 /*
  * Last saves to backup RAM, cache clean and WFI
  *
@@ -406,11 +370,6 @@ ENTRY(context_save_to_sram_and_wfi_internal)
 	bl context_clean_l1_cache_all		@ Commit all dirty data in L1
 	                                        @ cache to L2 without
 	                                        @ invalidating
-
-	cmp r4, #0
-	blne ux500_clean_l2_cache_all		@ If r4 != FALSE then clean all
-	                                        @ dirty data in L2 cache, no
-	                                        @ invalidate
 
 	dsb					@ data synchronization barrier
 	isb					@ instruction synchronization
