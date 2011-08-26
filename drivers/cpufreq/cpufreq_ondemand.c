@@ -390,12 +390,6 @@ static struct attribute_group dbs_attr_group = {
 	.name = "ondemand",
 };
 
-/*** delete after deprecation time ***/
-#ifdef CONFIG_UX500_SOC_DB8500
-extern bool wlan_mode_on;
-extern bool usb_mode_on;
-#endif
-
 /************************** sysfs end ************************/
 
 static void dbs_freq_increase(struct cpufreq_policy *p, unsigned int freq)
@@ -500,12 +494,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	}
 
 	/* Check for frequency increase */
-	if ((max_load_freq > dbs_tuners_ins.up_threshold * policy->cur)
-#ifdef CONFIG_UX500_SOC_DB8500
-		/* A work around for wlan and usb performance issues */
-		|| (usb_mode_on || wlan_mode_on)
-#endif
-		) {
+	if (max_load_freq > dbs_tuners_ins.up_threshold * policy->cur) {
 		/* If switching to max speed, apply sampling_down_factor */
 		if (policy->cur < policy->max)
 			this_dbs_info->rate_mult =
