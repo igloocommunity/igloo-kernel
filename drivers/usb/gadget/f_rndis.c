@@ -193,7 +193,7 @@ rndis_iad_descriptor = {
 	.bFirstInterface =	0, /* XXX, hardcoded */
 	.bInterfaceCount = 	2,	// control + data
 	.bFunctionClass =	USB_CLASS_COMM,
-	.bFunctionSubClass =	USB_CDC_SUBCLASS_ETHERNET,
+	.bFunctionSubClass =	USB_CDC_SUBCLASS_ACM,
 	.bFunctionProtocol =	USB_CDC_ACM_PROTO_VENDOR,
 	/* .iFunction = DYNAMIC */
 };
