@@ -168,7 +168,6 @@ static int rpm_check_suspend_allowed(struct device *dev)
 static int rpm_idle(struct device *dev, int rpmflags)
 {
 	int (*callback)(struct device *);
-	int (*domain_callback)(struct device *);
 	int retval;
 
 	retval = rpm_check_suspend_allowed(dev);
@@ -225,19 +224,10 @@ static int rpm_idle(struct device *dev, int rpmflags)
 	else
 		callback = NULL;
 
-	if (dev->pwr_domain)
-		domain_callback = dev->pwr_domain->ops.runtime_idle;
-	else
-		domain_callback = NULL;
-
-	if (callback || domain_callback) {
+	if (callback) {
 		spin_unlock_irq(&dev->power.lock);
 
-		if (domain_callback)
-			retval = domain_callback(dev);
-
-		if (!retval && callback)
-			callback(dev);
+		callback(dev);
 
 		spin_lock_irq(&dev->power.lock);
 	}
@@ -404,8 +394,6 @@ static int rpm_suspend(struct device *dev, int rpmflags)
 		else
 			pm_runtime_cancel_pending(dev);
 	} else {
-		if (dev->pwr_domain)
-			rpm_callback(dev->pwr_domain->ops.runtime_suspend, dev);
  no_callback:
 		__update_runtime_status(dev, RPM_SUSPENDED);
 		pm_runtime_deactivate_timer(dev);
