@@ -1080,7 +1080,10 @@ static struct regulator_consumer_supply u8500_esram12_consumers[] = {
 };
 
 struct regulator_init_data u8500_esram12_regulator = {
-	.supply_regulator = "u8500-vape",
+	/*
+	 * esram12 is set in retention and supplied by Vsafe when Vape is off,
+	 * no need to hold Vape
+	 */
 	.constraints = {
 		.name = "u8500-esram12",
 		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
@@ -1143,7 +1146,10 @@ static struct regulator_consumer_supply u8500_esram34_consumers[] = {
 };
 
 struct regulator_init_data u8500_esram34_regulator = {
-	.supply_regulator = "u8500-vape",
+	/*
+	 * esram34 is set in retention and supplied by Vsafe when Vape is off,
+	 * no need to hold Vape
+	 */
 	.constraints = {
 		.name = "u8500-esram34",
 		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
