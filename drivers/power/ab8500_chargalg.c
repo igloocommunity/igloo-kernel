@@ -399,7 +399,8 @@ static void ab8500_chargalg_start_safety_timer(struct ab8500_chargalg *di)
 static void ab8500_chargalg_stop_safety_timer(struct ab8500_chargalg *di)
 {
 	di->events.safety_timer_expired = false;
-	del_timer(&di->safety_timer);
+	if (timer_pending(&di->safety_timer))
+		del_timer(&di->safety_timer);
 }
 
 /**
@@ -848,6 +849,27 @@ static void handle_maxim_chg_curr(struct ab8500_chargalg *di)
 	default:
 		/* Do nothing..*/
 		break;
+	}
+}
+
+static void ab8500_chargalg_check_safety_timer(struct ab8500_chargalg *di)
+{
+	/*
+	 * The safety timer will not be started until the capacity reported
+	 * from the FG algorithm is 100%. Then we know that the amount of
+	 * charge that's gone into the battery is enough for the battery
+	 * to be full. If it has not reached end-of-charge before the safety
+	 * timer has expired then we know that the battery is overcharged
+	 * and charging will be stopped to protect the battery.
+	 */
+	if (di->batt_data.percent == 100 &&
+		!timer_pending(&di->safety_timer)) {
+		ab8500_chargalg_start_safety_timer(di);
+		dev_dbg(di->dev, "start safety timer\n");
+	} else if (di->batt_data.percent != 100 &&
+			timer_pending(&di->safety_timer)) {
+		ab8500_chargalg_stop_safety_timer(di);
+		dev_dbg(di->dev, "stop safety timer\n");
 	}
 }
 
@@ -1401,7 +1423,6 @@ static void ab8500_chargalg_algorithm(struct ab8500_chargalg *di)
 			di->bat->bat_type[di->bat->batt_id].normal_vol_lvl,
 			di->bat->bat_type[di->bat->batt_id].normal_cur_lvl);
 		ab8500_chargalg_state_to(di, STATE_NORMAL);
-		ab8500_chargalg_start_safety_timer(di);
 		ab8500_chargalg_stop_maintenance_timer(di);
 		init_maxim_chg_curr(di);
 		di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
@@ -1422,6 +1443,8 @@ static void ab8500_chargalg_algorithm(struct ab8500_chargalg *di)
 				ab8500_chargalg_state_to(di,
 					STATE_MAINTENANCE_A_INIT);
 		}
+		/* Check whether we should start the safety timer or not */
+		ab8500_chargalg_check_safety_timer(di);
 		break;
 
 	/* This state will be used when the maintenance state is disabled */
