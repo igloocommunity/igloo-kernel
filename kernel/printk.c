@@ -54,7 +54,7 @@ void asmlinkage __attribute__((weak)) early_printk(const char *fmt, ...)
 
 #define __LOG_BUF_LEN	(1 << CONFIG_LOG_BUF_SHIFT)
 
-#ifdef        CONFIG_DEBUG_LL
+#ifdef        CONFIG_PRINTK_LL
 extern void printascii(char *);
 #endif
 
@@ -924,7 +924,7 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	printed_len += vscnprintf(printk_buf + printed_len,
 				  sizeof(printk_buf) - printed_len, fmt, args);
 
-#ifdef	CONFIG_DEBUG_LL
+#ifdef	CONFIG_PRINTK_LL
 	printascii(printk_buf);
 #endif
 
