@@ -56,12 +56,10 @@ static enum arm_opp idx2opp[] = {
 #define WLAN_PROBE_DELAY 3000 /* 3 seconds */
 #define WLAN_LIMIT (3000/3) /* If we have more than 1000 irqs per second */
 static struct delayed_work work_wlan_workaround;
-bool wlan_mode_on;
 
 #define USB_PROBE_DELAY 1000 /* 1 seconds */
 #define USB_LIMIT (200) /* If we have more than 200 irqs per second */
 static struct delayed_work work_usb_workaround;
-bool usb_mode_on;
 
 static void wlan_load(struct work_struct *work)
 {
@@ -74,9 +72,11 @@ static void wlan_load(struct work_struct *work)
 
 	if ((num_irqs > old_num_irqs) &&
 	    (num_irqs - old_num_irqs) > WLAN_LIMIT)
-		wlan_mode_on = true;
+		prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
+					     "wlan", 125);
 	else
-		wlan_mode_on = false;
+		prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
+					     "wlan", 25);
 
 	old_num_irqs = num_irqs;
 
@@ -96,9 +96,11 @@ static void usb_load(struct work_struct *work)
 
 	if ((num_irqs > old_num_irqs) &&
 	    (num_irqs - old_num_irqs) > USB_LIMIT)
-		usb_mode_on = true;
+		prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
+					     "usb", 125);
 	else
-		usb_mode_on = false;
+		prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
+					     "usb", 25);
 
 	old_num_irqs = num_irqs;
 
@@ -115,7 +117,8 @@ void cpufreq_usb_connect_notify(bool connect)
 				 msecs_to_jiffies(USB_PROBE_DELAY));
 	} else {
 		cancel_delayed_work_sync(&work_usb_workaround);
-		usb_mode_on = false;
+		prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
+					     "usb", 25);
 	}
 }
 
@@ -195,6 +198,9 @@ static int __init u8500_cpufreq_register(void)
 
 	INIT_DELAYED_WORK_DEFERRABLE(&work_usb_workaround,
 				     usb_load);
+
+	prcmu_qos_add_requirement(PRCMU_QOS_ARM_OPP, "usb", 25);
+	prcmu_qos_add_requirement(PRCMU_QOS_ARM_OPP, "wlan", 25);
 
 	schedule_delayed_work_on(0,
 				 &work_wlan_workaround,
