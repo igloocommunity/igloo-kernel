@@ -12,6 +12,7 @@
 #define STM_H
 
 #define STM_DEV_NAME "stm"
+#define STM_NUMBER_OF_CHANNEL   256
 
 /* One single channel mapping */
 struct stm_channel {
@@ -27,6 +28,11 @@ struct stm_channel {
 		__u32 stamp32;
 		__u64 stamp64;
 	};
+};
+
+/* Mapping of all channels */
+struct stm_channels {
+  struct stm_channel channel[STM_NUMBER_OF_CHANNEL];
 };
 
 /* Possible trace modes */
