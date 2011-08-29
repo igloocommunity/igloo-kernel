@@ -558,6 +558,15 @@ config HWMEM
 	  can be used by hardware. It also enables accessing hwmem allocated
 	  memory buffers through a secure id which can be shared across processes.
 
+config DISPDEV
+	bool "Display overlay device"
+	depends on FB_MCDE
+	default n
+	help
+	  This driver provides a way to use a second overlay for a display (in
+	  addition to the framebuffer). The device allows for registration of
+	  userspace buffers to be used with the overlay.
+
 config U5500_MBOX
 	bool "Mailbox support"
 	depends on (UX500_SOC_DB5500 && U5500_MODEM_IRQ)
