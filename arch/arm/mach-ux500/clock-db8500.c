@@ -142,7 +142,7 @@ static int ab_ulpclk_enable(struct clk *clk)
 	if (unlikely(err))
 		goto enable_error;
 	/* Unknown/undocumented PLL locking time => wait 1 ms. */
-	msleep(1);
+	mdelay(1);
 	return 0;
 
 enable_error:
