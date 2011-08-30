@@ -19,10 +19,13 @@
 /**
  * struct vibra_info - Vibrator information structure
  * @tdev:		Pointer to timed output device structure
+ * @linear_workqueue:   Pointer to linear vibrator workqueue structure
+ * @linear_work:	Linear Vibrator work
+ * @linear_tick:	Linear Vibrator high resolution timer
  * @vibra_workqueue:    Pointer to vibrator workqueue structure
  * @vibra_work:		Vibrator work
- * @vibra_lock:		Vibrator lock
  * @vibra_timer:	Vibrator high resolution timer
+ * @vibra_lock:		Vibrator lock
  * @vibra_state:	Actual vibrator state
  * @state_force:	Indicates if oppositive state is requested
  * @timeout:		Indicates how long time the vibrator will be enabled
@@ -33,10 +36,13 @@
  **/
 struct vibra_info {
 	struct timed_output_dev			tdev;
+	struct workqueue_struct			*linear_workqueue;
+	struct work_struct			linear_work;
+	struct hrtimer				linear_tick;
 	struct workqueue_struct			*vibra_workqueue;
 	struct work_struct			vibra_work;
-	spinlock_t				vibra_lock;
 	struct hrtimer				vibra_timer;
+	spinlock_t				vibra_lock;
 	enum ste_timed_vibra_states		vibra_state;
 	bool					state_force;
 	unsigned int				timeout;
@@ -45,12 +51,46 @@ struct vibra_info {
 };
 
 /*
- * For Linear type vibrators, resonance frequency waveform is
- * generated using software loop and for same negative and
- * positive cycle time period need to be calibrated. For 150Hz
- * frequency nearest delay value is found out to be equal to "3".
+ * Linear vibrator hardware operates on a particular resonance
+ * frequency. The resonance frequency (f) may also vary with h/w.
+ * This define is half time period (t) in micro seconds (us).
+ * For resonance frequency f = 150 Hz
+ * t = T/2 = ((1/150) / 2) = 3333 usec.
  */
-#define LINEAR_VIBRA_150HZ_DELAY	3
+#define LINEAR_RESONANCE	3333
+
+/**
+ * linear_vibra_work() - Linear Vibrator work, turns on/off vibrator
+ * @work:	Pointer to work structure
+ *
+ * This function is called from workqueue, turns on/off vibrator
+ **/
+static void linear_vibra_work(struct work_struct *work)
+{
+	struct vibra_info *vinfo =
+			container_of(work, struct vibra_info, linear_work);
+	unsigned char speed_pos = 0, speed_neg = 0;
+	ktime_t ktime;
+	static unsigned char toggle;
+
+	if (toggle) {
+		speed_pos = vinfo->pdata->boost_level;
+		speed_neg = 0;
+	} else {
+		speed_neg = vinfo->pdata->boost_level;
+		speed_pos = 0;
+	}
+
+	toggle = !toggle;
+	vinfo->pdata->timed_vibra_control(speed_pos, speed_neg,
+			speed_pos, speed_neg);
+
+	if (vinfo->vibra_state != STE_VIBRA_IDLE) {
+		ktime = ktime_set((LINEAR_RESONANCE / USEC_PER_SEC),
+			(LINEAR_RESONANCE % USEC_PER_SEC) * NSEC_PER_USEC);
+		hrtimer_start(&vinfo->linear_tick, ktime, HRTIMER_MODE_REL);
+	}
+}
 
 /**
  * vibra_control_work() - Vibrator work, turns on/off vibrator
@@ -65,7 +105,6 @@ static void vibra_control_work(struct work_struct *work)
 	unsigned val = 0;
 	unsigned char speed_pos = 0, speed_neg = 0;
 	unsigned long flags;
-	unsigned long jiffies_till;
 
 	spin_lock_irqsave(&vinfo->vibra_lock, flags);
 	/* Should be already expired */
@@ -95,37 +134,22 @@ static void vibra_control_work(struct work_struct *work)
 	}
 	spin_unlock_irqrestore(&vinfo->vibra_lock, flags);
 
-	if (vinfo->pdata->is_linear_vibra) {
-		jiffies_till = jiffies + msecs_to_jiffies(vinfo->timeout);
-		while (time_before(jiffies, jiffies_till)) {
-			vinfo->pdata->timed_vibra_control(
-					speed_pos, speed_neg,
-					speed_pos, speed_neg);
-			mdelay(LINEAR_VIBRA_150HZ_DELAY);
-			vinfo->pdata->timed_vibra_control(
-					speed_neg, speed_pos,
-					speed_neg, speed_pos);
-			mdelay(LINEAR_VIBRA_150HZ_DELAY);
-		}
-
-		/* Disable Vibrator */
-		speed_pos = speed_neg = 0;
-		vinfo->pdata->timed_vibra_control(
-				speed_pos, speed_neg,
-				speed_pos, speed_neg);
-		vinfo->vibra_state = STE_VIBRA_IDLE;
-	} else {
-		/* Send new settings */
-		vinfo->pdata->timed_vibra_control(
-				speed_pos, speed_neg,
+	/* Send new settings (only for rotary vibrators) */
+	if (!vinfo->pdata->is_linear_vibra)
+		vinfo->pdata->timed_vibra_control(speed_pos, speed_neg,
 				speed_pos, speed_neg);
 
+	if (vinfo->vibra_state != STE_VIBRA_IDLE) {
 		/* Start timer if it's not in IDLE state */
-		if (vinfo->vibra_state != STE_VIBRA_IDLE) {
-			hrtimer_start(&vinfo->vibra_timer,
-				ktime_set(val / 1000, (val % 1000) * 1000000),
-				HRTIMER_MODE_REL);
-		}
+		ktime_t ktime;
+		ktime = ktime_set((val / MSEC_PER_SEC),
+				(val % MSEC_PER_SEC) * NSEC_PER_MSEC),
+		hrtimer_start(&vinfo->vibra_timer, ktime, HRTIMER_MODE_REL);
+	} else if (vinfo->pdata->is_linear_vibra) {
+		/* Cancel work and timers of linear vibrator in IDLE state */
+		hrtimer_cancel(&vinfo->linear_tick);
+		flush_workqueue(vinfo->linear_workqueue);
+		vinfo->pdata->timed_vibra_control(0, 0, 0, 0);
 	}
 }
 
@@ -151,10 +175,12 @@ static void vibra_enable(struct timed_output_dev *tdev, int timeout)
 
 		vinfo->state_force = false;
 		/* Trim timeout */
-		timeout = timeout < vinfo->pdata->boost_time ?
+		vinfo->timeout = timeout < vinfo->pdata->boost_time ?
 				vinfo->pdata->boost_time : timeout;
-		/* Remember timeout value */
-		vinfo->timeout = timeout;
+
+		if (vinfo->pdata->is_linear_vibra)
+			queue_work(vinfo->linear_workqueue,
+					&vinfo->linear_work);
 		queue_work(vinfo->vibra_workqueue, &vinfo->vibra_work);
 		break;
 	case STE_VIBRA_BOOST:
@@ -164,7 +190,11 @@ static void vibra_enable(struct timed_output_dev *tdev, int timeout)
 		break;
 	case STE_VIBRA_ON:
 		/* If user requested OFF */
-		if (!timeout && !vinfo->pdata->is_linear_vibra) {
+		if (!timeout) {
+			if (vinfo->pdata->is_linear_vibra) {
+				hrtimer_cancel(&vinfo->linear_tick);
+				flush_workqueue(vinfo->linear_workqueue);
+			}
 			hrtimer_cancel(&vinfo->vibra_timer);
 			vinfo->vibra_state = STE_VIBRA_OFF;
 			queue_work(vinfo->vibra_workqueue, &vinfo->vibra_work);
@@ -179,6 +209,26 @@ static void vibra_enable(struct timed_output_dev *tdev, int timeout)
 		break;
 	}
 	spin_unlock_irqrestore(&vinfo->vibra_lock, flags);
+}
+
+/**
+ * linear_vibra_tick() - Generate resonance frequency waveform
+ * @hrtimer: Pointer to high resolution timer structure
+ *
+ * This function helps in generating the resonance frequency
+ * waveform required for linear vibrators
+ *
+ * Returns:
+ *	Returns value which indicates whether hrtimer should be restarted
+ **/
+static enum hrtimer_restart linear_vibra_tick(struct hrtimer *hrtimer)
+{
+	struct vibra_info *vinfo =
+			container_of(hrtimer, struct vibra_info, linear_tick);
+
+	queue_work(vinfo->linear_workqueue, &vinfo->linear_work);
+
+	return HRTIMER_NORESTART;
 }
 
 /**
@@ -292,22 +342,36 @@ static int __devinit ste_timed_vibra_probe(struct platform_device *pdev)
 	vinfo->tdev.dev->parent = pdev->dev.parent;
 	dev_set_drvdata(vinfo->tdev.dev, vinfo);
 
+	vinfo->linear_workqueue =
+		create_singlethread_workqueue("ste-timed-linear-vibra");
+	if (!vinfo->linear_workqueue) {
+		dev_err(&pdev->dev, "failed to allocate workqueue\n");
+		ret = -ENOMEM;
+		goto exit_timed_output_unregister;
+	}
+
 	/* Create workqueue just for timed output vibrator */
 	vinfo->vibra_workqueue =
 		create_singlethread_workqueue("ste-timed-output-vibra");
 	if (!vinfo->vibra_workqueue) {
 		dev_err(&pdev->dev, "failed to allocate workqueue\n");
 		ret = -ENOMEM;
-		goto exit_timed_output_unregister;
+		goto exit_destroy_workqueue;
 	}
 
+	INIT_WORK(&vinfo->linear_work, linear_vibra_work);
 	INIT_WORK(&vinfo->vibra_work, vibra_control_work);
 	spin_lock_init(&vinfo->vibra_lock);
+	hrtimer_init(&vinfo->linear_tick, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	hrtimer_init(&vinfo->vibra_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	vinfo->linear_tick.function = linear_vibra_tick;
 	vinfo->vibra_timer.function = vibra_timer_expired;
+
 	platform_set_drvdata(pdev, vinfo);
 	return 0;
 
+exit_destroy_workqueue:
+	destroy_workqueue(vinfo->linear_workqueue);
 exit_timed_output_unregister:
 	timed_output_dev_unregister(&vinfo->tdev);
 exit_free_vinfo:
@@ -320,6 +384,7 @@ static int __devexit ste_timed_vibra_remove(struct platform_device *pdev)
 	struct vibra_info *vinfo = platform_get_drvdata(pdev);
 
 	timed_output_dev_unregister(&vinfo->tdev);
+	destroy_workqueue(vinfo->linear_workqueue);
 	destroy_workqueue(vinfo->vibra_workqueue);
 	kfree(vinfo);
 	platform_set_drvdata(pdev, NULL);
