@@ -7,9 +7,11 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/fixed.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/ab5500.h>
 
+#include "regulator-u5500.h"
 #include "board-u5500.h"
 
 /*
@@ -24,6 +26,7 @@ static struct regulator_consumer_supply ab5500_ldo_h_consumers[] = {
 	REGULATOR_SUPPLY("v-display", NULL),
 	REGULATOR_SUPPLY("vdd", "1-004b"), /* Synaptics */
 	REGULATOR_SUPPLY("vin", "2-0036"), /* LM3530 */
+	REGULATOR_SUPPLY("vcpin", "spi1.0"),
 };
 
 static struct regulator_consumer_supply ab5500_ldo_k_consumers[] = {
@@ -33,6 +36,8 @@ static struct regulator_consumer_supply ab5500_ldo_k_consumers[] = {
 };
 
 static struct regulator_consumer_supply ab5500_ldo_l_consumers[] = {
+	REGULATOR_SUPPLY("v-EMMC", "sdi0"),
+	REGULATOR_SUPPLY("v-EMMC", "sdi2"),
 };
 
 static struct regulator_consumer_supply ab5500_ldo_vdigmic_consumers[] = {
@@ -89,7 +94,10 @@ ab5500_regulator_init_data[AB5500_NUM_REGULATORS] = {
 			.min_uV		= 1200000,
 			.max_uV		= 2910000,
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-					  REGULATOR_CHANGE_STATUS,
+					  REGULATOR_CHANGE_STATUS |
+					  REGULATOR_CHANGE_MODE,
+			.valid_modes_mask = REGULATOR_MODE_NORMAL |
+					    REGULATOR_MODE_IDLE,
 		},
 		.consumer_supplies	= ab5500_ldo_l_consumers,
 		.num_consumer_supplies	= ARRAY_SIZE(ab5500_ldo_l_consumers),
@@ -104,7 +112,9 @@ ab5500_regulator_init_data[AB5500_NUM_REGULATORS] = {
 	},
 	[AB5500_LDO_SIM] = {
 		.constraints = {
-			.min_uV		= 1875000,
+			.boot_on	= 1,
+			.always_on	= 1,
+			.min_uV		= 2900000,
 			.max_uV		= 2900000,
 			.apply_uV	= 1,
 			.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE |
@@ -120,6 +130,84 @@ struct ab5500_regulator_platform_data u5500_ab5500_regulator_data = {
 	.num_regulator	= ARRAY_SIZE(ab5500_regulator_init_data),
 };
 
+/*
+ * Power state, ePOD, etc.
+ */
+
+static struct regulator_consumer_supply u5500_vape_consumers[] = {
+	REGULATOR_SUPPLY("v-ape", NULL),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.0"),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.1"),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.2"),
+	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.3"),
+	REGULATOR_SUPPLY("v-mmc", "sdi0"),
+	REGULATOR_SUPPLY("v-mmc", "sdi1"),
+	REGULATOR_SUPPLY("v-mmc", "sdi2"),
+	REGULATOR_SUPPLY("v-mmc", "sdi3"),
+	REGULATOR_SUPPLY("v-mmc", "sdi4"),
+	REGULATOR_SUPPLY("v-uart", "uart0"),
+	REGULATOR_SUPPLY("v-uart", "uart1"),
+	REGULATOR_SUPPLY("v-uart", "uart2"),
+	REGULATOR_SUPPLY("v-uart", "uart3"),
+	REGULATOR_SUPPLY("v-ape", "db5500-keypad"),
+};
+
+static struct regulator_consumer_supply u5500_sga_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.0"),
+	REGULATOR_SUPPLY("v-mali", NULL),
+};
+
+static struct regulator_consumer_supply u5500_hva_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.1"),
+	REGULATOR_SUPPLY("v-hva", NULL),
+};
+
+static struct regulator_consumer_supply u5500_sia_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.2"),
+	REGULATOR_SUPPLY("v-sia", "mmio_camera"),
+};
+
+static struct regulator_consumer_supply u5500_disp_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.3"),
+	REGULATOR_SUPPLY("vsupply", "b2r2_bus"),
+	REGULATOR_SUPPLY("vsupply", "mcde"),
+};
+
+static struct regulator_consumer_supply u5500_esram12_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.4"),
+	REGULATOR_SUPPLY("v-esram12", "mcde"),
+	REGULATOR_SUPPLY("esram12", "hva"),
+};
+
+#define U5500_REGULATOR_SWITCH(lower, upper)                           \
+[U5500_REGULATOR_SWITCH_##upper] = (struct regulator_init_data []) {   \
+{                                                                      \
+	.constraints = {                                                \
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,              \
+	},                                                              \
+	.consumer_supplies      = u5500_##lower##_consumers,            \
+	.num_consumer_supplies  = ARRAY_SIZE(u5500_##lower##_consumers),\
+}                                                                      \
+}
+
+static struct regulator_init_data *
+u5500_regulator_init_data[U5500_NUM_REGULATORS] __initdata = {
+	[U5500_REGULATOR_VAPE] = (struct regulator_init_data []) {
+		{
+			.constraints = {
+				.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+			},
+			.consumer_supplies	= u5500_vape_consumers,
+			.num_consumer_supplies	= ARRAY_SIZE(u5500_vape_consumers),
+		}
+	},
+	U5500_REGULATOR_SWITCH(sga, SGA),
+	U5500_REGULATOR_SWITCH(hva, HVA),
+	U5500_REGULATOR_SWITCH(sia, SIA),
+	U5500_REGULATOR_SWITCH(disp, DISP),
+	U5500_REGULATOR_SWITCH(esram12, ESRAM12),
+};
+
 static void __init u5500_regulators_init_debug(void)
 {
 	const char data[] = "debug";
@@ -130,7 +218,34 @@ static void __init u5500_regulators_init_debug(void)
 			data, sizeof(data));
 }
 
+static struct regulator_consumer_supply u5500_vio_consumers[] = {
+	REGULATOR_SUPPLY("gbf_1v8", "cg2900-uart.0"),
+};
+
+static struct regulator_init_data u5500_vio_init_data = {
+	.constraints.always_on	= 1,
+	.consumer_supplies	= u5500_vio_consumers,
+	.num_consumer_supplies	= ARRAY_SIZE(u5500_vio_consumers),
+};
+
+static struct fixed_voltage_config u5500_vio_pdata __initdata = {
+	.supply_name	= "vio_1v8",
+	.microvolts	= 1800000,
+	.init_data	= &u5500_vio_init_data,
+	.gpio		= -EINVAL,
+};
+
 void __init u5500_regulators_init(void)
 {
 	u5500_regulators_init_debug();
+
+	platform_device_register_data(NULL, "u5500-regulators", -1,
+			u5500_regulator_init_data,
+			sizeof(u5500_regulator_init_data));
+
+	platform_device_register_data(NULL, "reg-fixed-voltage", -1,
+				      &u5500_vio_pdata,
+				      sizeof(u5500_vio_pdata));
+
+	regulator_has_full_constraints();
 }
