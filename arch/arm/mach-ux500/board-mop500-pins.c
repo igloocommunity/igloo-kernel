@@ -119,7 +119,7 @@ static pin_cfg_t mop500_pins_hrefv60[] = {
 	GPIO32_GPIO | PIN_INPUT_PULLDOWN, /* Magnetometer DRDY */
 
 	/* Display Interface */
-	GPIO65_GPIO		| PIN_OUTPUT_LOW, /* DISP1 RST */
+	GPIO65_GPIO		| PIN_OUTPUT_HIGH, /* DISP1 NO RST */
 	GPIO66_GPIO		| PIN_OUTPUT_LOW, /* DISP2 RST */
 
 	/* Touch screen INTERFACE */
