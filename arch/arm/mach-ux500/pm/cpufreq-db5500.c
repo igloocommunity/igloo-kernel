@@ -61,12 +61,6 @@ static int __init u5500_cpufreq_register(void)
 
 	if (cpu_is_u5500v1())
 		return -ENODEV;
-
-	if (prcmu_get_ddr_freq() < 333) {
-		freq_table[1].frequency = 325000;
-		freq_table[2].frequency = 650000;
-	}
-
 	pr_info("u5500-cpufreq : Available frequencies:\n");
 	while (freq_table[i].frequency != CPUFREQ_TABLE_END)
 		pr_info("  %d Mhz\n", freq_table[i++].frequency/1000);
