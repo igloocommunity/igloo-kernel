@@ -27,8 +27,8 @@ static struct regulator_consumer_supply ab5500_ldo_h_consumers[] = {
 };
 
 static struct regulator_consumer_supply ab5500_ldo_k_consumers[] = {
-	REGULATOR_SUPPLY("v-accel", "lsm303dlh.0"),
-	REGULATOR_SUPPLY("v-mag", "lsm303dlh.1"),
+	REGULATOR_SUPPLY("vdd", "lsm303dlh.0"),
+	REGULATOR_SUPPLY("vdd", "lsm303dlh.1"),
 	REGULATOR_SUPPLY("v-mmio-camera", "mmio_camera"),
 };
 
