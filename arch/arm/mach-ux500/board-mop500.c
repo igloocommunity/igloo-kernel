@@ -772,6 +772,11 @@ static struct platform_device ux500_backlight_device[] = {
 };
 #endif
 
+/* Force feedback vibrator device */
+static struct platform_device ste_ff_vibra_device = {
+	.name = "ste_ff_vibra"
+};
+
 #ifdef CONFIG_HSI
 static struct hsi_board_info __initdata u8500_hsi_devices[] = {
 	{
@@ -874,6 +879,7 @@ static struct platform_device *mop500_platform_devs[] __initdata = {
 	&u8500_sim_detect_device,
 #endif
 	&u8500_shrm_device,
+	&ste_ff_vibra_device,
 #ifdef CONFIG_U8500_MMIO
 	&ux500_mmio_device,
 #endif
@@ -1070,6 +1076,8 @@ static void ux500_uart0_exit(void)
 	if (ret < 0)
 		pr_err("pl011: uart pins_disable failed\n");
 }
+
+
 
 static struct amba_pl011_data uart0_plat = {
 #ifdef CONFIG_STE_DMA40_REMOVE
