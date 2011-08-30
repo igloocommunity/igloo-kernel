@@ -30,7 +30,7 @@
 #include <mach/hsi.h>
 #include <mach/ste-dma40-db8500.h>
 #include <trace/stm.h>
-#include <pm/pm.h>
+#include "pm/pm.h"
 
 #include "pins-db8500.h"
 
