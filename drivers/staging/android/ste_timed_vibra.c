@@ -85,7 +85,8 @@ static void linear_vibra_work(struct work_struct *work)
 	vinfo->pdata->timed_vibra_control(speed_pos, speed_neg,
 			speed_pos, speed_neg);
 
-	if (vinfo->vibra_state != STE_VIBRA_IDLE) {
+	if ((vinfo->vibra_state != STE_VIBRA_IDLE) &&
+		(vinfo->vibra_state != STE_VIBRA_OFF)) {
 		ktime = ktime_set((LINEAR_RESONANCE / USEC_PER_SEC),
 			(LINEAR_RESONANCE % USEC_PER_SEC) * NSEC_PER_USEC);
 		hrtimer_start(&vinfo->linear_tick, ktime, HRTIMER_MODE_REL);
@@ -191,10 +192,8 @@ static void vibra_enable(struct timed_output_dev *tdev, int timeout)
 	case STE_VIBRA_ON:
 		/* If user requested OFF */
 		if (!timeout) {
-			if (vinfo->pdata->is_linear_vibra) {
+			if (vinfo->pdata->is_linear_vibra)
 				hrtimer_cancel(&vinfo->linear_tick);
-				flush_workqueue(vinfo->linear_workqueue);
-			}
 			hrtimer_cancel(&vinfo->vibra_timer);
 			vinfo->vibra_state = STE_VIBRA_OFF;
 			queue_work(vinfo->vibra_workqueue, &vinfo->vibra_work);
@@ -226,7 +225,10 @@ static enum hrtimer_restart linear_vibra_tick(struct hrtimer *hrtimer)
 	struct vibra_info *vinfo =
 			container_of(hrtimer, struct vibra_info, linear_tick);
 
-	queue_work(vinfo->linear_workqueue, &vinfo->linear_work);
+	if ((vinfo->vibra_state != STE_VIBRA_IDLE) &&
+		(vinfo->vibra_state != STE_VIBRA_OFF)) {
+		queue_work(vinfo->linear_workqueue, &vinfo->linear_work);
+	}
 
 	return HRTIMER_NORESTART;
 }
