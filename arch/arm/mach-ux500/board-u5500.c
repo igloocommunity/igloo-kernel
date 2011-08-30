@@ -13,6 +13,7 @@
 #include <linux/i2c.h>
 #include <linux/i2s/i2s.h>
 #include <linux/mfd/abx500.h>
+#include <linux/ab5500-vibra.h>
 #include <linux/led-lm3530.h>
 #include <../drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h>
 #include <linux/input/matrix_keypad.h>
@@ -129,6 +130,15 @@ static struct ab5500_ponkey_platform_data ab5500_ponkey_data = {
 	 * to 10sec, 5sec and 0sec(disabled)
 	 */
 	.shutdown_secs = 10,
+};
+
+/* ab5500-vibra */
+static struct ab5500_vibra_platform_data ab5500_vibra_data = {
+	.type           = AB5500_VIB_ROTARY,
+	.voltage        = AB5500_VIB_VOLT_MIN,
+	.res_freq       = AB5500_VIB_RFREQ_150HZ,
+	.magnitude      = 0x7F,
+	.pulse          = AB5500_VIB_PULSE_130ms,
 };
 
 /*
@@ -344,6 +354,8 @@ static struct ab5500_platform_data ab5500_plf_data = {
 	.regulator	= &u5500_ab5500_regulator_data,
 	.dev_data[AB5500_DEVID_LEDS] = &ab5500_hvleds_data,
 	.dev_data_sz[AB5500_DEVID_LEDS] = sizeof(ab5500_hvleds_data),
+	.dev_data[AB5500_DEVID_VIBRATOR] = &ab5500_vibra_data,
+	.dev_data_sz[AB5500_DEVID_VIBRATOR] = sizeof(ab5500_vibra_data),
 	.init_settings = (struct abx500_init_settings[]){
 			{
 				.bank = 0x3,
