@@ -49,7 +49,12 @@ obj-$(CONFIG_IP_DCCP)		+= dccp/
 obj-$(CONFIG_IP_SCTP)		+= sctp/
 obj-$(CONFIG_RDS)		+= rds/
 ifneq ($(CONFIG_COMPAT_WIRELESS),)
-obj-$(CONFIG_COMPAT_WIRELESS)	+= compat-wireless/
+# If MAC80211 is disabled use UMAC
+ifneq ($(CONFIG_MAC80211),)
+obj-$(CONFIG_COMPAT_WIRELESS)   += compat-wireless-openmac/
+else
+obj-$(CONFIG_COMPAT_WIRELESS)   += compat-wireless/
+endif
 else
 obj-$(CONFIG_WIRELESS)		+= wireless/
 obj-$(CONFIG_MAC80211)		+= mac80211/

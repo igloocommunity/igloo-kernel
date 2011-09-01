@@ -13,6 +13,9 @@ PRIVATE_OUT := $(abspath $(PRODUCT_OUT)/system)
 PATH := $(PATH):$(BOOT_PATH)/u-boot/tools:$(abspath $(UBOOT_OUTPUT)/tools)
 export PATH
 
+# For compat-wireless gits to compile with kernel
+export STERICSSON_WLAN_BUILT_IN=y
+
 # only do this if we are buidling out of tree
 ifneq ($(KERNEL_OUTPUT),)
 ifneq ($(KERNEL_OUTPUT), $(abspath $(TOP)/kernel))
@@ -74,6 +77,27 @@ ifeq ($(KERNEL_DEFCONFIG),local)
 	@echo Skipping kernel configuration, KERNEL_DEFCONFIG set to local
 else
 	$(MAKE) $(PRIVATE_KERNEL_ARGS) $(KERNEL_DEFCONFIG)
+endif
+
+# Enable openMAC from here, since the defconfig is now set for UMAC
+ifeq ($(WLAN_ENABLE_OPEN_MAC_SOLUTION),true)
+ifeq ($(shell [ -f kernel/net/compat-wireless-openmac/Makefile ] && echo "OK"), OK)
+	kernel/scripts/config --file $(KERNEL_OUTPUT)/.config \
+		--enable CONFIG_MAC80211 \
+		--module CONFIG_CW1200 \
+		--enable CONFIG_CW1200_WAPI_SUPPORT \
+		--enable CONFIG_CW1200_USE_STE_EXTENSIONS \
+		--disable CONFIG_CW1200_NON_POWER_OF_TWO_BLOCKSIZES \
+		--disable CONFIG_CW1200_USE_GPIO_IRQ \
+		--disable CONFIG_CW1200_5GHZ_SUPPORT \
+		--enable CONFIG_CW1200_STA_DEBUG \
+		--enable CONFIG_CW1200_DEBUGFS \
+		--disable CONFIG_CW1200_BH_DEBUG \
+		--disable CONFIG_CW1200_WSM_DEBUG \
+		--disable CONFIG_CW1200_WSM_DUMPS \
+		--disable CONFIG_CW1200_TXRX_DEBUG \
+		--disable CONFIG_CW1200_TX_POLICY_DEBUG
+endif
 endif
 
 	$(MAKE) $(PRIVATE_KERNEL_ARGS) uImage
