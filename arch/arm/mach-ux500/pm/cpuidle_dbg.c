@@ -433,7 +433,7 @@ static void state_history_reset(void)
 
 	for_each_possible_cpu(cpu) {
 		sh = per_cpu(state_history, cpu);
-		for (i = 0; i <= cstates_len; i++) {
+		for (i = 0; i < cstates_len; i++) {
 			sh->states[i].counter = 0;
 			sh->states[i].hit_rate = 0;
 			sh->states[i].state_ok = 0;
