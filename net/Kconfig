@@ -323,12 +323,96 @@ menuconfig WIRELESS
 	depends on !S390
 	default y
 
+#
+# These are for the compat-wireless git
+#
+
+config COMPAT_WIRELESS
+       tristate "Compat Wireless"
+       default n
+       ---help---
+         To compile this code as a module, choose M here.
+if COMPAT_WIRELESS
+
+config CFG80211
+       tristate "Compat CFG80211"
+       default n
+       ---help---
+         To compile this code as a module, choose M here.
+
+config COMPAT_MAC80211_RC_DEFAULT
+       string "MAC80211_RC_DEFAULT"
+       default "minstrel"
+       ---help---
+
+config MAC80211_RC_DEFAULT_MINSTREL
+       bool "MAC80211_RC_DEFAULT_MINSTREL"
+       depends on COMPAT_WIRELESS
+       default y
+       ---help---
+
+config COMPAT_RFKILL
+       tristate "Compat RFKILL"
+       depends on COMPAT_WIRELESS
+       default y
+       ---help---
+
+config NL80211_TESTMODE
+       bool "Compat NL80211 testmode"
+       depends on COMPAT_WIRELESS
+       default y
+       ---help---
+
+config CFG80211_DEFAULT_PS
+       bool "CFG80211_DEFAULT_PS"
+       depends on COMPAT_WIRELESS
+       default y
+       ---help---
+
+config CFG80211_REG_DEBUG
+       bool "CFG80211_REG_DEBUG"
+       depends on COMPAT_WIRELESS
+       default y
+       ---help---
+
+config MAC80211_RC_PID
+       bool "MAC80211_RC_PID"
+       depends on COMPAT_WIRELESS
+       default y
+       ---help---
+
+config MAC80211_RC_MINSTREL
+       bool "MAC80211_RC_MINSTREL"
+       depends on COMPAT_WIRELESS
+       default y
+       ---help---
+
+config MAC80211_LEDS
+       bool "MAC80211_LEDS"
+       depends on COMPAT_WIRELESS
+       default y
+       ---help---
+
+config MAC80211_MESH
+       bool "MAC80211_MESH"
+       depends on COMPAT_WIRELESS
+       default y
+       ---help---
+
+endif
+
+#
+# End compat-wireless
+#
+
+if !COMPAT_WIRELESS
 if WIRELESS
 
 source "net/wireless/Kconfig"
 source "net/mac80211/Kconfig"
 
 endif # WIRELESS
+endif #!COMPAT_WIRELESS
 
 source "net/wimax/Kconfig"
 
