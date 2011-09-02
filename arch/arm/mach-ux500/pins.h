@@ -39,5 +39,6 @@ struct ux500_pins *ux500_pins_get(const char *name);
 int ux500_pins_enable(struct ux500_pins *pins);
 int ux500_pins_disable(struct ux500_pins *pins);
 void ux500_pins_put(struct ux500_pins *pins);
+int pins_for_u9500(void);
 
 #endif
