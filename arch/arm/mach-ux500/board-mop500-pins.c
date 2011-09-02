@@ -75,7 +75,7 @@ static pin_cfg_t mop500_pins_common[] = {
 	GPIO223_HSIT_DAT0,
 	GPIO224_HSIT_RDY0,
 	GPIO225_GPIO	| PIN_INPUT_PULLDOWN, /* CA_WAKE0 */
-	GPIO226_GPIO	| PIN_OUTPUT_HIGH, /* AC_WAKE0 */
+	GPIO226_GPIO	| PIN_OUTPUT_LOW, /* WLAN_PMU_EN / AC_WAKE0 */
 };
 
 static pin_cfg_t mop500_pins_default[] = {
