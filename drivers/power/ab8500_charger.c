@@ -440,7 +440,7 @@ static int ab8500_charger_detect_chargers(struct ab8500_charger *di)
 		goto out;
 	}
 
-	if (val & (VBUS_DET_DBNC100 | VBUS_DET_DBNC1))
+	if ((val & VBUS_DET_DBNC1) && (val & VBUS_DET_DBNC100))
 		result |= USB_PW_CONN;
 
 	/*
