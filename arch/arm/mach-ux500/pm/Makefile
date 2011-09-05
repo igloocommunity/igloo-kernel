@@ -18,3 +18,5 @@ endif
 ifeq ($(CONFIG_UX500_SOC_DB5500), y)
 obj-$(CONFIG_UX500_CPUFREQ) 		+= cpufreq-db5500.o
 endif
+
+obj-$(CONFIG_UX500_PM_PERFORMANCE)	+= performance.o

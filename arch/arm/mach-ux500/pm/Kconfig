@@ -91,3 +91,11 @@ config UX500_USECASE_GOVERNOR
 	default y
 	help
 	  Adjusts CPU_IDLE, CPU_FREQ, HOTPLUG_CPU and L2 cache parameters
+
+config UX500_PM_PERFORMANCE
+	bool "Performance supervision"
+	depends on UX500_PRCMU_QOS_POWER
+	default y
+	help
+	  Enable supervision of events which may require a boost
+	  of platform performance.
