@@ -1,1 +1,1 @@
-obj-y			+= drm/ vga/ mali/
+obj-y			+= drm/ vga/ stub/ ion/ mali/
