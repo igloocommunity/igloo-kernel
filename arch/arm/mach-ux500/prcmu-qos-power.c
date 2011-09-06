@@ -245,10 +245,6 @@ static void update_target(int target)
 	switch (target) {
 	case PRCMU_QOS_DDR_OPP:
 		switch (extreme_value) {
-		case 25:
-			op = DDR_25_OPP;
-			pr_debug("prcmu qos: set ddr opp to 25%%\n");
-			break;
 		case 50:
 			op = DDR_50_OPP;
 			pr_debug("prcmu qos: set ddr opp to 50%%\n");
@@ -257,6 +253,13 @@ static void update_target(int target)
 			op = DDR_100_OPP;
 			pr_debug("prcmu qos: set ddr opp to 100%%\n");
 			break;
+		case 25:
+			/* 25% DDR OPP is not supported on 5500 */
+			if (!cpu_is_u5500()) {
+				op = DDR_25_OPP;
+				pr_debug("prcmu qos: set ddr opp to 25%%\n");
+				break;
+			}
 		default:
 			pr_err("prcmu qos: Incorrect ddr target value (%d)",
 			       extreme_value);
@@ -666,6 +669,10 @@ static int qos_delayed_cpufreq_notifier(struct notifier_block *nb,
 static int __init prcmu_qos_power_init(void)
 {
 	int ret = 0;
+
+	/* 25% DDR OPP is not supported on 5500 */
+	if (cpu_is_u5500())
+		ddr_opp_qos.default_value = 50;
 
 	ret = register_prcmu_qos_misc(&ape_opp_qos, &prcmu_qos_ape_power_fops);
 	if (ret < 0) {
