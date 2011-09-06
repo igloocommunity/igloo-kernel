@@ -23,6 +23,7 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/mfd/abx500.h>
+#include <linux/mfd/abx500/ab5500.h>
 #include <linux/list.h>
 #include <linux/bitops.h>
 #include <linux/spinlock.h>
