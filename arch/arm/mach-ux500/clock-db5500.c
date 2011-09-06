@@ -741,6 +741,57 @@ static void configure_clkouts(void)
 		DB5500_CLKOUT_REF_CLK_SEL0, 0));
 }
 
+static struct clk *db5500_clks_tobe_disabled[] __initdata = {
+	&siaclk,
+	&sgaclk,
+	&sdmmcclk,
+	&p1_pclk0,
+	&p1_pclk6,
+	&p3_keypad_clk,
+	&p3_pclk1,
+	&p5_pclk0,
+	&p5_pclk11,
+	&p5_pclk12,
+	&p5_pclk13,
+	&p5_pclk14,
+	&p6_pclk4,
+	&p6_pclk5,
+	&p6_pclk7,
+	&p5_uart1_clk,
+	&p5_uart2_clk,
+	&p5_uart3_clk,
+	&p5_sdi1_clk,
+	&p5_sdi3_clk,
+	&p5_sdi4_clk,
+	&p5_i2c3_clk,
+	&p5_irrc_clk,
+	&p5_irda_clk,
+};
+
+static int __init init_clock_states(void)
+{
+	int i = 0;
+	/*
+	 * The following clks are shared with secure world.
+	 * Currently this leads to a limitation where we need to
+	 * enable them at all times.
+	 */
+	clk_enable(&p6_pclk1);
+	clk_enable(&p6_pclk2);
+	clk_enable(&p6_pclk3);
+	clk_enable(&p6_rng_clk);
+
+	/*
+	 * Disable clocks that are on at boot, but should be off.
+	 */
+	for (i = 0; i < ARRAY_SIZE(db5500_clks_tobe_disabled); i++) {
+		if (!clk_enable(db5500_clks_tobe_disabled[i]))
+			clk_disable(db5500_clks_tobe_disabled[i]);
+	}
+	return 0;
+}
+late_initcall(init_clock_states);
+
 int __init db5500_clk_init(void)
 {
 	if (ux500_is_svp()) {
