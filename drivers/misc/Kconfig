@@ -593,5 +593,6 @@ source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
 source "drivers/misc/i2s/Kconfig"
 source "drivers/misc/audio_io_dev/Kconfig"
+source "drivers/misc/modem_audio/Kconfig"
 
 endif # MISC_DEVICES

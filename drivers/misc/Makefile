@@ -61,3 +61,4 @@ obj-$(CONFIG_HWMEM)             += hwmem/
 obj-$(CONFIG_DISPDEV)		+= dispdev/
 obj-$(CONFIG_U5500_MBOX)	+= mbox.o mbox_channels-db5500.o
 obj-$(CONFIG_U8500_SIM_DETECT)	+= sim_detect.o
+obj-y				+= modem_audio/
