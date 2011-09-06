@@ -280,9 +280,9 @@ enum db5500_ap_pwr_state {
  * the bits in the bit field are not. (The bits also have a tendency to move
  * around, to further complicate matters.)
  */
-#define IRQ_INDEX(_name) ((IRQ_PRCMU_##_name) - IRQ_PRCMU_BASE)
+#define IRQ_INDEX(_name) ((IRQ_DB5500_PRCMU_##_name) - IRQ_DB5500_PRCMU_BASE)
 #define IRQ_ENTRY(_name)[IRQ_INDEX(_name)] = (WAKEUP_BIT_##_name)
-static u32 prcmu_irq_bit[NUM_PRCMU_WAKEUPS] = {
+static u32 prcmu_irq_bit[NUM_DB5500_PRCMU_WAKEUPS] = {
 	IRQ_ENTRY(RTC),
 	IRQ_ENTRY(RTT0),
 	IRQ_ENTRY(RTT1),
@@ -1318,9 +1318,9 @@ static bool read_mailbox_0(void)
 
 		ev &= mb0_transfer.req.dbb_irqs;
 
-		for (n = 0; n < NUM_PRCMU_WAKEUPS; n++) {
+		for (n = 0; n < NUM_DB5500_PRCMU_WAKEUPS; n++) {
 			if (ev & prcmu_irq_bit[n])
-				generic_handle_irq(IRQ_PRCMU_BASE + n);
+				generic_handle_irq(IRQ_DB5500_PRCMU_BASE + n);
 		}
 		r = true;
 		break;
@@ -1502,40 +1502,40 @@ static void prcmu_mask_work(struct work_struct *work)
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
 }
 
-static void prcmu_irq_mask(unsigned int irq)
+static void prcmu_irq_mask(struct irq_data *d)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
 
-	mb0_transfer.req.dbb_irqs &= ~prcmu_irq_bit[irq - IRQ_PRCMU_BASE];
+	mb0_transfer.req.dbb_irqs &= ~prcmu_irq_bit[d->irq - IRQ_DB5500_PRCMU_BASE];
 
 	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
 	schedule_work(&mb0_transfer.mask_work);
 }
 
-static void prcmu_irq_unmask(unsigned int irq)
+static void prcmu_irq_unmask(struct irq_data *d)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
 
-	mb0_transfer.req.dbb_irqs |= prcmu_irq_bit[irq - IRQ_PRCMU_BASE];
+	mb0_transfer.req.dbb_irqs |= prcmu_irq_bit[d->irq - IRQ_DB5500_PRCMU_BASE];
 
 	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
 	schedule_work(&mb0_transfer.mask_work);
 }
 
-static void noop(unsigned int irq)
+static void noop(struct irq_data *d)
 {
 }
 
 static struct irq_chip prcmu_irq_chip = {
 	.name           = "prcmu",
-	.disable        = prcmu_irq_mask,
-	.ack            = noop,
-	.mask           = prcmu_irq_mask,
-	.unmask         = prcmu_irq_unmask,
+	.irq_disable	= prcmu_irq_mask,
+	.irq_ack	= noop,
+	.irq_mask	= prcmu_irq_mask,
+	.irq_unmask	= prcmu_irq_unmask,
 };
 void __init prcmu_early_init(void)
 {
@@ -1578,13 +1578,13 @@ void __init prcmu_early_init(void)
 	INIT_WORK(&mb0_transfer.mask_work, prcmu_mask_work);
 
 	/* Initalize irqs. */
-	for (i = 0; i < NUM_PRCMU_WAKEUPS; i++) {
+	for (i = 0; i < NUM_DB5500_PRCMU_WAKEUPS; i++) {
 		unsigned int irq;
 
-		irq = IRQ_PRCMU_BASE + i;
-		set_irq_chip(irq, &prcmu_irq_chip);
+		irq = IRQ_DB5500_PRCMU_BASE + i;
 		set_irq_flags(irq, IRQF_VALID);
-		set_irq_handler(irq, handle_simple_irq);
+		irq_set_chip_and_handler(irq, &prcmu_irq_chip,
+					 handle_simple_irq);
 	}
 }
 
