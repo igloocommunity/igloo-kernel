@@ -1232,12 +1232,20 @@ int prcmu_get_ape_opp(void)
 
 int prcmu_get_ddr_opp(void)
 {
-	return DDR_100_OPP;
+	return readb(_PRCMU_BASE + PRCM_DDR_SUBSYS_APE_MINBW);
 }
 
 int prcmu_set_ddr_opp(u8 opp)
 {
-	return opp == DDR_100_OPP ? 0 : -EINVAL;
+	if (cpu_is_u5500v1())
+		return -EINVAL;
+
+	if (opp != DDR_100_OPP && opp != DDR_50_OPP)
+		return -EINVAL;
+
+	writeb(opp, _PRCMU_BASE + PRCM_DDR_SUBSYS_APE_MINBW);
+
+	return 0;
 }
 
 /**
