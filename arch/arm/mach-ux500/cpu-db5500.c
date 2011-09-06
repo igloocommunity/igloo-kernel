@@ -39,7 +39,9 @@ static struct map_desc u5500_io_desc[] __initdata = {
 	__IO_DEV_DESC(U5500_TWD_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_MTU0_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_SCU_BASE, SZ_4K),
+	__IO_DEV_DESC(U5500_RTC_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_BACKUPRAM0_BASE, SZ_8K),
+	__MEM_DEV_DESC(U5500_BOOT_ROM_BASE, SZ_1M),
 
 	__IO_DEV_DESC(U5500_GPIO0_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_GPIO1_BASE, SZ_4K),
@@ -53,26 +55,6 @@ static struct map_desc u5500_io_desc[] __initdata = {
 	__IO_DEV_DESC(U5500_CLKRST3_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_CLKRST5_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_CLKRST6_BASE, SZ_4K),
-};
-
-static struct resource db5500_pmu_resources[] = {
-	[0] = {
-		.start		= IRQ_DB5500_PMU0,
-		.end		= IRQ_DB5500_PMU0,
-		.flags		= IORESOURCE_IRQ,
-	},
-	[1] = {
-		.start		= IRQ_DB5500_PMU1,
-		.end		= IRQ_DB5500_PMU1,
-		.flags		= IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device db5500_pmu_device = {
-	.name			= "arm-pmu",
-	.id			= ARM_PMU_DEVICE_CPU,
-	.num_resources		= ARRAY_SIZE(db5500_pmu_resources),
-	.resource		= db5500_pmu_resources,
 };
 
 static struct resource mbox0_resources[] = {
@@ -164,7 +146,6 @@ static struct platform_device db5500_prcmu_device = {
 };
 
 static struct platform_device *db5500_platform_devs[] __initdata = {
-	&db5500_pmu_device,
 	&mbox0_device,
 	&mbox1_device,
 	&mbox2_device,
