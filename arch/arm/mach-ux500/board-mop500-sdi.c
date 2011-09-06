@@ -127,8 +127,7 @@ static struct mmci_platform_data mop500_sdi1_data = {
 	.ocr_mask	= MMC_VDD_29_30,
 	.f_max		= 15000000,
 	.capabilities	= MMC_CAP_4_BIT_DATA |
-				MMC_CAP_SDIO_IRQ |
-				MMC_CAP_BROKEN_SDIO_CMD53,
+				MMC_CAP_SDIO_IRQ,
 	.gpio_cd	= -1,
 	.gpio_wp	= -1,
 #ifdef CONFIG_STE_DMA40
