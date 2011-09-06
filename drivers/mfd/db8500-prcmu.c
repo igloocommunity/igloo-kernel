@@ -924,23 +924,23 @@ int db8500_prcmu_get_arm_opp(void)
 }
 
 /**
- * prcmu_get_ddr_opp - get the current DDR OPP
+ * db8500_prcmu_get_ddr_opp - get the current DDR OPP
  *
  * Returns: the current DDR OPP
  */
-int prcmu_get_ddr_opp(void)
+int db8500_prcmu_get_ddr_opp(void)
 {
 	return readb(PRCM_DDR_SUBSYS_APE_MINBW);
 }
 
 /**
- * set_ddr_opp - set the appropriate DDR OPP
+ * db8500_set_ddr_opp - set the appropriate DDR OPP
  * @opp: The new DDR operating point to which transition is to be made
  * Returns: 0 on success, non-zero on failure
  *
  * This function sets the operating point of the DDR.
  */
-int prcmu_set_ddr_opp(u8 opp)
+int db8500_prcmu_set_ddr_opp(u8 opp)
 {
 	if (opp < DDR_100_OPP || opp > DDR_25_OPP)
 		return -EINVAL;
