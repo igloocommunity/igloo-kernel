@@ -39,6 +39,7 @@
 #define SD_MMC_TX_RX_REG_OFFSET 0x80
 #define CRYP1_RX_REG_OFFSET	0x10
 #define CRYP1_TX_REG_OFFSET	0x8
+#define HASH1_TX_REG_OFFSET	0x4
 
 /* MSP related board specific declaration************************/
 
