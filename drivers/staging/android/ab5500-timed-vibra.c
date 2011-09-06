@@ -19,6 +19,7 @@
 #include "timed_output.h"
 
 #include <linux/mfd/abx500.h>		/* abx500_* */
+#include <linux/mfd/abx500/ab5500.h>
 #include <linux/ab5500-vibra.h>
 
 #define AB5500_VIBRA_DEV_NAME          "ab5500:vibra"
