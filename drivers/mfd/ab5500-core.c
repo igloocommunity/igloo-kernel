@@ -22,8 +22,8 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/random.h>
-#include <linux/mfd/ab5500/ab5500.h>
 #include <linux/mfd/abx500.h>
+#include <linux/mfd/abx500/ab5500.h>
 #include <linux/list.h>
 #include <linux/bitops.h>
 #include <linux/spinlock.h>
@@ -388,7 +388,7 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 			},
 		},
 	},
-	[AB5500_DEVID_FUELGAUGE] =   {
+	[AB5500_DEVID_FG] =   {
 		.nbanks = 1,
 		.bank = (struct ab5500_i2c_ranges []) {
 			{
@@ -594,9 +594,9 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			},
 		},
 	},
-	[AB5500_DEVID_FUELGAUGE] = {
+	[AB5500_DEVID_FG] = {
 		.name = "ab5500-fuelgauge",
-		.id = AB5500_DEVID_FUELGAUGE,
+		.id = AB5500_DEVID_FG,
 		.num_resources = 6,
 		.resources = (struct resource[]) {
 			{
