@@ -503,8 +503,6 @@ bool prcmu_has_arm_maxopp(void);
 bool prcmu_is_u8400(void);
 int prcmu_request_ape_opp_100_voltage(bool enable);
 int prcmu_release_usb_wakeup_state(void);
-int prcmu_set_ddr_opp(u8 opp);
-int prcmu_get_ddr_opp(void);
 /* NOTE! Use regulator framework instead */
 int prcmu_set_hwacc(u16 hw_acc_dev, u8 state);
 void prcmu_configure_auto_pm(struct prcmu_auto_pm_config *sleep,
@@ -548,6 +546,8 @@ int db8500_prcmu_set_arm_opp(u8 opp);
 int db8500_prcmu_get_arm_opp(void);
 int db8500_prcmu_set_ape_opp(u8 opp);
 int db8500_prcmu_get_ape_opp(void);
+int db8500_prcmu_set_ddr_opp(u8 opp);
+int db8500_prcmu_get_ddr_opp(void);
 
 #else /* !CONFIG_MFD_DB8500_PRCMU */
 
@@ -598,12 +598,12 @@ static inline int prcmu_release_usb_wakeup_state(void)
 	return 0;
 }
 
-static inline int prcmu_set_ddr_opp(u8 opp)
+static inline int db8500_prcmu_set_ddr_opp(u8 opp)
 {
 	return 0;
 }
 
-static inline int prcmu_get_ddr_opp(void)
+static inline int db8500_prcmu_get_ddr_opp(void)
 {
 	return DDR_100_OPP;
 }
