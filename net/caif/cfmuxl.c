@@ -254,5 +254,6 @@ static void cfmuxl_ctrlcmd(struct cflayer *layr, enum caif_ctrlcmd ctrl,
 		if (cfsrvl_phyid_match(layer, phyid))
 			layer->ctrlcmd(layer, ctrl, phyid);
 		}
+	}
 	rcu_read_unlock();
 }
