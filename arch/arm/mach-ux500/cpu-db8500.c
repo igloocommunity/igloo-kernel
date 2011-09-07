@@ -160,6 +160,7 @@ static int usb_db8500_tx_dma_cfg[] = {
  */
 void __init u8500_init_devices(void)
 {
+	ux500_init_devices();
 	db8500_dma_init();
 	db8500_add_rtc();
 	db8500_add_usb(usb_db8500_rx_dma_cfg, usb_db8500_tx_dma_cfg);

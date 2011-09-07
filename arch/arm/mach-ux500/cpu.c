@@ -31,6 +31,23 @@ void __iomem *_PRCMU_BASE;
 static void __iomem *l2x0_base;
 #endif
 
+void __init ux500_init_devices(void)
+{
+#ifdef CONFIG_CACHE_L2X0
+	BUG_ON(!l2x0_base);
+
+	/*
+	 * Unlock Data and Instruction Lock if locked.  This is done here
+	 * instead of in l2x0_init since doing it there appears to cause the
+	 * second core boot to occasionaly fail.
+	 */
+	if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_D) & 0xFF)
+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D);
+
+	if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_I) & 0xFF)
+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I);
+#endif
+}
 
 static void ux500_restart(char mode, const char *cmd)
 {
