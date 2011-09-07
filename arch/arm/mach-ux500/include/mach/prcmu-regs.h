@@ -106,5 +106,6 @@
 #define PRCM_GPIOCR_DBG_STM_MOD_CMD1            0x800
 #define PRCM_GPIOCR_DBG_UARTMOD_CMD0            0x1
 
+#define PRCM_DBG_PWRCTL            0x4AC
 
 #endif /* __MACH_PRCMU__REGS_H */
