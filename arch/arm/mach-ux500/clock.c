@@ -12,6 +12,7 @@
 #include <linux/spinlock.h>
 #include <linux/mfd/ab8500/sysctrl.h>
 #include <mach/prcmu.h>
+#include <mach/prcmu-regs.h>
 
 #include "clock.h"
 
@@ -389,8 +390,14 @@ int __init clk_init(void)
 
 	if (cpu_is_u8500())
 		db8500_clk_init();
-	else if (cpu_is_u5500())
-		db5500_clk_init();
+    else if (cpu_is_u5500()) {
+            unsigned int temp = 0;
+            db5500_clk_init();
+            if (cpu_is_u5500v1())
+                temp = readl(prcmu_base + PRCM_DBG_PWRCTL);
+                temp |= 0x18;
+                writel(temp, (prcmu_base + PRCM_DBG_PWRCTL));
+        }
 
 	return 0;
 }
