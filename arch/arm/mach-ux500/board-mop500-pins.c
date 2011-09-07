@@ -42,6 +42,9 @@ static pin_cfg_t mop500_pins_common[] = {
 	GPIO195_MSP2_TFS,
 	GPIO196_MSP2_RXD | PIN_OUTPUT_LOW,
 
+	/* LCD TE0 */
+	GPIO68_LCD_VSI0	| PIN_INPUT_PULLUP,
+
 	/* Touch screen INTERFACE */
 	GPIO84_GPIO	| PIN_INPUT_PULLUP, /* TOUCH_INT1 */
 
