@@ -81,4 +81,12 @@ static inline void ux500_regulator_put(struct ux500_regulator *regulator)
 }
 #endif /* CONFIG_REGULATOR */
 
+#ifdef CONFIG_REGULATOR_DEBUG
+void ux500_regulator_suspend_debug(void);
+void ux500_regulator_resume_debug(void);
+#else
+static inline void ux500_regulator_suspend_debug(void) { }
+static inline void ux500_regulator_resume_debug(void) { }
+#endif
+
 #endif

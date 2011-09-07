@@ -13,6 +13,8 @@
 #include <linux/mfd/dbx500-prcmu.h>
 #include <linux/gpio/nomadik.h>
 #include <linux/regulator/ab8500-debug.h>
+#include <linux/regulator/dbx500-prcmu.h>
+#include <linux/mfd/dbx500-prcmu.h>
 
 #include <mach/context.h>
 #include <mach/pm.h>
@@ -197,11 +199,13 @@ static int ux500_suspend_prepare_late(void)
 	/* ESRAM to retention instead of OFF until ROM is fixed */
 	(void) prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
 	ab8500_regulator_debug_force();
+	ux500_regulator_suspend_debug();
 	return 0;
 }
 
 static void ux500_suspend_wake(void)
 {
+	ux500_regulator_resume_debug();
 	ab8500_regulator_debug_restore();
 	(void) prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
 }
