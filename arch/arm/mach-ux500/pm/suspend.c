@@ -19,6 +19,7 @@
 #include <mach/prcmu.h>
 #include <mach/prcmu-regs.h>
 #include <mach/prcmu-qos.h>
+#include <mach/regulator.h>
 
 #include "context.h"
 #include "pm.h"
@@ -201,12 +202,14 @@ static int ux500_suspend_prepare_late(void)
 	/* ESRAM to retention instead of OFF until ROM is fixed */
 	(void)prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
 	ab8500_regulator_debug_force();
+	ux500_regulator_suspend_debug();
 
 	return 0;
 }
 
 static void ux500_suspend_wake(void)
 {
+	ux500_regulator_resume_debug();
 	ab8500_regulator_debug_restore();
 	(void)prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
 }
