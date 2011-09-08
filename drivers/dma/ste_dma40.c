@@ -2016,6 +2016,7 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
 	err = d40_allocate_channel(d40c);
 	if (err) {
 		chan_err(d40c, "Failed to allocate channel\n");
+		d40c->configured = false;
 		goto fail;
 	}
 
