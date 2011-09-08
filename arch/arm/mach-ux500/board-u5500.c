@@ -34,6 +34,7 @@
 #include <mach/devices.h>
 #include <mach/setup.h>
 #include <mach/db5500-keypad.h>
+#include <mach/crypto-ux500.h>
 
 #include "pins-db5500.h"
 #include "pins.h"
@@ -479,6 +480,42 @@ static struct platform_device u5500_mloader_device = {
 	.num_resources = 0,
 };
 
+static struct cryp_platform_data u5500_cryp1_platform_data = {
+	.mem_to_engine = {
+		.dir = STEDMA40_MEM_TO_PERIPH,
+		.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
+		.dst_dev_type = DB5500_DMA_DEV48_CRYPTO1_TX,
+		.src_info.data_width = STEDMA40_WORD_WIDTH,
+		.dst_info.data_width = STEDMA40_WORD_WIDTH,
+		.mode = STEDMA40_MODE_LOGICAL,
+		.src_info.psize = STEDMA40_PSIZE_LOG_4,
+		.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+	},
+	.engine_to_mem = {
+		.dir = STEDMA40_PERIPH_TO_MEM,
+		.src_dev_type = DB5500_DMA_DEV48_CRYPTO1_RX,
+		.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
+		.src_info.data_width = STEDMA40_WORD_WIDTH,
+		.dst_info.data_width = STEDMA40_WORD_WIDTH,
+		.mode = STEDMA40_MODE_LOGICAL,
+		.src_info.psize = STEDMA40_PSIZE_LOG_4,
+		.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+	}
+};
+
+static struct hash_platform_data u5500_hash1_platform_data = {
+	.mem_to_engine = {
+.dir = STEDMA40_MEM_TO_PERIPH,
+.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
+.dst_dev_type = DB5500_DMA_DEV50_HASH1_TX,
+.src_info.data_width = STEDMA40_WORD_WIDTH,
+.dst_info.data_width = STEDMA40_WORD_WIDTH,
+.mode = STEDMA40_MODE_LOGICAL,
+.src_info.psize = STEDMA40_PSIZE_LOG_16,
+.dst_info.psize = STEDMA40_PSIZE_LOG_16,
+},
+};
+
 static struct platform_device *u5500_platform_devices[] __initdata = {
 	&u5500_ab5500_device,
 	&ux500_mcde_device,
@@ -523,6 +560,12 @@ static void __init u5500_uart_init(void)
 	db5500_add_uart3(NULL);
 }
 
+static void __init u5500_cryp1_hash1_init(void)
+{
+	db5500_add_cryp1(&u5500_cryp1_platform_data);
+	db5500_add_hash1(&u5500_hash1_platform_data);
+}
+
 static void __init u5500_init_machine(void)
 {
 	u5500_regulators_init();
@@ -537,6 +580,7 @@ static void __init u5500_init_machine(void)
 	u5500_uart_init();
 
 	db5500_add_keypad(&u5500_keypad_board);
+	u5500_cryp1_hash1_init();
 
 	platform_add_devices(u5500_platform_devices,
 			     ARRAY_SIZE(u5500_platform_devices));

@@ -666,10 +666,11 @@ static struct clk_lookup db5500_prcc_clocks[] = {
 	CLK_LOOKUP(p5_pclk15, "gpio.7", NULL),
 
 	CLK_LOOKUP(p6_rng_clk, "rng", NULL),
-	CLK_LOOKUP(p6_pclk1, "cryp", NULL),
+	CLK_LOOKUP(p6_pclk1, "cryp0", NULL),
 	CLK_LOOKUP(p6_pclk2, "hash0", NULL),
 	CLK_LOOKUP(p6_pclk3, "pka", NULL),
 	CLK_LOOKUP(p6_pclk4, "hash1", NULL),
+	CLK_LOOKUP(p6_pclk1, "cryp1", NULL),
 	CLK_LOOKUP(p6_pclk5, "cfgreg", NULL),
 	CLK_LOOKUP(p6_mtu0_clk, "mtu0", NULL),
 	CLK_LOOKUP(p6_mtu1_clk, "mtu1", NULL),
