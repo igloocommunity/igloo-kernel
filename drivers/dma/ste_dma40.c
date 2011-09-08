@@ -2136,6 +2136,7 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
 	if (err) {
 		dev_err(&d40c->chan.dev->device,
 			"[%s] Failed to allocate channel\n", __func__);
+		d40c->configured = false;
 		goto fail;
 	}
 
