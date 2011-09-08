@@ -47,21 +47,21 @@ db5500_add_keypad(struct db5500_keypad_platform_data *pdata)
 #define db5500_add_usb(rx_cfg, tx_cfg) \
 	ux500_add_usb(U5500_USBOTG_BASE, IRQ_DB5500_USBOTG, rx_cfg, tx_cfg)
 
-#define db5500_add_sdi0(pdata) \
+#define db5500_add_sdi0(pdata, pid) \
 	dbx500_add_sdi("sdi0", U5500_SDI0_BASE, IRQ_DB5500_SDMMC0, pdata, \
-		       0x10480180)
-#define db5500_add_sdi1(pdata) \
+		       pid)
+#define db5500_add_sdi1(pdata, pid) \
 	dbx500_add_sdi("sdi1", U5500_SDI1_BASE, IRQ_DB5500_SDMMC1, pdata, \
-		       0x10480180)
-#define db5500_add_sdi2(pdata) \
+		       pid)
+#define db5500_add_sdi2(pdata, pid) \
 	dbx500_add_sdi("sdi2", U5500_SDI2_BASE, IRQ_DB5500_SDMMC2, pdata, \
-		       0x10480180)
-#define db5500_add_sdi3(pdata) \
+		       pid)
+#define db5500_add_sdi3(pdata, pid) \
 	dbx500_add_sdi("sdi3", U5500_SDI3_BASE, IRQ_DB5500_SDMMC3, pdata, \
-		       0x10480180)
-#define db5500_add_sdi4(pdata) \
+		       pid)
+#define db5500_add_sdi4(pdata, pid) \
 	dbx500_add_sdi("sdi4", U5500_SDI4_BASE, IRQ_DB5500_SDMMC4, pdata, \
-		       0x10480180)
+		       pid)
 
 /* This one has a bad peripheral ID in the U5500 silicon */
 #define db5500_add_spi0(pdata) \

@@ -20,6 +20,12 @@
 #include "board-u5500.h"
 #include "../../../drivers/mmc/host/mmci.h" /* to avoid MCI_ST* redefinition */
 
+#define BACKUPRAM_ROM_DEBUG_ADDR 0xFFC
+#define MMC_BLOCK_ID	0x20
+
+#define SDI_PID_V1 0x00480180
+#define SDI_PID_V2 0x10480180
+
 /*
  * SDI0 (EMMC)
  */
@@ -63,6 +69,28 @@ static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
 };
 
 /*
+ * SDI2 (EMMC2)
+ */
+
+struct stedma40_chan_cfg sdi2_dma_cfg_rx = {
+	.mode = STEDMA40_MODE_LOGICAL,
+	.dir = STEDMA40_PERIPH_TO_MEM,
+	.src_dev_type = DB5500_DMA_DEV26_SDMMC2_RX,
+	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
+	.src_info.data_width = STEDMA40_WORD_WIDTH,
+	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+};
+
+static struct stedma40_chan_cfg sdi2_dma_cfg_tx = {
+	.mode = STEDMA40_MODE_LOGICAL,
+	.dir = STEDMA40_MEM_TO_PERIPH,
+	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
+	.dst_dev_type = DB5500_DMA_DEV26_SDMMC2_TX,
+	.src_info.data_width = STEDMA40_WORD_WIDTH,
+	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+};
+
+/*
  * SDI3 (SDIO)
  */
 static struct stedma40_chan_cfg sdi3_dma_cfg_rx = {
@@ -95,6 +123,21 @@ static struct mmci_platform_data u5500_sdi0_data = {
 	.dma_filter	= stedma40_filter,
 	.dma_rx_param	= &sdi0_dma_cfg_rx,
 	.dma_tx_param	= &sdi0_dma_cfg_tx,
+#endif
+};
+
+static struct mmci_platform_data u5500_sdi2_data = {
+	.ocr_mask	= MMC_VDD_165_195,
+	.f_max		= 50000000,
+	.capabilities	= MMC_CAP_4_BIT_DATA |
+				MMC_CAP_8_BIT_DATA |
+				MMC_CAP_MMC_HIGHSPEED,
+	.gpio_cd	= -1,
+	.gpio_wp	= -1,
+#ifdef CONFIG_STE_DMA40
+	.dma_filter	= stedma40_filter,
+	.dma_rx_param	= &sdi2_dma_cfg_rx,
+	.dma_tx_param	= &sdi2_dma_cfg_tx,
 #endif
 };
 
@@ -187,8 +230,33 @@ static struct mmci_platform_data u5500_sdi3_data = {
 
 void __init u5500_sdi_init(void)
 {
-	db5500_add_sdi0(&u5500_sdi0_data);
+	int pid;
+	int mmc_blk = 0;
+
+	if (cpu_is_u5500v1())
+		pid = SDI_PID_V1;
+	else
+		pid = SDI_PID_V2;
+
+	if (cpu_is_u5500v1())
+		u5500_sdi0_data.ocr_mask = MMC_VDD_165_195;
+	else
+		/*
+			Fix me in 5500 v2.1
+			Dynamic detection of booting device by reading
+			ROM debug register from BACKUP RAM and register the
+			corresponding EMMC.
+			This is done due to wrong configuration of MMC0 clock
+			in ROM code for u5500 v2.
+		*/
+		mmc_blk = readl(__io_address(U5500_BACKUPRAM1_BASE) +
+					BACKUPRAM_ROM_DEBUG_ADDR);
+
+	if (mmc_blk & MMC_BLOCK_ID)
+		db5500_add_sdi2(&u5500_sdi2_data, pid);
+	else
+		db5500_add_sdi0(&u5500_sdi0_data, pid);
 	sdi1_configure();
-	db5500_add_sdi1(&u5500_sdi1_data);
-	db5500_add_sdi3(&u5500_sdi3_data);
+	db5500_add_sdi1(&u5500_sdi1_data, pid);
+	db5500_add_sdi3(&u5500_sdi3_data, pid);
 }

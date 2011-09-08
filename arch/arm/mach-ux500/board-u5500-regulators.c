@@ -19,7 +19,7 @@
  */
 
 static struct regulator_consumer_supply ab5500_ldo_g_consumers[] = {
-	REGULATOR_SUPPLY("v-MMC-SD", "sdi1"),
+	REGULATOR_SUPPLY("vmmc", "sdi1"),
 };
 
 static struct regulator_consumer_supply ab5500_ldo_h_consumers[] = {
@@ -36,8 +36,8 @@ static struct regulator_consumer_supply ab5500_ldo_k_consumers[] = {
 };
 
 static struct regulator_consumer_supply ab5500_ldo_l_consumers[] = {
-	REGULATOR_SUPPLY("v-EMMC", "sdi0"),
-	REGULATOR_SUPPLY("v-EMMC", "sdi2"),
+	REGULATOR_SUPPLY("vmmc", "sdi0"),
+	REGULATOR_SUPPLY("vmmc", "sdi2"),
 };
 
 static struct regulator_consumer_supply ab5500_ldo_vdigmic_consumers[] = {
@@ -140,11 +140,11 @@ static struct regulator_consumer_supply u5500_vape_consumers[] = {
 	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.1"),
 	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.2"),
 	REGULATOR_SUPPLY("v-i2c", "nmk-i2c.3"),
-	REGULATOR_SUPPLY("v-mmc", "sdi0"),
-	REGULATOR_SUPPLY("v-mmc", "sdi1"),
-	REGULATOR_SUPPLY("v-mmc", "sdi2"),
-	REGULATOR_SUPPLY("v-mmc", "sdi3"),
-	REGULATOR_SUPPLY("v-mmc", "sdi4"),
+	REGULATOR_SUPPLY("vcore", "sdi0"),
+	REGULATOR_SUPPLY("vcore", "sdi1"),
+	REGULATOR_SUPPLY("vcore", "sdi2"),
+	REGULATOR_SUPPLY("vcore", "sdi3"),
+	REGULATOR_SUPPLY("vcore", "sdi4"),
 	REGULATOR_SUPPLY("v-uart", "uart0"),
 	REGULATOR_SUPPLY("v-uart", "uart1"),
 	REGULATOR_SUPPLY("v-uart", "uart2"),
