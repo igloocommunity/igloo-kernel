@@ -92,6 +92,11 @@ static void platform_pm_runtime_used(struct device *dev,
 		set_bit(BIT_ONCE, &prd->flags);
 }
 
+static int ux500_pd_runtime_idle(struct device *dev)
+{
+	return pm_runtime_suspend(dev);
+}
+
 static int ux500_pd_runtime_suspend(struct device *dev)
 {
 	struct pm_runtime_data *prd = __to_prd(dev);
@@ -274,10 +279,49 @@ static int ux500_pd_bus_notify(struct notifier_block *nb,
 
 #endif /* CONFIG_PM_RUNTIME */
 
-struct dev_power_domain ux500_dev_power_domain = {
+struct dev_power_domain ux500_amba_dev_power_domain = {
 	.ops = {
+		/* USE_AMBA_PM_SLEEP_OPS minus the two we replace */
+		.prepare = amba_pm_prepare,
+		.complete = amba_pm_complete,
+		.suspend = amba_pm_suspend,
+		.resume = amba_pm_resume,
+		.freeze = amba_pm_freeze,
+		.thaw = amba_pm_thaw,
+		.poweroff = amba_pm_poweroff,
+		.restore = amba_pm_restore,
+		.freeze_noirq = amba_pm_freeze_noirq,
+		.thaw_noirq = amba_pm_thaw_noirq,
+		.poweroff_noirq = amba_pm_poweroff_noirq,
+		.restore_noirq = amba_pm_restore_noirq,
+
 		.suspend_noirq		= ux500_pd_suspend_noirq,
 		.resume_noirq		= ux500_pd_resume_noirq,
+		.runtime_idle		= ux500_pd_runtime_idle,
+		.runtime_suspend	= ux500_pd_runtime_suspend,
+		.runtime_resume		= ux500_pd_runtime_resume,
+	},
+};
+
+struct dev_power_domain ux500_dev_power_domain = {
+	.ops = {
+		/* USE_PLATFORM_PM_SLEEP_OPS minus the two we replace */
+		.prepare = platform_pm_prepare,
+		.complete = platform_pm_complete,
+		.suspend = platform_pm_suspend,
+		.resume = platform_pm_resume,
+		.freeze = platform_pm_freeze,
+		.thaw = platform_pm_thaw,
+		.poweroff = platform_pm_poweroff,
+		.restore = platform_pm_restore,
+		.freeze_noirq = platform_pm_freeze_noirq,
+		.thaw_noirq = platform_pm_thaw_noirq,
+		.poweroff_noirq = platform_pm_poweroff_noirq,
+		.restore_noirq = platform_pm_restore_noirq,
+
+		.suspend_noirq		= ux500_pd_suspend_noirq,
+		.resume_noirq		= ux500_pd_resume_noirq,
+		.runtime_idle		= ux500_pd_runtime_idle,
 		.runtime_suspend	= ux500_pd_runtime_suspend,
 		.runtime_resume		= ux500_pd_runtime_resume,
 	},
