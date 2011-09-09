@@ -36,7 +36,9 @@
 #define HREFV60_XSHUTDOWN_SECONDARY_SENSOR 140
 #define XSHUTDOWN_PRIMARY_SENSOR 	141
 #define XSHUTDOWN_SECONDARY_SENSOR 	142
-
+#define CYPRESS_TOUCH_INT_PIN 84
+#define CYPRESS_TOUCH_RST_GPIO 143
+#define CYPRESS_SLAVE_SELECT_GPIO 216
 /* MOP500 generic GPIOs */
 #define MOP500_HDMI_RST_GPIO		196
 
@@ -83,6 +85,8 @@ void __init mop500_stuib_init(void);
 void __init mop500_msp_init(void);
 void __init mop500_pins_init(void);
 void __init mop500_vibra_init(void);
+void mop500_cyttsp_init(void);
+void __init mop500_u8500uib_r3_init(void);
 
 void mop500_uib_i2c_add(int busnum, struct i2c_board_info const *info,
 		unsigned n);
