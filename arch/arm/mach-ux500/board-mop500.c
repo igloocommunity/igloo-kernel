@@ -36,6 +36,7 @@
 #include <linux/pwm_backlight.h>
 #include <linux/gpio/nomadik.h>
 #include <linux/leds.h>
+#include <linux/cyttsp.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -996,6 +997,10 @@ static struct pl022_ssp_controller ssp0_platform_data = {
 	/* on this platform, gpio 31,142,144,214 &
 	 * 224 are connected as chip selects
 	 */
+	.num_chipselect = NUM_SSP_CLIENTS,
+};
+static struct pl022_ssp_controller mop500_spi2_data = {
+	.bus_id	= SPI023_2_CONTROLLER,
 	.num_chipselect = NUM_SSP_CLIENTS,
 };
 

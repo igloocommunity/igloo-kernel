@@ -19,6 +19,7 @@
 #include <linux/input/matrix_keypad.h>
 #include <linux/lsm303dlh.h>
 #include <linux/leds-ab5500.h>
+#include <linux/cyttsp.h>
 
 #include <video/av8100.h>
 
@@ -581,6 +582,10 @@ static void __init u5500_init_machine(void)
 
 	db5500_add_keypad(&u5500_keypad_board);
 	u5500_cryp1_hash1_init();
+
+#ifdef CONFIG_TOUCHSCREEN_CYTTSP_SPI
+	u5500_cyttsp_init();
+#endif
 
 	platform_add_devices(u5500_platform_devices,
 			     ARRAY_SIZE(u5500_platform_devices));
