@@ -18,7 +18,8 @@ struct reboot_reason reboot_reasons[] = {
 	{"factory-reset", SW_RESET_FACTORY_RESET},
 	{"recovery", SW_RESET_NORMAL},
 	{"charging", SW_RESET_CHARGING},
-	{"", SW_RESET_NORMAL}, /* Normal Boot */
+	{"coldstart", SW_RESET_COLDSTART},
+	{"none", SW_RESET_NO_ARGUMENT}, /* Normal Boot */
 };
 
 unsigned int reboot_reasons_size = ARRAY_SIZE(reboot_reasons);
@@ -66,5 +67,5 @@ const char *reboot_reason_string(u16 code)
 	}
 
 	/* No valid reboot reason code found */
-	return "";
+	return "unknown";
 }
