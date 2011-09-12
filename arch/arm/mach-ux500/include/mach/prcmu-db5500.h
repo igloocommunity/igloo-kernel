@@ -15,6 +15,11 @@ int db5500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
 
 int db5500_prcmu_request_clock(u8 clock, bool enable);
 
+static inline unsigned long prcmu_clock_rate(u8 clock)
+{
+	return 0;
+}
+
 int prcmu_resetout(u8 resoutn, u8 state);
 
 unsigned int prcmu_get_ddr_freq(void);

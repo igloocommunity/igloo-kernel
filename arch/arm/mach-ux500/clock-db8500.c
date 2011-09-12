@@ -33,13 +33,6 @@
 #include "pins-db8500.h"
 #include "product.h"
 
-#define PRCM_SDMMCCLK_MGT	0x024
-#define PRCM_TCR		0x1C8
-#define PRCM_TCR_STOPPED	(1 << 16)
-#define PRCM_TCR_DOZE_MODE	(1 << 17)
-#define SD_CLK_DIV_MASK		0x1F
-#define SD_CLK_DIV_VAL		8
-
 static DEFINE_MUTEX(soc1_pll_mutex);
 static DEFINE_MUTEX(sysclk_mutex);
 static DEFINE_MUTEX(ab_ulpclk_mutex);
@@ -50,20 +43,13 @@ static struct delayed_work sysclk_disable_work;
 
 /* PLL operations. */
 
-static int clk_pllsrc_enable(struct clk *clk)
+static unsigned long pll_get_rate(struct clk *clk)
 {
-	/* To enable pll */
-	return 0;
+	return prcmu_clock_rate(clk->cg_sel);
 }
 
-static void clk_pllsrc_disable(struct clk *clk)
-{
-	/* To disable pll */
-}
-
-static struct clkops pll_clk_ops = {
-	.enable = clk_pllsrc_enable,
-	.disable = clk_pllsrc_disable,
+static struct clkops pll_ops = {
+	.get_rate = pll_get_rate,
 };
 
 /* SysClk operations. */
@@ -405,19 +391,12 @@ static struct clkops clkout1_ops = {
 #define DEF_PER6_KCLK(_cg_bit, _name, _parent) \
 	DEF_PRCC_KCLK(_name, U8500_CLKRST6_BASE, _cg_bit, _parent, &per6clk)
 
-#define DEF_MTU_CLK(_cg_sel, _name, _bus_parent) \
-	struct clk _name = { \
-		.name = #_name, \
-		.ops = &mtu_clk_ops, \
-		.cg_sel = _cg_sel, \
-		.bus_parent = _bus_parent, \
-	}
-
 /* Clock sources. */
 
 static struct clk soc0_pll = {
 	.name = "soc0_pll",
-	.ops = &pll_clk_ops,
+	.ops = &pll_ops,
+	.cg_sel = PRCMU_PLLSOC0,
 };
 
 static struct clk soc1_pll = {
@@ -429,11 +408,13 @@ static struct clk soc1_pll = {
 
 static struct clk ddr_pll = {
 	.name = "ddr_pll",
-	.ops = &pll_clk_ops,
+	.ops = &pll_ops,
+	.cg_sel = PRCMU_PLLDDR,
 };
 
 static struct clk ulp38m4 = {
 	.name = "ulp38m4",
+	.rate = 38400000,
 };
 
 static struct clk sysclk = {
@@ -447,6 +428,7 @@ static struct clk sysclk2 = {
 	.name = "sysclk2",
 	.ops = &sysclk_ops,
 	.cg_sel = AB8500_SYSULPCLKCTRL1_SYSCLKBUF2REQ,
+	.rate = 38400000,
 	.mutex = &sysclk_mutex,
 };
 
@@ -454,6 +436,7 @@ static struct clk sysclk3 = {
 	.name = "sysclk3",
 	.ops = &sysclk_ops,
 	.cg_sel = AB8500_SYSULPCLKCTRL1_SYSCLKBUF3REQ,
+	.rate = 38400000,
 	.mutex = &sysclk_mutex,
 };
 
@@ -461,6 +444,7 @@ static struct clk sysclk4 = {
 	.name = "sysclk4",
 	.ops = &sysclk_ops,
 	.cg_sel = AB8500_SYSULPCLKCTRL1_SYSCLKBUF4REQ,
+	.rate = 38400000,
 	.mutex = &sysclk_mutex,
 };
 
@@ -773,21 +757,24 @@ static int clk_show_print(struct seq_file *s, void *p)
 	int i;
 	int enabled_only = (int)s->private;
 
-	seq_printf(s, "\n%-20s %s\n", "name", "enabled (kernel + debug)");
+	seq_printf(s, "\n%-20s %10s %s\n", "name", "rate",
+		"enabled (kernel + debug)");
 	for (i = 0; i < ARRAY_SIZE(dbg_clks); i++) {
 		if (enabled_only && !dbg_clks[i].clk->enabled)
 			continue;
 		if (dbg_clks[i].name)
 			seq_printf(s,
-				   "%-20s %5d + %d\n",
+				   "%-20s %10lu %5d + %d\n",
 				   dbg_clks[i].name,
+				   clk_get_rate(dbg_clks[i].clk),
 				   dbg_clks[i].clk->enabled
 						- !!dbg_clks[i].enabled,
 				   dbg_clks[i].enabled);
 		else
 			seq_printf(s,
-				   "%-20s %5d + %d\n",
+				   "%-20s %10lu %5d + %d\n",
 				   dbg_clks[i].clk->name,
+				   clk_get_rate(dbg_clks[i].clk),
 				   dbg_clks[i].clk->enabled
 						- !!dbg_clks[i].enabled,
 				   dbg_clks[i].enabled);
