@@ -426,41 +426,50 @@ static __iomem void *tcdm_base;
 struct clk_mgt {
 	unsigned int offset;
 	u32 pllsw;
+	int branch;
+	bool clk38div;
+};
+
+enum {
+	PLL_RAW,
+	PLL_FIX,
+	PLL_DIV
 };
 
 static DEFINE_SPINLOCK(clk_mgt_lock);
 
-#define CLK_MGT_ENTRY(_name)[PRCMU_##_name] = { (PRCM_##_name##_MGT_OFF), 0 }
+#define CLK_MGT_ENTRY(_name, _branch, _clk38div)[PRCMU_##_name] = \
+	{ (PRCM_##_name##_MGT), 0 , _branch, _clk38div}
 struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
-	CLK_MGT_ENTRY(SGACLK),
-	CLK_MGT_ENTRY(UARTCLK),
-	CLK_MGT_ENTRY(MSP02CLK),
-	CLK_MGT_ENTRY(MSP1CLK),
-	CLK_MGT_ENTRY(I2CCLK),
-	CLK_MGT_ENTRY(SDMMCCLK),
-	CLK_MGT_ENTRY(SLIMCLK),
-	CLK_MGT_ENTRY(PER1CLK),
-	CLK_MGT_ENTRY(PER2CLK),
-	CLK_MGT_ENTRY(PER3CLK),
-	CLK_MGT_ENTRY(PER5CLK),
-	CLK_MGT_ENTRY(PER6CLK),
-	CLK_MGT_ENTRY(PER7CLK),
-	CLK_MGT_ENTRY(LCDCLK),
-	CLK_MGT_ENTRY(BMLCLK),
-	CLK_MGT_ENTRY(HSITXCLK),
-	CLK_MGT_ENTRY(HSIRXCLK),
-	CLK_MGT_ENTRY(HDMICLK),
-	CLK_MGT_ENTRY(APEATCLK),
-	CLK_MGT_ENTRY(APETRACECLK),
-	CLK_MGT_ENTRY(MCDECLK),
-	CLK_MGT_ENTRY(IPI2CCLK),
-	CLK_MGT_ENTRY(DSIALTCLK),
-	CLK_MGT_ENTRY(DMACLK),
-	CLK_MGT_ENTRY(B2R2CLK),
-	CLK_MGT_ENTRY(TVCLK),
-	CLK_MGT_ENTRY(SSPCLK),
-	CLK_MGT_ENTRY(RNGCLK),
-	CLK_MGT_ENTRY(UICCCLK),
+	CLK_MGT_ENTRY(SGACLK, PLL_DIV, false),
+	CLK_MGT_ENTRY(UARTCLK, PLL_FIX, true),
+	CLK_MGT_ENTRY(MSP02CLK, PLL_FIX, true),
+	CLK_MGT_ENTRY(MSP1CLK, PLL_FIX, true),
+	CLK_MGT_ENTRY(I2CCLK, PLL_FIX, true),
+	CLK_MGT_ENTRY(SDMMCCLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(SLIMCLK, PLL_FIX, true),
+	CLK_MGT_ENTRY(PER1CLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(PER2CLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(PER3CLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(PER5CLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(PER6CLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(PER7CLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(LCDCLK, PLL_FIX, true),
+	CLK_MGT_ENTRY(BMLCLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(HSITXCLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(HSIRXCLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(HDMICLK, PLL_FIX, false),
+	CLK_MGT_ENTRY(APEATCLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(APETRACECLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(MCDECLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(IPI2CCLK, PLL_FIX, true),
+	CLK_MGT_ENTRY(DSIALTCLK, PLL_FIX, false),
+	CLK_MGT_ENTRY(DMACLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(B2R2CLK, PLL_DIV, true),
+	CLK_MGT_ENTRY(TVCLK, PLL_FIX, false),
+	CLK_MGT_ENTRY(SSPCLK, PLL_FIX, true),
+	CLK_MGT_ENTRY(RNGCLK, PLL_FIX, true),
+	CLK_MGT_ENTRY(UICCCLK, PLL_FIX, false),
 };
 
 static struct regulator *hwacc_regulator[NUM_HW_ACC];
@@ -1445,7 +1454,7 @@ static int request_timclk(bool enable)
 	return 0;
 }
 
-static int request_reg_clock(u8 clock, bool enable)
+static int request_clock(u8 clock, bool enable)
 {
 	u32 val;
 	unsigned long flags;
@@ -1483,7 +1492,7 @@ static int request_sga_clock(u8 clock, bool enable)
 		writel(val | PRCM_CGATING_BYPASS_ICN2, PRCM_CGATING_BYPASS);
 	}
 
-	ret = request_reg_clock(clock, enable);
+	ret = request_clock(clock, enable);
 
 	if (!ret && !enable) {
 		val = readl(PRCM_CGATING_BYPASS);
@@ -1506,7 +1515,7 @@ int db8500_prcmu_request_clock(u8 clock, bool enable)
 	if (clock == PRCMU_SGACLK)
 		return request_sga_clock(clock, enable);
 	else if (clock < PRCMU_NUM_REG_CLOCKS)
-		return request_reg_clock(clock, enable);
+		return request_clock(clock, enable);
 	else if (clock == PRCMU_TIMCLK)
 		return request_timclk(enable);
 	else if (clock == PRCMU_SYSCLK)
@@ -1515,6 +1524,99 @@ int db8500_prcmu_request_clock(u8 clock, bool enable)
 		return request_pll(clock, enable);
 	else
 		return -EINVAL;
+}
+
+static unsigned long pll_rate(unsigned int reg_offset, unsigned long src_rate,
+	u32 div, int branch)
+{
+	u64 rate;
+	u32 val;
+	u32 d;
+
+	val = readl(_PRCMU_BASE + reg_offset);
+
+	rate = src_rate;
+	rate *= ((val & PRCM_PLL_FREQ_D_MASK) >> PRCM_PLL_FREQ_D_SHIFT);
+
+	d = ((val & PRCM_PLL_FREQ_N_MASK) >> PRCM_PLL_FREQ_N_SHIFT);
+	if (d > 1)
+		div *= d;
+
+	d = ((val & PRCM_PLL_FREQ_R_MASK) >> PRCM_PLL_FREQ_R_SHIFT);
+	if (d > 1)
+		div *= d;
+
+	if (val & PRCM_PLL_FREQ_SELDIV2)
+		div *= 2;
+
+	if ((branch == PLL_FIX) || ((branch == PLL_DIV) &&
+		(val & PRCM_PLL_FREQ_DIV2EN) &&
+		((reg_offset == PRCM_PLLSOC0_FREQ) ||
+		 (reg_offset == PRCM_PLLDDR_FREQ))))
+		div *= 2;
+
+	(void)do_div(rate, div);
+
+	return (unsigned long)rate;
+}
+
+#define ROOT_CLOCK_RATE 38400000
+
+static unsigned long clock_rate(u8 clock)
+{
+	u32 val;
+	u32 div;
+	unsigned long src_rate = ROOT_CLOCK_RATE;
+
+	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
+
+	if (val & PRCM_CLK_MGT_CLK38) {
+		if (clk_mgt[clock].clk38div && (val & PRCM_CLK_MGT_CLK38DIV))
+			src_rate /= 2;
+		return src_rate;
+	}
+
+	if ((clock == PRCMU_SGACLK) &&
+		(val & PRCM_SGACLK_MGT_SGACLKDIV_BY_2_5_EN)) {
+		src_rate *= 10;
+		div = 25;
+	} else {
+		div = (val & PRCM_CLK_MGT_CLKPLLDIV_MASK);
+		if (!div)
+			return 0;
+	}
+
+	switch ((val | clk_mgt[clock].pllsw) & PRCM_CLK_MGT_CLKPLLSW_MASK) {
+	case PRCM_CLK_MGT_CLKPLLSW_SOC0:
+		return pll_rate(PRCM_PLLSOC0_FREQ, src_rate, div,
+			clk_mgt[clock].branch);
+	case PRCM_CLK_MGT_CLKPLLSW_SOC1:
+		return pll_rate(PRCM_PLLSOC1_FREQ, src_rate, div,
+			clk_mgt[clock].branch);
+	case PRCM_CLK_MGT_CLKPLLSW_DDR:
+		return pll_rate(PRCM_PLLDDR_FREQ, src_rate, div,
+			clk_mgt[clock].branch);
+	default:
+		return 0;
+	}
+}
+
+unsigned long prcmu_clock_rate(u8 clock)
+{
+	if (clock < PRCMU_NUM_REG_CLOCKS)
+		return clock_rate(clock);
+	else if (clock == PRCMU_TIMCLK)
+		return ROOT_CLOCK_RATE / 16;
+	else if (clock == PRCMU_SYSCLK)
+		return ROOT_CLOCK_RATE;
+	else if (clock == PRCMU_PLLSOC0)
+		return pll_rate(PRCM_PLLSOC0_FREQ, ROOT_CLOCK_RATE, 1, PLL_RAW);
+	else if (clock == PRCMU_PLLSOC1)
+		return pll_rate(PRCM_PLLSOC1_FREQ, ROOT_CLOCK_RATE, 1, PLL_RAW);
+	else if (clock == PRCMU_PLLDDR)
+		return pll_rate(PRCM_PLLDDR_FREQ, ROOT_CLOCK_RATE, 1, PLL_RAW);
+	else
+		return 0;
 }
 
 int db8500_prcmu_config_esram0_deep_sleep(u8 state)
