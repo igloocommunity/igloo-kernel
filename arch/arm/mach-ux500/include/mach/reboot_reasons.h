@@ -20,11 +20,12 @@
  * location before resetting. These values are exposed through a sysfs
  * entry under /sys/socinfo, see mach-ux500/cpu-db8500.c
  */
-#define SW_RESET_NO_ARGUMENT 0x0
+#define SW_RESET_NO_ARGUMENT 0xBEEF
 #define SW_RESET_FACTORY_RESET 0x4242
 #define SW_RESET_CRASH 0xDEAD
 #define SW_RESET_NORMAL 0xc001
 #define SW_RESET_CHARGING 0xCAFE
+#define SW_RESET_COLDSTART 0x0
 
 /*
  * The array reboot_reasons[] is used when you want to map a string to a reboot
