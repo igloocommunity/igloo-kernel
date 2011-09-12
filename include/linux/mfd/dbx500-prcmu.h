@@ -290,6 +290,8 @@ static inline int prcmu_request_clock(u8 clock, bool enable)
 		return db8500_prcmu_request_clock(clock, enable);
 }
 
+unsigned long prcmu_clock_rate(u8 clock);
+
 int prcmu_set_ape_opp(u8 opp);
 int prcmu_get_ape_opp(void);
 int prcmu_set_ddr_opp(u8 opp);
@@ -404,6 +406,11 @@ static inline int prcmu_config_clkout(u8 clkout, u8 source, u8 div)
 }
 
 static inline int prcmu_request_clock(u8 clock, bool enable)
+{
+	return 0;
+}
+
+static inline unsigned long prcmu_clock_rate(u8 clock)
 {
 	return 0;
 }

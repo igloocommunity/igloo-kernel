@@ -50,6 +50,11 @@ static inline int db5500_prcmu_request_clock(u8 clock, bool enable)
 	return 0;
 }
 
+static inline unsigned long db5500_prcmu_clock_rate(u8 clock)
+{
+	return 0;
+}
+
 static inline int db5500_prcmu_set_display_clocks(void)
 {
 	return 0;
