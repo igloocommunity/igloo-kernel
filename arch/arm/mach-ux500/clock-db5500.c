@@ -802,6 +802,7 @@ int __init db5500_clk_init(void)
 		prcc_kclk_ops.enable = NULL;
 		prcc_kclk_ops.disable = NULL;
 	}
+	prcmu_clk_ops.get_rate = NULL;
 
 	if (cpu_is_u5500v1())
 		p1_sdi0_kclk.parent = &sdmmcclk;

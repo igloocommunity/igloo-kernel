@@ -303,14 +303,21 @@ out_error:
 	pr_err("clock: %s failed to disable %s.\n", __func__, clk->name);
 }
 
+static unsigned long prcmu_clk_get_rate(struct clk *clk)
+{
+	return prcmu_clock_rate(clk->cg_sel);
+}
+
 struct clkops prcmu_clk_ops = {
 	.enable = prcmu_clk_enable,
 	.disable = prcmu_clk_disable,
+	.get_rate = prcmu_clk_get_rate,
 };
 
 struct clkops prcmu_opp100_clk_ops = {
 	.enable = prcmu_opp100_clk_enable,
 	.disable = prcmu_opp100_clk_disable,
+	.get_rate = prcmu_clk_get_rate,
 };
 
 /* PRCC clock operations. */
