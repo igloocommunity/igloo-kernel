@@ -123,6 +123,8 @@ enum ab8500_usb_state {
 #define USB_CH_IP_CUR_LVL_1P4		1400
 #define USB_CH_IP_CUR_LVL_1P5		1500
 
+#define VBAT_3700			3700
+
 #define to_ab8500_charger_usb_device_info(x) container_of((x), \
 	struct ab8500_charger, usb_chg)
 #define to_ab8500_charger_ac_device_info(x) container_of((x), \
@@ -173,6 +175,8 @@ struct ab8500_charger_usb_state {
  *			VBUS detected during startup
  * @ac_conn:		This will be true when the AC charger has been plugged
  * @vddadc_en:		Indicate if VDD ADC supply is enabled from this driver
+ * @vbat		Battery voltage
+ * @old_vbat		Previously measured battery voltage
  * @parent:		Pointer to the struct ab8500
  * @gpadc:		Pointer to the struct gpadc
  * @pdata:		Pointer to the ab8500_charger platform data
@@ -185,6 +189,7 @@ struct ab8500_charger_usb_state {
  * @usb:		Structure that holds the USB charger properties
  * @regu:		Pointer to the struct regulator
  * @charger_wq:		Work queue for the IRQs and checking HW state
+ * @check_vbat_work	Work for checking vbat threshold to adjust vbus current
  * @check_hw_failure_work:	Work for checking HW state
  * @check_usbchgnotok_work:	Work for checking USB charger not ok status
  * @kick_wd_work:		Work for kicking the charger watchdog in case
@@ -206,6 +211,8 @@ struct ab8500_charger {
 	bool vbus_detected_start;
 	bool ac_conn;
 	bool vddadc_en;
+	int vbat;
+	int old_vbat;
 	struct ab8500 *parent;
 	struct ab8500_gpadc *gpadc;
 	struct ab8500_charger_platform_data *pdata;
@@ -218,6 +225,7 @@ struct ab8500_charger {
 	struct ab8500_charger_info usb;
 	struct regulator *regu;
 	struct workqueue_struct *charger_wq;
+	struct delayed_work check_vbat_work;
 	struct delayed_work check_hw_failure_work;
 	struct delayed_work check_usbchgnotok_work;
 	struct delayed_work kick_wd_work;
@@ -881,6 +889,19 @@ static int ab8500_charger_set_vbus_in_curr(struct ab8500_charger *di,
 	/* We should always use to lowest current limit */
 	min_value = min(di->bat->chg_params->usb_curr_max, ich_in);
 
+	switch (min_value) {
+	case 100:
+		if (di->vbat < VBAT_3700)
+			min_value = USB_CH_IP_CUR_LVL_0P05;
+		break;
+	case 500:
+		if (di->vbat < VBAT_3700)
+			min_value = USB_CH_IP_CUR_LVL_0P45;
+		break;
+	default:
+		break;
+	}
+
 	input_curr_index = ab8500_vbus_in_curr_to_regval(min_value);
 	if (input_curr_index < 0) {
 		dev_err(di->dev, "VBUS input current limit too high\n");
@@ -1174,6 +1195,8 @@ static int ab8500_charger_usb_en(struct ux500_charger *charger,
 		if (ret < 0)
 			dev_err(di->dev, "failed to enable LED\n");
 
+		queue_delayed_work(di->charger_wq, &di->check_vbat_work, HZ);
+
 		di->usb.charger_online = 1;
 	} else {
 		/* Disable USB charging */
@@ -1193,6 +1216,11 @@ static int ab8500_charger_usb_en(struct ux500_charger *charger,
 		di->usb.charger_online = 0;
 		di->usb.wd_expired = false;
 		dev_dbg(di->dev, "%s Disabled USB charging\n", __func__);
+
+		/* Cancel any pending Vbat check work */
+		if (delayed_work_pending(&di->check_vbat_work))
+			cancel_delayed_work(&di->check_vbat_work);
+
 	}
 	power_supply_changed(&di->usb_chg.psy);
 
@@ -1272,6 +1300,101 @@ static int ab8500_charger_update_charger_current(struct ux500_charger *charger,
 	}
 
 	return ret;
+}
+
+static int ab8500_charger_get_ext_psy_data(struct device *dev, void *data)
+{
+	struct power_supply *psy;
+	struct power_supply *ext;
+	struct ab8500_charger *di;
+	union power_supply_propval ret;
+	int i, j;
+	bool psy_found = false;
+	struct ux500_charger *usb_chg;
+
+	usb_chg = (struct ux500_charger *)data;
+	psy = &usb_chg->psy;
+
+	di = to_ab8500_charger_usb_device_info(usb_chg);
+
+	ext = dev_get_drvdata(dev);
+
+	/* For all psy where the driver name appears in any supplied_to */
+	for (i = 0; i < ext->num_supplicants; i++) {
+		if (!strcmp(ext->supplied_to[i], psy->name))
+			psy_found = true;
+	}
+
+	if (!psy_found)
+		return 0;
+
+	/* Go through all properties for the psy */
+	for (j = 0; j < ext->num_properties; j++) {
+		enum power_supply_property prop;
+		prop = ext->properties[j];
+
+		if (ext->get_property(ext, prop, &ret))
+			continue;
+
+		switch (prop) {
+		case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+			switch (ext->type) {
+			case POWER_SUPPLY_TYPE_BATTERY:
+				di->vbat = ret.intval / 1000;
+				break;
+			default:
+				break;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+	return 0;
+}
+
+/**
+ * ab8500_charger_check_vbat_work() - keep vbus current within spec
+ * @work	pointer to the work_struct structure
+ *
+ * Due to a asic bug it is necessary to lower the input current to the vbus
+ * charger when charging with at some specific levels. This issue is only valid
+ * for below a certain battery voltage. This function makes sure that the
+ * the allowed current limit isn't exceeded.
+ */
+static void ab8500_charger_check_vbat_work(struct work_struct *work)
+{
+	int t = 10;
+	struct ab8500_charger *di = container_of(work,
+		struct ab8500_charger, check_vbat_work.work);
+
+	class_for_each_device(power_supply_class, NULL,
+		&di->usb_chg.psy, ab8500_charger_get_ext_psy_data);
+
+	/* First run old_vbat is 0. */
+	if (di->old_vbat == 0)
+		di->old_vbat = di->vbat;
+
+	if (!((di->old_vbat <= VBAT_3700 && di->vbat <= VBAT_3700) ||
+		(di->old_vbat > VBAT_3700 && di->vbat > VBAT_3700))) {
+		dev_dbg(di->dev, "Vbat did cross threshold, curr: %d, new: %d,"
+			" old: %d\n", di->max_usb_in_curr, di->vbat,
+			di->old_vbat);
+		ab8500_charger_set_vbus_in_curr(di, di->max_usb_in_curr);
+		power_supply_changed(&di->usb_chg.psy);
+	}
+
+	di->old_vbat = di->vbat;
+
+	/*
+	 * No need to check the battery voltage every second when not close to
+	 * the threshold.
+	 */
+	if (di->vbat < (VBAT_3700 + 100) &&
+		(di->vbat > (VBAT_3700 - 100)))
+			t = 1;
+
+	queue_delayed_work(di->charger_wq, &di->check_vbat_work, t * HZ);
 }
 
 /**
@@ -2398,7 +2521,6 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK_DEFERRABLE(&di->check_usbchgnotok_work,
 		ab8500_charger_check_usbchargernotok_work);
 
-
 	/*
 	 * For ABB revision 1.0 and 1.1 there is a bug in the watchdog
 	 * logic. That means we have to continously kick the charger
@@ -2410,6 +2532,9 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 	 */
 	INIT_DELAYED_WORK_DEFERRABLE(&di->kick_wd_work,
 		ab8500_charger_kick_watchdog_work);
+
+	INIT_DELAYED_WORK_DEFERRABLE(&di->check_vbat_work,
+		ab8500_charger_check_vbat_work);
 
 	/* Init work for charger detection */
 	INIT_WORK(&di->usb_link_status_work,
