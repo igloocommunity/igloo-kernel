@@ -134,7 +134,7 @@ unsigned long __clk_get_rate(struct clk *clk, void *current_lock)
 	return rate;
 }
 
-static unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+static long __clk_round_rate(struct clk *clk, unsigned long rate)
 {
 	if ((clk->ops != NULL) && (clk->ops->round_rate != NULL))
 		return clk->ops->round_rate(clk, rate);
@@ -181,6 +181,7 @@ EXPORT_SYMBOL(clk_get_rate);
 
 long clk_round_rate(struct clk *clk, unsigned long rate)
 {
+	long rounded_rate;
 	unsigned long flags;
 
 	if (clk == NULL)
@@ -188,13 +189,30 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
 
 	__clk_lock(clk, NO_LOCK, &flags);
 
-	rate = __clk_round_rate(clk, rate);
+	rounded_rate = __clk_round_rate(clk, rate);
 
 	__clk_unlock(clk, NO_LOCK, flags);
 
-	return rate;
+	return rounded_rate;
 }
 EXPORT_SYMBOL(clk_round_rate);
+
+long clk_round_rate_rec(struct clk *clk, unsigned long rate)
+{
+	long rounded_rate;
+	unsigned long flags;
+
+	if ((clk == NULL) || (clk->parent == NULL))
+		return -EINVAL;
+
+	__clk_lock(clk->parent, clk->mutex, &flags);
+
+	rounded_rate = __clk_round_rate(clk->parent, rate);
+
+	__clk_unlock(clk->parent, clk->mutex, flags);
+
+	return rounded_rate;
+}
 
 int clk_set_rate(struct clk *clk, unsigned long rate)
 {
@@ -213,6 +231,23 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 	return err;
 }
 EXPORT_SYMBOL(clk_set_rate);
+
+int clk_set_rate_rec(struct clk *clk, unsigned long rate)
+{
+	int err;
+	unsigned long flags;
+
+	if ((clk == NULL) || (clk->parent == NULL))
+		return -EINVAL;
+
+	__clk_lock(clk->parent, clk->mutex, &flags);
+
+	err = __clk_set_rate(clk->parent, rate);
+
+	__clk_unlock(clk->parent, clk->mutex, flags);
+
+	return err;
+}
 
 int clk_set_parent(struct clk *clk, struct clk *parent)
 {
@@ -308,10 +343,28 @@ static unsigned long prcmu_clk_get_rate(struct clk *clk)
 	return prcmu_clock_rate(clk->cg_sel);
 }
 
+static long prcmu_clk_round_rate(struct clk *clk, unsigned long rate)
+{
+	return prcmu_round_clock_rate(clk->cg_sel, rate);
+}
+
+static int prcmu_clk_set_rate(struct clk *clk, unsigned long rate)
+{
+	return prcmu_set_clock_rate(clk->cg_sel, rate);
+}
+
 struct clkops prcmu_clk_ops = {
 	.enable = prcmu_clk_enable,
 	.disable = prcmu_clk_disable,
 	.get_rate = prcmu_clk_get_rate,
+};
+
+struct clkops prcmu_scalable_clk_ops = {
+	.enable = prcmu_clk_enable,
+	.disable = prcmu_clk_disable,
+	.get_rate = prcmu_clk_get_rate,
+	.round_rate = prcmu_clk_round_rate,
+	.set_rate = prcmu_clk_set_rate,
 };
 
 struct clkops prcmu_opp100_clk_ops = {
