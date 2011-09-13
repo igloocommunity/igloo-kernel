@@ -274,6 +274,8 @@ int prcmu_config_clkout(u8 clkout, u8 source, u8 div);
 
 int prcmu_request_clock(u8 clock, bool enable);
 unsigned long prcmu_clock_rate(u8 clock);
+long prcmu_round_clock_rate(u8 clock, unsigned long rate);
+int prcmu_set_clock_rate(u8 clock, unsigned long rate);
 
 int prcmu_set_ape_opp(u8 opp);
 int prcmu_get_ape_opp(void);
@@ -330,6 +332,16 @@ static inline int prcmu_config_clkout(u8 clkout, u8 source, u8 div)
 }
 
 static inline int prcmu_request_clock(u8 clock, bool enable)
+{
+	return 0;
+}
+
+static inline long prcmu_round_clock_rate(u8 clock, unsigned long rate)
+{
+	return 0;
+}
+
+static inline int prcmu_set_clock_rate(u8 clock, unsigned long rate)
 {
 	return 0;
 }

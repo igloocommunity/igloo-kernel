@@ -20,6 +20,16 @@ static inline unsigned long prcmu_clock_rate(u8 clock)
 	return 0;
 }
 
+static inline long prcmu_round_clock_rate(u8 clock, unsigned long rate)
+{
+	return 0;
+}
+
+static inline int prcmu_set_clock_rate(u8 clock, unsigned long rate)
+{
+	return 0;
+}
+
 int prcmu_resetout(u8 resoutn, u8 state);
 
 unsigned int prcmu_get_ddr_freq(void);

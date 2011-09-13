@@ -163,8 +163,6 @@ int prcmu_request_ape_opp_100_voltage(bool enable);
 
 int prcmu_release_usb_wakeup_state(void);
 
-int prcmu_set_clock_divider(u8 clock, u8 divider);
-
 void prcmu_configure_auto_pm(struct prcmu_auto_pm_config *sleep,
 	struct prcmu_auto_pm_config *idle);
 bool prcmu_is_auto_pm_enabled(void);
@@ -205,11 +203,6 @@ static inline int prcmu_request_ape_opp_100_voltage(bool enable)
 }
 
 static inline int prcmu_release_usb_wakeup_state(void)
-{
-	return 0;
-}
-
-static inline int prcmu_set_clock_divider(u8 clock, u8 divider)
 {
 	return 0;
 }

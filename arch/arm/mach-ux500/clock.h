@@ -66,11 +66,12 @@ struct clkops {
 	void (*disable)(struct clk *);
 	unsigned long (*get_rate)(struct clk *);
 	int (*set_rate)(struct clk *, unsigned long);
-	unsigned long (*round_rate)(struct clk *, unsigned long);
+	long (*round_rate)(struct clk *, unsigned long);
 	int (*set_parent)(struct clk *, struct clk *);
 };
 
 extern struct clkops prcmu_clk_ops;
+extern struct clkops prcmu_scalable_clk_ops;
 extern struct clkops prcmu_opp100_clk_ops;
 extern struct mutex clk_opp100_mutex;
 extern struct clkops prcc_pclk_ops;
@@ -84,6 +85,13 @@ extern struct clkops sga_clk_ops;
 		.ops = &prcmu_clk_ops, \
 		.cg_sel = _cg_sel, \
 		.rate = _rate, \
+	}
+
+#define DEF_PRCMU_SCALABLE_CLK(_name, _cg_sel) \
+	struct clk _name = { \
+		.name = #_name, \
+		.ops = &prcmu_scalable_clk_ops, \
+		.cg_sel = _cg_sel, \
 	}
 
 /* Use this for clocks that are only defined at OPP 100%. */
@@ -129,6 +137,8 @@ void clks_register(struct clk_lookup *clks, size_t num);
 int __clk_enable(struct clk *clk, void *current_lock);
 void __clk_disable(struct clk *clk, void *current_lock);
 unsigned long __clk_get_rate(struct clk *clk, void *current_lock);
+long clk_round_rate_rec(struct clk *clk, unsigned long rate);
+int clk_set_rate_rec(struct clk *clk, unsigned long rate);
 
 #ifdef CONFIG_DEBUG_FS
 int dbx500_clk_debug_init(struct clk **clks, int num);

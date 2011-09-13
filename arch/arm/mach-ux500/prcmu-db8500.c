@@ -1551,11 +1551,12 @@ int prcmu_request_clock(u8 clock, bool enable)
 }
 
 static unsigned long pll_rate(unsigned int reg_offset, unsigned long src_rate,
-	u32 div, int branch)
+	int branch)
 {
 	u64 rate;
 	u32 val;
 	u32 d;
+	u32 div = 1;
 
 	val = readl(_PRCMU_BASE + reg_offset);
 
@@ -1589,40 +1590,41 @@ static unsigned long pll_rate(unsigned int reg_offset, unsigned long src_rate,
 static unsigned long clock_rate(u8 clock)
 {
 	u32 val;
-	u32 div;
-	unsigned long src_rate = ROOT_CLOCK_RATE;
+	u32 pllsw;
+	unsigned long rate = ROOT_CLOCK_RATE;
 
 	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
 
 	if (val & PRCM_CLK_MGT_CLK38) {
 		if (clk_mgt[clock].clk38div && (val & PRCM_CLK_MGT_CLK38DIV))
-			src_rate /= 2;
-		return src_rate;
+			rate /= 2;
+		return rate;
 	}
+
+	val |= clk_mgt[clock].pllsw;
+	pllsw = (val & PRCM_CLK_MGT_CLKPLLSW_MASK);
+
+	if (pllsw == PRCM_CLK_MGT_CLKPLLSW_SOC0)
+		rate = pll_rate(PRCM_PLLSOC0_FREQ, rate, clk_mgt[clock].branch);
+	else if (pllsw == PRCM_CLK_MGT_CLKPLLSW_SOC1)
+		rate = pll_rate(PRCM_PLLSOC1_FREQ, rate, clk_mgt[clock].branch);
+	else if (pllsw == PRCM_CLK_MGT_CLKPLLSW_DDR)
+		rate = pll_rate(PRCM_PLLDDR_FREQ, rate, clk_mgt[clock].branch);
+	else
+		return 0;
 
 	if ((clock == PRCMU_SGACLK) &&
 		(val & PRCM_SGACLK_MGT_SGACLKDIV_BY_2_5_EN)) {
-		src_rate *= 10;
-		div = 25;
-	} else {
-		div = (val & PRCM_CLK_MGT_CLKPLLDIV_MASK);
-		if (!div)
-			return 0;
-	}
+		u64 r = (rate * 10);
 
-	switch ((val | clk_mgt[clock].pllsw) & PRCM_CLK_MGT_CLKPLLSW_MASK) {
-	case PRCM_CLK_MGT_CLKPLLSW_SOC0:
-		return pll_rate(PRCM_PLLSOC0_FREQ, src_rate, div,
-			clk_mgt[clock].branch);
-	case PRCM_CLK_MGT_CLKPLLSW_SOC1:
-		return pll_rate(PRCM_PLLSOC1_FREQ, src_rate, div,
-			clk_mgt[clock].branch);
-	case PRCM_CLK_MGT_CLKPLLSW_DDR:
-		return pll_rate(PRCM_PLLDDR_FREQ, src_rate, div,
-			clk_mgt[clock].branch);
-	default:
-		return 0;
+		(void)do_div(r, 25);
+		return (unsigned long)r;
 	}
+	val &= PRCM_CLK_MGT_CLKPLLDIV_MASK;
+	if (val)
+		return rate / val;
+	else
+		return 0;
 }
 
 unsigned long prcmu_clock_rate(u8 clock)
@@ -1634,13 +1636,136 @@ unsigned long prcmu_clock_rate(u8 clock)
 	else if (clock == PRCMU_SYSCLK)
 		return ROOT_CLOCK_RATE;
 	else if (clock == PRCMU_PLLSOC0)
-		return pll_rate(PRCM_PLLSOC0_FREQ, ROOT_CLOCK_RATE, 1, PLL_RAW);
+		return pll_rate(PRCM_PLLSOC0_FREQ, ROOT_CLOCK_RATE, PLL_RAW);
 	else if (clock == PRCMU_PLLSOC1)
-		return pll_rate(PRCM_PLLSOC1_FREQ, ROOT_CLOCK_RATE, 1, PLL_RAW);
+		return pll_rate(PRCM_PLLSOC1_FREQ, ROOT_CLOCK_RATE, PLL_RAW);
 	else if (clock == PRCMU_PLLDDR)
-		return pll_rate(PRCM_PLLDDR_FREQ, ROOT_CLOCK_RATE, 1, PLL_RAW);
+		return pll_rate(PRCM_PLLDDR_FREQ, ROOT_CLOCK_RATE, PLL_RAW);
 	else
 		return 0;
+}
+
+static unsigned long clock_source_rate(u32 clk_mgt_val, int branch)
+{
+	if (clk_mgt_val & PRCM_CLK_MGT_CLK38)
+		return ROOT_CLOCK_RATE;
+	clk_mgt_val &= PRCM_CLK_MGT_CLKPLLSW_MASK;
+	if (clk_mgt_val == PRCM_CLK_MGT_CLKPLLSW_SOC0)
+		return pll_rate(PRCM_PLLSOC0_FREQ, ROOT_CLOCK_RATE, branch);
+	else if (clk_mgt_val == PRCM_CLK_MGT_CLKPLLSW_SOC1)
+		return pll_rate(PRCM_PLLSOC1_FREQ, ROOT_CLOCK_RATE, branch);
+	else if (clk_mgt_val == PRCM_CLK_MGT_CLKPLLSW_DDR)
+		return pll_rate(PRCM_PLLDDR_FREQ, ROOT_CLOCK_RATE, branch);
+	else
+		return 0;
+}
+
+static u32 clock_divider(unsigned long src_rate, unsigned long rate)
+{
+	u32 div;
+
+	div = (src_rate / rate);
+	if (div == 0)
+		return 1;
+	if (rate < (src_rate / div))
+		div++;
+	if (div > 31)
+		div = 31;
+	return div;
+}
+
+static long round_clock_rate(u8 clock, unsigned long rate)
+{
+	u32 val;
+	u32 div;
+	unsigned long src_rate;
+	long rounded_rate;
+
+	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
+	src_rate = clock_source_rate((val | clk_mgt[clock].pllsw),
+		clk_mgt[clock].branch);
+	div = clock_divider(src_rate, rate);
+	if (val & PRCM_CLK_MGT_CLK38) {
+		if (clk_mgt[clock].clk38div) {
+			if (div > 2)
+				div = 2;
+		} else {
+			div = 1;
+		}
+	} else if ((clock == PRCMU_SGACLK) && (div == 3)) {
+		u64 r = (src_rate * 10);
+
+		(void)do_div(r, 25);
+		if (r <= rate)
+			return (unsigned long)r;
+	}
+	rounded_rate = (src_rate / div);
+
+	return rounded_rate;
+}
+
+long prcmu_round_clock_rate(u8 clock, unsigned long rate)
+{
+	if (clock < PRCMU_NUM_REG_CLOCKS)
+		return round_clock_rate(clock, rate);
+	else
+		return (long)prcmu_clock_rate(clock);
+}
+
+static void set_clock_rate(u8 clock, unsigned long rate)
+{
+	u32 val;
+	u32 div;
+	unsigned long src_rate;
+	unsigned long flags;
+
+	spin_lock_irqsave(&clk_mgt_lock, flags);
+
+	/* Grab the HW semaphore. */
+	while ((readl(_PRCMU_BASE + PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
+		cpu_relax();
+
+	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
+	src_rate = clock_source_rate((val | clk_mgt[clock].pllsw),
+		clk_mgt[clock].branch);
+	div = clock_divider(src_rate, rate);
+	if (val & PRCM_CLK_MGT_CLK38) {
+		if (clk_mgt[clock].clk38div) {
+			if (div > 1)
+				val |= PRCM_CLK_MGT_CLK38DIV;
+			else
+				val &= ~PRCM_CLK_MGT_CLK38DIV;
+		}
+	} else if (clock == PRCMU_SGACLK) {
+		val &= ~(PRCM_CLK_MGT_CLKPLLDIV_MASK |
+			PRCM_SGACLK_MGT_SGACLKDIV_BY_2_5_EN);
+		if (div == 3) {
+			u64 r = (src_rate * 10);
+
+			(void)do_div(r, 25);
+			if (r <= rate) {
+				val |= PRCM_SGACLK_MGT_SGACLKDIV_BY_2_5_EN;
+				div = 0;
+			}
+		}
+		val |= div;
+	} else {
+		val &= ~PRCM_CLK_MGT_CLKPLLDIV_MASK;
+		val |= div;
+	}
+	writel(val, (_PRCMU_BASE + clk_mgt[clock].offset));
+
+	/* Release the HW semaphore. */
+	writel(0, (_PRCMU_BASE + PRCM_SEM));
+
+	spin_unlock_irqrestore(&clk_mgt_lock, flags);
+}
+
+int prcmu_set_clock_rate(u8 clock, unsigned long rate)
+{
+	if (clock < PRCMU_NUM_REG_CLOCKS)
+		set_clock_rate(clock, rate);
+	return 0;
 }
 
 int prcmu_config_esram0_deep_sleep(u8 state)
@@ -1801,41 +1926,6 @@ int prcmu_load_a9wdog(u8 id, u32 timeout)
 			    (u8)((timeout >> 4) & 0xff),
 			    (u8)((timeout >> 12) & 0xff),
 			    (u8)((timeout >> 20) & 0xff));
-}
-
-/**
- * prcmu_set_clock_divider() - Configure the clock divider.
- * @clock:	The clock for which the request is made.
- * @divider:	The clock divider. (< 32)
- *
- * This function should only be used by the clock implementation.
- * Do not use it from any other place!
- */
-int prcmu_set_clock_divider(u8 clock, u8 divider)
-{
-	u32 val;
-	unsigned long flags;
-
-	if ((clock >= PRCMU_NUM_REG_CLOCKS) || (divider < 1) || (31 < divider))
-		return -EINVAL;
-
-	spin_lock_irqsave(&clk_mgt_lock, flags);
-
-	/* Grab the HW semaphore. */
-	while ((readl(_PRCMU_BASE + PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
-		cpu_relax();
-
-	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
-	val &= ~(PRCM_CLK_MGT_CLKPLLDIV_MASK);
-	val |= (u32)divider;
-	writel(val, (_PRCMU_BASE + clk_mgt[clock].offset));
-
-	/* Release the HW semaphore. */
-	writel(0, (_PRCMU_BASE + PRCM_SEM));
-
-	spin_unlock_irqrestore(&clk_mgt_lock, flags);
-
-	return 0;
 }
 
 /**
