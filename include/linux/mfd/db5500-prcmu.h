@@ -77,6 +77,16 @@ static inline int db5500_prcmu_config_esram0_deep_sleep(u8 state)
 
 static inline void db5500_prcmu_enable_wakeups(u32 wakeups) {}
 
+static inline long db5500_prcmu_round_clock_rate(u8 clock, unsigned long rate)
+{
+	return 0;
+}
+
+static inline int db5500_prcmu_set_clock_rate(u8 clock, unsigned long rate)
+{
+	return 0;
+}
+
 static inline int prcmu_resetout(u8 resoutn, u8 state)
 {
 	return 0;
