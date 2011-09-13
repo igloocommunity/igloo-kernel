@@ -150,14 +150,14 @@ config U5500_MODEM_IRQ
 
 config TEE_UX500
 	bool "Trusted Execution Environment (TEE) ux500 hardware support"
-	depends on (TEE_SUPPORT && MACH_U8500)
+	depends on TEE_SUPPORT
 	default y
 	help
 	  Adds TEE hardware support for ux500 platforms.
 
 config TEE_SVP
 	bool "Trusted Execution Environment (TEE) ux500 SVP support"
-	depends on (TEE_SUPPORT && (MACH_U8500_SIMULATOR || MACH_U5500_SIMULATOR))
+	depends on TEE_SUPPORT && UX500_SVP
 	default y
 	help
 	  Adds TEE support for SVP in ux500 platforms.
