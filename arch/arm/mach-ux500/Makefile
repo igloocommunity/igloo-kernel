@@ -1,11 +1,10 @@
 #
-# Makefile for the linux kernel, U8500 machine.
+# Makefile for the linux kernel, UX500 machine.
 #
 
 obj-y				:= clock.o cpu.o devices.o dcache.o \
 				   devices-common.o id.o pins.o \
-				   timer.o timer-mtu.o usb.o reboot_reasons.o \
-				   uart-db8500.o
+				   usb.o reboot_reasons.o
 obj-y				+= pm/
 
 obj-$(CONFIG_REGULATOR)			+= regulator-ux500.o
@@ -51,10 +50,7 @@ obj-$(CONFIG_DB8500_MLOADER) 	+= mloader-db8500.o
 obj-$(CONFIG_U5500_MLOADER)	+= mloader-db5500.o
 obj-$(CONFIG_U5500_PRCMU)		+= prcmu-db5500.o
 obj-$(CONFIG_U8500_PRCMU)		+= prcmu-db8500.o
-obj-$(CONFIG_UX500_PRCMU_TIMER)	+= timer-prcmu.o
 obj-$(CONFIG_U8500_REGULATOR_DEBUG)	+= virt-regulator-u8500.o
-obj-$(CONFIG_UX500_PRCMU_DEBUG)		+= prcmu-debug.o
-obj-$(CONFIG_UX500_PRCMU_QOS_POWER)	+= prcmu-qos-power.o
 obj-$(CONFIG_UX500_DEBUG_HWREG) 	+= hwreg.o
 obj-$(CONFIG_HWMEM)			+= hwmem-int.o
 obj-$(CONFIG_UX500_L2X0_PREFETCH_CTRL)	+= l2x0-prefetch.o
