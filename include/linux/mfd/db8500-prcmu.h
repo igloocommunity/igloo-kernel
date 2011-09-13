@@ -514,7 +514,7 @@ void prcmu_configure_auto_pm(struct prcmu_auto_pm_config *sleep,
 bool prcmu_is_auto_pm_enabled(void);
 
 int prcmu_config_clkout(u8 clkout, u8 source, u8 div);
-int prcmu_set_clock_divider(u8 clock, u8 divider);
+
 int prcmu_config_hotdog(u8 threshold);
 int prcmu_config_hotmon(u8 low, u8 high);
 int prcmu_start_temp_sense(u16 cycles32k);
@@ -613,7 +613,6 @@ static inline int prcmu_set_hwacc(u16 hw_acc_dev, u8 state)
 {
 	return 0;
 }
-
 static inline void prcmu_configure_auto_pm(struct prcmu_auto_pm_config *sleep,
 	struct prcmu_auto_pm_config *idle)
 {
@@ -625,11 +624,6 @@ static inline bool prcmu_is_auto_pm_enabled(void)
 }
 
 static inline int prcmu_config_clkout(u8 clkout, u8 source, u8 div)
-{
-	return 0;
-}
-
-static inline int prcmu_set_clock_divider(u8 clock, u8 divider)
 {
 	return 0;
 }
