@@ -15,8 +15,6 @@
 
 #include <asm/cacheflush.h>
 
-#include "pm/context.h"
-
 extern volatile int pen_release;
 
 static inline void platform_do_lowpower(unsigned int cpu)
@@ -25,13 +23,8 @@ static inline void platform_do_lowpower(unsigned int cpu)
 
 	for (;;) {
 
-		context_varm_save_core();
-		context_save_cpu_registers();
-
-		context_save_to_sram_and_wfi(false);
-
-		context_restore_cpu_registers();
-		context_varm_restore_core();
+		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
+				     : : : "memory");
 
 		if (pen_release == cpu) {
 			/*
@@ -66,4 +59,3 @@ int platform_cpu_disable(unsigned int cpu)
 	 */
 	return cpu == 0 ? -EPERM : 0;
 }
-

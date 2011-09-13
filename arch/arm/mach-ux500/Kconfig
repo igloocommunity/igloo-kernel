@@ -8,6 +8,7 @@ config UX500_SOC_COMMON
 	select ARM_ERRATA_753970
 	select ARM_ERRATA_754322
 	select SYS_SOC
+	select HAS_MTU
 
 config UX500_SOC_DBX500
 	depends on UX500_SOC_DB5500 || UX500_SOC_DB8500
@@ -72,26 +73,6 @@ config KEYLAYOUT_LAYOUT2
 
 endchoice
 
-choice
-	prompt "Ux500 sched_clock timer"
-	default UX500_MTU_TIMER
-
-config UX500_PRCMU_TIMER
-	bool "PRCMU Timer sched_clock"
-	depends on !HAS_MTU
-	help
-	  Add support for an always on sched_clock, required for
-	  proper cpuidle and suspend.
-
-config UX500_MTU_TIMER
-	bool "Multi Timer Unit sched_clock"
-	help
-	  Add sched_clock support for the Multi Timer Unit.
-	  Since mtu isn't always on cpuidle will not
-	  work with this clock.
-
-endchoice
-
 config U8500_PRCMU
 	bool "U8500 PRCMU support"
 	depends on UX500_SOC_DB8500
@@ -106,20 +87,6 @@ config U5500_PRCMU
 	help
 	  Add support for PRCMU for U5500
 
-config UX500_PRCMU_QOS_POWER
-	bool "UX500 PRCMU power QoS support"
-	depends on (U5500_PRCMU || U8500_PRCMU)
-	default y
-	help
-	  Add support for PRCMU power Quality of Service
-
-config UX500_PRCMU_DEBUG
-	bool "PRCMU debug"
-	depends on ((U5500_PRCMU || U8500_PRCMU) && DEBUG_FS)
-	default n
-	help
-	  Add support for PRCMU debug
-
 config UX500_DEBUG_UART
 	int "Ux500 UART to use for low-level debug"
 	default 2
@@ -132,7 +99,6 @@ config U8500_REGULATOR_DEBUG
 	depends on REGULATOR_VIRTUAL_CONSUMER
 	help
 	  Add support for U8500 regulator debug
-
 
 config SENSORS1P_MOP
 	tristate "HAL and Proximity sensors support"
@@ -199,5 +165,4 @@ config UX500_L2X0_PREFETCH_CTRL
 	  Communication with Trustzone is done through TEE driver.
 
 source "arch/arm/mach-ux500/Kconfig-arch"
-source "arch/arm/mach-ux500/pm/Kconfig"
 endif
