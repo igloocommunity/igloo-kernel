@@ -179,15 +179,31 @@ static struct regulator_consumer_supply u5500_esram12_consumers[] = {
 	REGULATOR_SUPPLY("esram12", "hva"),
 };
 
-#define U5500_REGULATOR_SWITCH(lower, upper)                           \
-[U5500_REGULATOR_SWITCH_##upper] = (struct regulator_init_data []) {   \
-{                                                                      \
+#define U5500_REGULATOR_SWITCH(lower, upper)                            \
+[U5500_REGULATOR_SWITCH_##upper] = (struct regulator_init_data []) {    \
+{                                                                       \
 	.constraints = {                                                \
 		.valid_ops_mask = REGULATOR_CHANGE_STATUS,              \
 	},                                                              \
 	.consumer_supplies      = u5500_##lower##_consumers,            \
 	.num_consumer_supplies  = ARRAY_SIZE(u5500_##lower##_consumers),\
-}                                                                      \
+}                                                                       \
+}
+
+/*
+ * EPODs that require VAPE as supply regulator
+ */
+
+#define U5500_REGULATOR_SWITCH_WITH_SUPPLY(lower, upper)                \
+[U5500_REGULATOR_SWITCH_##upper] = (struct regulator_init_data []) {    \
+{                                                                       \
+	.supply_regulator = "u5500-vape",                               \
+	.constraints = {                                                \
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,              \
+	},                                                              \
+	.consumer_supplies      = u5500_##lower##_consumers,            \
+	.num_consumer_supplies  = ARRAY_SIZE(u5500_##lower##_consumers),\
+}                                                                       \
 }
 
 static struct regulator_init_data *
@@ -201,10 +217,14 @@ u5500_regulator_init_data[U5500_NUM_REGULATORS] __initdata = {
 			.num_consumer_supplies	= ARRAY_SIZE(u5500_vape_consumers),
 		}
 	},
-	U5500_REGULATOR_SWITCH(sga, SGA),
-	U5500_REGULATOR_SWITCH(hva, HVA),
-	U5500_REGULATOR_SWITCH(sia, SIA),
-	U5500_REGULATOR_SWITCH(disp, DISP),
+	U5500_REGULATOR_SWITCH_WITH_SUPPLY(sga, SGA),
+	U5500_REGULATOR_SWITCH_WITH_SUPPLY(hva, HVA),
+	U5500_REGULATOR_SWITCH_WITH_SUPPLY(sia, SIA),
+	U5500_REGULATOR_SWITCH_WITH_SUPPLY(disp, DISP),
+	/*
+	 * ESRAM12 is put in rentention by FW on VAPE off
+	 * no need to hold VAPE
+	 */
 	U5500_REGULATOR_SWITCH(esram12, ESRAM12),
 };
 
