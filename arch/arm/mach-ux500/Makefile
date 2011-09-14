@@ -4,7 +4,7 @@
 
 obj-y				:= clock.o cpu.o devices.o dcache.o \
 				   devices-common.o id.o pins.o \
-				   usb.o reboot_reasons.o
+				   usb.o reboot_reasons.o timer.o
 obj-y				+= pm/
 
 obj-$(CONFIG_REGULATOR)			+= regulator-ux500.o
