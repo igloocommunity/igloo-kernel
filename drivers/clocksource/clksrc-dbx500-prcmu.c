@@ -14,6 +14,7 @@
  */
 #include <linux/clockchips.h>
 #include <linux/clksrc-dbx500-prcmu.h>
+#include <linux/boottime.h>
 
 #include <asm/sched_clock.h>
 
@@ -69,6 +70,23 @@ static u32 notrace dbx500_prcmu_sched_clock_read(void)
 
 #endif
 
+#ifdef CONFIG_BOOTTIME
+static unsigned long __init boottime_get_time(void)
+{
+	return div_s64(clocksource_cyc2ns(clocksource_dbx500_prcmu.read(
+						  &clocksource_dbx500_prcmu),
+					  clocksource_dbx500_prcmu.mult,
+					  clocksource_dbx500_prcmu.shift),
+		       1000);
+}
+
+static struct boottime_timer __initdata boottime_timer = {
+	.init     = NULL,
+	.get_time = boottime_get_time,
+	.finalize = NULL,
+};
+#endif
+
 void __init clksrc_dbx500_prcmu_init(void __iomem *base)
 {
 	clksrc_dbx500_timer_base = base;
@@ -93,4 +111,6 @@ void __init clksrc_dbx500_prcmu_init(void __iomem *base)
 	clocksource_calc_mult_shift(&clocksource_dbx500_prcmu,
 				    RATE_32K, SCHED_CLOCK_MIN_WRAP);
 	clocksource_register(&clocksource_dbx500_prcmu);
+
+	boottime_activate(&boottime_timer);
 }
