@@ -129,5 +129,8 @@ clean clobber : clean-kernel
 clean-kernel:
 	$(MAKE) $(PRIVATE_KERNEL_ARGS) clean
 
+$(INSTALLED_KERNEL_TARGET): $(PRODUCT_OUT)/uImage
+	ln -sf $(notdir $<) $@
+
 
 endif
