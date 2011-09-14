@@ -4,7 +4,7 @@
 
 obj-y				:= clock.o cpu.o devices.o \
 				   devices-common.o id.o pins.o \
-				   usb.o reboot_reasons.o
+				   usb.o reboot_reasons.o timer.o
 obj-y				+= pm/
 ifeq ($(CONFIG_UX500_SOC_DB5500), y)
 obj-$(CONFIG_UX500_SOC_DBX500)	+= cpu-db5500.o dma-db5500.o \
