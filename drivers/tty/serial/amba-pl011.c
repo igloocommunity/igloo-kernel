@@ -52,8 +52,8 @@
 #include <linux/dma-mapping.h>
 #include <linux/scatterlist.h>
 #include <linux/delay.h>
+#include <linux/io.h>
 
-#include <asm/io.h>
 #include <asm/sizes.h>
 
 #define UART_NR			14
@@ -64,7 +64,8 @@
 
 #define AMBA_ISR_PASS_LIMIT	256
 
-#define UART_DR_ERROR		(UART011_DR_OE|UART011_DR_BE|UART011_DR_PE|UART011_DR_FE)
+#define UART_DR_ERROR	(UART011_DR_OE | UART011_DR_BE | \
+						UART011_DR_PE | UART011_DR_FE)
 #define UART_DUMMY_DR_RX	(1 << 16)
 
 /*
@@ -345,7 +346,8 @@ static void pl011_dma_probe_initcall(struct uart_amba_port *uap)
 			.src_maxburst = uap->fifosize >> 1,
 		};
 
-		chan = dma_request_channel(mask, plat->dma_filter, plat->dma_rx_param);
+		chan = dma_request_channel(mask,
+					plat->dma_filter, plat->dma_rx_param);
 		if (!chan) {
 			dev_err(uap->port.dev, "no RX DMA channel!\n");
 			return;
@@ -789,8 +791,9 @@ static void pl011_dma_rx_chars(struct uart_amba_port *uap,
 	 */
 	if (dma_count == pending && readfifo) {
 		/* Clear any error flags */
-		writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS,
-		       uap->port.membase + UART011_ICR);
+		writew(UART011_OEIS | UART011_BEIS |
+				UART011_PEIS | UART011_FEIS,
+				uap->port.membase + UART011_ICR);
 
 		/*
 		 * If we read all the DMA'd characters, and we had an
@@ -987,11 +990,13 @@ static void pl011_dma_shutdown(struct uart_amba_port *uap)
 	spin_unlock_irq(&uap->port.lock);
 
 	if (uap->using_tx_dma) {
-		/* In theory, this should already be done by pl011_dma_flush_buffer */
+		/* In theory, this should already be done by
+		 * pl011_dma_flush_buffer
+		 */
 		dmaengine_terminate_all(uap->dmatx.chan);
 		if (uap->dmatx.queued) {
-			dma_unmap_sg(uap->dmatx.chan->device->dev, &uap->dmatx.sg, 1,
-				     DMA_TO_DEVICE);
+			dma_unmap_sg(uap->dmatx.chan->device->dev,
+				&uap->dmatx.sg, 1, DMA_TO_DEVICE);
 			uap->dmatx.queued = false;
 		}
 
@@ -1002,8 +1007,10 @@ static void pl011_dma_shutdown(struct uart_amba_port *uap)
 	if (uap->using_rx_dma) {
 		dmaengine_terminate_all(uap->dmarx.chan);
 		/* Clean up the RX DMA */
-		pl011_sgbuf_free(uap->dmarx.chan, &uap->dmarx.sgbuf_a, DMA_FROM_DEVICE);
-		pl011_sgbuf_free(uap->dmarx.chan, &uap->dmarx.sgbuf_b, DMA_FROM_DEVICE);
+		pl011_sgbuf_free(uap->dmarx.chan, &uap->dmarx.sgbuf_a,
+			DMA_FROM_DEVICE);
+		pl011_sgbuf_free(uap->dmarx.chan, &uap->dmarx.sgbuf_b,
+			DMA_FROM_DEVICE);
 		uap->using_rx_dma = false;
 	}
 }
@@ -1142,31 +1149,31 @@ static void pl011_lockup_wa(unsigned long data)
 
 static void __pl011_startup(struct uart_amba_port *uap)
 {
-   unsigned int cr;
+	unsigned int cr;
 
-   writew(uap->ifls, uap->port.membase + UART011_IFLS);
+	writew(uap->ifls, uap->port.membase + UART011_IFLS);
 
-   /*
-    * Provoke TX FIFO interrupt into asserting.
-    */
-   cr = UART01x_CR_UARTEN | UART011_CR_TXE | UART011_CR_LBE;
-   writew(cr, uap->port.membase + UART011_CR);
-   writew(0, uap->port.membase + UART011_FBRD);
-   writew(1, uap->port.membase + UART011_IBRD);
-   writew(0, uap->port.membase + uap->lcrh_rx);
-   if (uap->lcrh_tx != uap->lcrh_rx) {
-       int i;
-       /*
-        * Wait 10 PCLKs before writing LCRH_TX register,
-        * to get this delay write read only register 10 times
-        */
-       for (i = 0; i < 10; ++i)
-           writew(0xff, uap->port.membase + UART011_MIS);
-       writew(0, uap->port.membase + uap->lcrh_tx);
-   }
-   writew(0, uap->port.membase + UART01x_DR);
-   while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_BUSY)
-       barrier();
+	/*
+	 * Provoke TX FIFO interrupt into asserting.
+	 */
+	cr = UART01x_CR_UARTEN | UART011_CR_TXE | UART011_CR_LBE;
+	writew(cr, uap->port.membase + UART011_CR);
+	writew(0, uap->port.membase + UART011_FBRD);
+	writew(1, uap->port.membase + UART011_IBRD);
+	writew(0, uap->port.membase + uap->lcrh_rx);
+	if (uap->lcrh_tx != uap->lcrh_rx) {
+		int i;
+		/*
+		 * Wait 10 PCLKs before writing LCRH_TX register,
+		 * to get this delay write read only register 10 times
+		 */
+		for (i = 0; i < 10; ++i)
+			writew(0xff, uap->port.membase + UART011_MIS);
+		writew(0, uap->port.membase + uap->lcrh_tx);
+	}
+	writew(0, uap->port.membase + UART01x_DR);
+	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_BUSY)
+		barrier();
 }
 
 /* Backup the registers during regulator startup/shutdown */
@@ -1175,10 +1182,10 @@ static int pl011_backup(struct uart_amba_port *uap, bool suspend)
 {
 	int i, cnt;
 
-    if (!suspend) {
-        __pl011_startup(uap);
-        writew(0, uap->port.membase + UART011_CR);
-    }
+	if (!suspend) {
+		__pl011_startup(uap);
+		writew(0, uap->port.membase + UART011_CR);
+	}
 
 	for (i = 0; i < ARRAY_SIZE(backup_regs); i++) {
 		if (suspend)
@@ -1217,16 +1224,16 @@ static void pl011_clock_off(struct work_struct *work)
 	unsigned int busy, interrupt_status;
 
 	spin_lock_irqsave(&port->lock, flags);
-	
+
 	interrupt_status = readw(uap->port.membase + UART011_MIS);
 	busy = readw(uap->port.membase + UART01x_FR) & UART01x_FR_BUSY;
 
 	if (uap->clk_state == PL011_CLK_REQUEST_OFF) {
-			if (uart_circ_empty(xmit) && !interrupt_status && !busy) {
-				if (!uart_console(&uap->port) && uap->regulator) {
-					pl011_backup(uap, true);
-					disable_regulator = true;
-				}
+		if (uart_circ_empty(xmit) && !interrupt_status && !busy) {
+			if (!uart_console(&uap->port) && uap->regulator) {
+				pl011_backup(uap, true);
+				disable_regulator = true;
+			}
 			uap->clk_state = PL011_CLK_OFF;
 			clk_disable(uap->clk);
 		} else
@@ -1321,7 +1328,7 @@ static void pl011_power_shutdown(struct uart_amba_port *uap)
 	cancel_delayed_work_sync(&uap->clk_off_work);
 
 	spin_lock_irq(&uap->port.lock);
-	if (uap->clk_state == PL011_CLK_ON || 
+	if (uap->clk_state == PL011_CLK_ON ||
 		uap->clk_state ==  PL011_CLK_REQUEST_OFF) {
 		clk_disable(uap->clk);
 		if (!uart_console(&uap->port) && uap->regulator)
@@ -1329,7 +1336,7 @@ static void pl011_power_shutdown(struct uart_amba_port *uap)
 	}
 	uap->clk_state = PL011_PORT_OFF;
 	spin_unlock_irq(&uap->port.lock);
-	
+
 	if (disable_regulator)
 		regulator_disable(uap->regulator);
 }
@@ -1339,7 +1346,7 @@ pl011_clock_control(struct uart_port *port, struct ktermios *termios,
 		     struct ktermios *old)
 {
 	speed_t new_baud = tty_termios_baud_rate(termios);
-		
+
 	if (new_baud == 0)
 		pl011_clock_request_off(port);
 	else
@@ -1564,7 +1571,7 @@ static unsigned int pl01x_get_mctrl(struct uart_port *port)
 
 #define TIOCMBIT(uartbit, tiocmbit)	\
 	if (status & uartbit)		\
-		result |= tiocmbit
+		(result |= tiocmbit)
 
 	TIOCMBIT(UART01x_FR_DCD, TIOCM_CAR);
 	TIOCMBIT(UART01x_FR_DSR, TIOCM_DSR);
@@ -1582,10 +1589,12 @@ static void pl011_set_mctrl(struct uart_port *port, unsigned int mctrl)
 	cr = readw(uap->port.membase + UART011_CR);
 
 #define	TIOCMBIT(tiocmbit, uartbit)		\
-	if (mctrl & tiocmbit)		\
-		cr |= uartbit;		\
-	else				\
-		cr &= ~uartbit
+	do {\
+		if (mctrl & tiocmbit)	\
+			cr |= uartbit;		\
+		else					\
+			cr &= ~uartbit;		\
+	} while (0)
 
 	TIOCMBIT(TIOCM_RTS, UART011_CR_RTS);
 	TIOCMBIT(TIOCM_DTR, UART011_CR_DTR);
@@ -1678,7 +1687,8 @@ static int pl011_startup(struct uart_port *port)
 	/*
 	 * initialise the old status of the modem signals
 	 */
-	uap->old_status = readw(uap->port.membase + UART01x_FR) & UART01x_FR_MODEM_ANY;
+	uap->old_status = readw(uap->port.membase + UART01x_FR) &
+						UART01x_FR_MODEM_ANY;
 
 	/* Startup DMA */
 	pl011_dma_startup(uap);
@@ -1714,11 +1724,11 @@ static int pl011_startup(struct uart_port *port)
 static void pl011_shutdown_channel(struct uart_amba_port *uap,
 					unsigned int lcrh)
 {
-      unsigned long val;
+	unsigned long val;
 
-      val = readw(uap->port.membase + lcrh);
-      val &= ~(UART01x_LCRH_BRK | UART01x_LCRH_FEN);
-      writew(val, uap->port.membase + lcrh);
+	val = readw(uap->port.membase + lcrh);
+	val &= ~(UART01x_LCRH_BRK | UART01x_LCRH_FEN);
+	writew(val, uap->port.membase + lcrh);
 }
 
 static void pl011_shutdown(struct uart_port *port)
@@ -1745,7 +1755,8 @@ static void pl011_shutdown(struct uart_port *port)
 	 * disable the port
 	 */
 	uap->autorts = false;
-	writew(UART01x_CR_UARTEN | UART011_CR_TXE, uap->port.membase + UART011_CR);
+	writew(UART01x_CR_UARTEN | UART011_CR_TXE,
+		uap->port.membase + UART011_CR);
 
 	/*
 	 * disable break condition and fifos
@@ -1785,22 +1796,22 @@ unsigned int oldstate)
 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
 
 	switch (state) {
-		case 0: /*fully on */
-			/*
-			 * Enable the peripheral clock for this serial port.
-			 * This is called on uart_open() or a resume event.
-			 */
-			pl011_power_startup(uap);
-			break;
-		case 3: /* powered down */
-			/*
-			 * Disable the peripheral clock for this serial port.
-			 * This is called on uart_close() or a suspend event.
-			 */
-			pl011_power_shutdown(uap);
-			break;
-		default:
-			printk(KERN_ERR "pl011_serial: unknown pm %d\n", state);
+	case 0: /*fully on */
+		/*
+		 * Enable the peripheral clock for this serial port.
+		 * This is called on uart_open() or a resume event.
+		 */
+		pl011_power_startup(uap);
+		break;
+	case 3: /* powered down */
+		/*
+		 * Disable the peripheral clock for this serial port.
+		 * This is called on uart_close() or a suspend event.
+		 */
+		pl011_power_shutdown(uap);
+		break;
+	default:
+		printk(KERN_ERR "pl011_serial: unknown pm %d\n", state);
 	}
 }
 
@@ -1844,7 +1855,7 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
 	case CS7:
 		lcr_h = UART01x_LCRH_WLEN_7;
 		break;
-	default: // CS8
+	default: /* CS8 */
 		lcr_h = UART01x_LCRH_WLEN_8;
 		break;
 	}
@@ -2267,10 +2278,10 @@ static int pl011_suspend(struct amba_device *dev, pm_message_t state)
 	if (!uap)
 		return -EINVAL;
 #ifdef CONFIG_SERIAL_AMBA_PL011_CLOCK_CONTROL
-    cancel_delayed_work_sync(&uap->clk_off_work);
+	cancel_delayed_work_sync(&uap->clk_off_work);
 
-    if (uap->clk_state == PL011_CLK_OFF)
-       return 0;
+	if (uap->clk_state == PL011_CLK_OFF)
+		return 0;
 #endif
 	return uart_suspend_port(&amba_reg, &uap->port);
 }
@@ -2282,8 +2293,8 @@ static int pl011_resume(struct amba_device *dev)
 	if (!uap)
 		return -EINVAL;
 #ifdef CONFIG_SERIAL_AMBA_PL011_CLOCK_CONTROL
-    if (uap->clk_state == PL011_CLK_OFF)
-        return 0;
+	if (uap->clk_state == PL011_CLK_OFF)
+		return 0;
 #endif
 
 	return uart_resume_port(&amba_reg, &uap->port);
