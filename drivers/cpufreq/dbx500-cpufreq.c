@@ -135,6 +135,64 @@ static unsigned int dbx500_cpufreq_getspeed(unsigned int cpu)
 	return freq_table[i].frequency;
 }
 
+int dbx500_cpufreq_get_limits(int cpu, int r,
+			      unsigned int *min, unsigned int *max)
+{
+	int op;
+	int i;
+	int ret;
+	static int old_freq;
+	struct cpufreq_policy p;
+
+	switch (r) {
+	case 0:
+		/* Fall through */
+	case 25:
+		op = ARM_EXTCLK;
+		break;
+	case 50:
+		op = ARM_50_OPP;
+		break;
+	case 100:
+		op = ARM_100_OPP;
+		break;
+	case 125:
+		if (cpu_is_u8500() && prcmu_has_arm_maxopp())
+			op = ARM_MAX_OPP;
+		else
+			op = ARM_100_OPP;
+		break;
+	default:
+		pr_err("cpufreq-dbx500: Incorrect arm target value (%d).\n",
+		       r);
+		BUG();
+		break;
+	}
+
+	for (i = 0; idx2opp[i] != op; i++)
+		;
+
+	if (freq_table[i].frequency == CPUFREQ_TABLE_END) {
+		pr_err("cpufreq-dbx500: Minimum frequency does not exist!\n");
+		BUG();
+	}
+
+	if (freq_table[i].frequency != old_freq)
+		pr_debug("cpufreq-dbx500: set min arm freq to %d\n",
+			 freq_table[i].frequency);
+
+	(*min) = freq_table[i].frequency;
+
+	ret = cpufreq_get_policy(&p, cpu);
+	if (ret) {
+		pr_err("cpufreq-dbx500: Failed to get policy.\n");
+		return -EINVAL;
+	}
+
+	(*max) = p.max;
+	return 0;
+}
+
 static int __cpuinit dbx500_cpufreq_init(struct cpufreq_policy *policy)
 {
 	int res;

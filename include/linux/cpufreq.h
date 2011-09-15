@@ -332,6 +332,7 @@ static inline unsigned int cpufreq_quick_get(unsigned int cpu)
 }
 #endif
 
+int cpufreq_update_freq(int cpu, unsigned int min, unsigned int max);
 
 /*********************************************************************
  *                       CPUFREQ DEFAULT GOVERNOR                    *
