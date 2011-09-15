@@ -34,7 +34,7 @@
 #include <linux/mfd/abx500.h>
 #include <linux/mfd/ab8500.h>
 #include <linux/regulator/consumer.h>
-#include <mach/prcmu.h>
+#include <linux/mfd/dbx500-prcmu.h>
 #include <mach/usb.h>
 #include <linux/kernel_stat.h>
 
@@ -235,7 +235,6 @@ static void ab8500_usb_phy_enable(struct ab8500_usb *ab, bool sel_host)
 
 	prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
 				(char *)dev_name(ab->dev), 100);
-
 	if (!sel_host) {
 		schedule_delayed_work_on(0,
 					&ab->work_usb_workaround,
@@ -917,11 +916,9 @@ static int __devinit ab8500_usb_probe(struct platform_device *pdev)
 
 	prcmu_qos_add_requirement(PRCMU_QOS_APE_OPP,
 			(char *)dev_name(ab->dev), 50);
-
 	dev_info(&pdev->dev, "revision 0x%2x driver initialized\n", ab->rev);
 
 	prcmu_qos_add_requirement(PRCMU_QOS_ARM_OPP, "usb", 25);
-
 	wake_lock_init(&ab8500_musb_wakelock, WAKE_LOCK_SUSPEND, "ab8500-usb");
 
 	err = ab8500_usb_boot_detect(ab);

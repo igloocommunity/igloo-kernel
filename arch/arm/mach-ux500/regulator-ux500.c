@@ -18,13 +18,12 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
+#include <linux/mfd/dbx500-prcmu.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 
 #include "regulator-ux500.h"
-
-#include <mach/prcmu.h>
 
 #ifdef CONFIG_REGULATOR_DEBUG
 

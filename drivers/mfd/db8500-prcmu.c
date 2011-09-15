@@ -27,13 +27,14 @@
 #include <linux/platform_device.h>
 #include <linux/uaccess.h>
 #include <linux/mfd/core.h>
+#include <linux/mfd/dbx500-prcmu.h>
 #include <linux/regulator/db8500-prcmu.h>
 #include <linux/regulator/machine.h>
 #include <mach/hardware.h>
 #include <mach/irqs.h>
-#include <mach/prcmu-regs.h>
+#include <mach/db8500-regs.h>
 #include <mach/id.h>
-#include <mach/prcmu.h>
+#include "dbx500-prcmu-regs.h"
 
 /* Offset for the firmware version within the TCPM */
 #define PRCMU_FW_VERSION_OFFSET 0xA4
@@ -340,13 +341,11 @@ static struct {
  * mb1_transfer - state needed for mailbox 1 communication.
  * @lock:	The transaction lock.
  * @work:	The transaction completion structure.
- * @ape_opp:	The current APE OPP.
  * @ack:	Reply ("acknowledge") data.
  */
 static struct {
 	struct mutex lock;
 	struct completion work;
-	u8 ape_opp;
 	struct {
 		u8 header;
 		u8 arm_opp;
@@ -460,10 +459,6 @@ struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
 	CLK_MGT_ENTRY(UICCCLK),
 };
 
-/*
- * NOTE! Temporary until all users of set_hwacc() are using the regulator
- * framework API
- */
 static struct regulator *hwacc_regulator[NUM_HW_ACC];
 static struct regulator *hwacc_ret_regulator[NUM_HW_ACC];
 
@@ -940,53 +935,6 @@ int prcmu_set_ddr_opp(u8 opp)
 
 	return 0;
 }
-
-/* Divide the frequency of certain clocks by 2 for APE_50_PARTLY_25_OPP. */
-static void request_even_slower_clocks(bool enable)
-{
-	const u8 clock_reg_offset[] = {
-		PRCM_ACLK_MGT_OFF,
-		PRCM_DMACLK_MGT_OFF
-	};
-	unsigned long flags;
-	unsigned int i;
-
-	spin_lock_irqsave(&clk_mgt_lock, flags);
-
-	/* Grab the HW semaphore. */
-	while ((readl(PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
-		cpu_relax();
-
-	for (i = 0; i < ARRAY_SIZE(clock_reg_offset); i++) {
-		u32 val;
-		u32 div;
-
-		val = readl(_PRCMU_BASE + clock_reg_offset[i]);
-		div = (val & PRCM_CLK_MGT_CLKPLLDIV_MASK);
-		if (enable) {
-			if ((div <= 1) || (div > 15)) {
-				pr_err("prcmu: Bad clock divider %d in %s\n",
-					div, __func__);
-				goto unlock_and_return;
-			}
-			div <<= 1;
-		} else {
-			if (div <= 2)
-				goto unlock_and_return;
-			div >>= 1;
-		}
-		val = ((val & ~PRCM_CLK_MGT_CLKPLLDIV_MASK) |
-			(div & PRCM_CLK_MGT_CLKPLLDIV_MASK));
-		writel(val, (_PRCMU_BASE + clock_reg_offset[i]));
-	}
-
-unlock_and_return:
-	/* Release the HW semaphore. */
-	writel(0, PRCM_SEM);
-
-	spin_unlock_irqrestore(&clk_mgt_lock, flags);
-}
-
 /**
  * set_ape_opp - set the appropriate APE OPP
  * @opp: The new APE operating point to which transition is to be made
@@ -998,24 +946,14 @@ int prcmu_set_ape_opp(u8 opp)
 {
 	int r = 0;
 
-	if (opp == mb1_transfer.ape_opp)
-		return 0;
-
 	mutex_lock(&mb1_transfer.lock);
-
-	if (mb1_transfer.ape_opp == APE_50_PARTLY_25_OPP)
-		request_even_slower_clocks(false);
-
-	if ((opp != APE_100_OPP) && (mb1_transfer.ape_opp != APE_100_OPP))
-		goto skip_message;
 
 	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(1))
 		cpu_relax();
 
 	writeb(MB1H_ARM_APE_OPP, (tcdm_base + PRCM_MBOX_HEADER_REQ_MB1));
 	writeb(ARM_NO_CHANGE, (tcdm_base + PRCM_REQ_MB1_ARM_OPP));
-	writeb(((opp == APE_50_PARTLY_25_OPP) ? APE_50_OPP : opp),
-		(tcdm_base + PRCM_REQ_MB1_APE_OPP));
+	writeb(opp, (tcdm_base + PRCM_REQ_MB1_APE_OPP));
 
 	writel(MBOX_BIT(1), PRCM_MBOX_CPU_SET);
 	wait_for_completion(&mb1_transfer.work);
@@ -1023,13 +961,6 @@ int prcmu_set_ape_opp(u8 opp)
 	if ((mb1_transfer.ack.header != MB1H_ARM_APE_OPP) ||
 		(mb1_transfer.ack.ape_opp != opp))
 		r = -EIO;
-
-skip_message:
-	if ((!r && (opp == APE_50_PARTLY_25_OPP)) ||
-		(r && (mb1_transfer.ape_opp == APE_50_PARTLY_25_OPP)))
-		request_even_slower_clocks(true);
-	if (!r)
-		mb1_transfer.ape_opp = opp;
 
 	mutex_unlock(&mb1_transfer.lock);
 
@@ -2168,23 +2099,27 @@ static struct irq_chip prcmu_irq_chip = {
 void __init db8500_prcmu_early_init(void)
 {
 	unsigned int i;
+	if (cpu_is_u8500v2()) {
+		void *tcpm_base = ioremap_nocache(U8500_PRCMU_TCPM_BASE, SZ_4K);
 
-	void *tcpm_base = ioremap_nocache(U8500_PRCMU_TCPM_BASE, SZ_4K);
+		if (tcpm_base != NULL) {
+			int version;
+			version = readl(tcpm_base + PRCMU_FW_VERSION_OFFSET);
+			prcmu_version.project_number = version & 0xFF;
+			prcmu_version.api_version = (version >> 8) & 0xFF;
+			prcmu_version.func_version = (version >> 16) & 0xFF;
+			prcmu_version.errata = (version >> 24) & 0xFF;
+			pr_info("PRCMU firmware version %d.%d.%d\n",
+				(version >> 8) & 0xFF, (version >> 16) & 0xFF,
+				(version >> 24) & 0xFF);
+			iounmap(tcpm_base);
+		}
 
-	if (tcpm_base != NULL) {
-		int version;
-		version = readl(tcpm_base + PRCMU_FW_VERSION_OFFSET);
-		prcmu_version.project_number = version & 0xFF;
-		prcmu_version.api_version = (version >> 8) & 0xFF;
-		prcmu_version.func_version = (version >> 16) & 0xFF;
-		prcmu_version.errata = (version >> 24) & 0xFF;
-		pr_info("PRCMU firmware version %d.%d.%d\n",
-			(version >> 8) & 0xFF, (version >> 16) & 0xFF,
-			(version >> 24) & 0xFF);
-		iounmap(tcpm_base);
+		tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE);
+	} else {
+		pr_err("prcmu: Unsupported chip version\n");
+		BUG();
 	}
-
-	tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE);
 
 	spin_lock_init(&mb0_transfer.lock);
 	spin_lock_init(&mb0_transfer.dbb_irqs_lock);
@@ -2192,7 +2127,6 @@ void __init db8500_prcmu_early_init(void)
 	init_completion(&mb0_transfer.ac_wake_work);
 	mutex_init(&mb1_transfer.lock);
 	init_completion(&mb1_transfer.work);
-	mb1_transfer.ape_opp = APE_NO_CHANGE;
 	mutex_init(&mb2_transfer.lock);
 	init_completion(&mb2_transfer.work);
 	spin_lock_init(&mb2_transfer.auto_pm_lock);
@@ -2253,13 +2187,15 @@ static struct regulator_consumer_supply db8500_vape_consumers[] = {
 
 static struct regulator_consumer_supply db8500_vsmps2_consumers[] = {
 	/* CG2900 and CW1200 power to off-chip peripherals */
+	REGULATOR_SUPPLY("gbf_1v8", "cg2900-uart.0"),
+	REGULATOR_SUPPLY("wlan_1v8", "cw1200.0"),
 	REGULATOR_SUPPLY("musb_1v8", "ab8500-usb.0"),
 	/* AV8100 regulator */
 	REGULATOR_SUPPLY("hdmi_1v8", "0-0070"),
 };
 
 static struct regulator_consumer_supply db8500_b2r2_mcde_consumers[] = {
-	REGULATOR_SUPPLY("vsupply", "b2r2_bus"),
+	REGULATOR_SUPPLY("vsupply", "b2r2.0"),
 	REGULATOR_SUPPLY("vsupply", "mcde"),
 };
 

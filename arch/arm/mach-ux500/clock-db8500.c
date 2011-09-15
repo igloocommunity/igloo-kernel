@@ -27,7 +27,7 @@
 #include <plat/pincfg.h>
 
 #include <mach/hardware.h>
-#include <mach/prcmu.h>
+#include <linux/mfd/dbx500-prcmu.h>
 
 #include "clock.h"
 #include "pins-db8500.h"

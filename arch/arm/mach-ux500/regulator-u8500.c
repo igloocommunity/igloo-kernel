@@ -11,8 +11,7 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
-
-#include <mach/prcmu.h>
+#include <linux/mfd/dbx500-prcmu.h>
 
 #include "regulator-ux500.h"
 #include "regulator-u8500.h"
