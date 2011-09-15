@@ -100,6 +100,12 @@ config U5500_MODEM_IRQ
 	help
 	  Add support for handling IRQ:s from modem side
 
+config DBX500_PRCMU_DEBUG
+	bool "DBX500 PRCMU debug"
+	depends on ((MFD_DB5500_PRCMU || MFD_DB8500_PRCMU) && DEBUG_FS)
+	help
+	  Add support for PRCMU debug
+
 config TEE_UX500
 	bool "Trusted Execution Environment (TEE) ux500 hardware support"
 	depends on TEE_SUPPORT

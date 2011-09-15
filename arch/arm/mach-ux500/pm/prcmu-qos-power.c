@@ -22,6 +22,8 @@
 #include <linux/cpufreq.h>
 #include <linux/mfd/dbx500-prcmu.h>
 
+#include <mach/prcmu-debug.h>
+
 #define ARM_THRESHOLD_FREQ (400000)
 
 static int qos_delayed_cpufreq_notifier(struct notifier_block *,
@@ -194,7 +196,6 @@ static void update_target(int target)
 		blocking_notifier_call_chain(prcmu_qos_array[target]->notifiers,
 					     (unsigned long)extreme_value,
 					     NULL);
-
 	switch (target) {
 	case PRCMU_QOS_DDR_OPP:
 		switch (extreme_value) {
@@ -216,6 +217,7 @@ static void update_target(int target)
 			goto unlock_and_return;
 		}
 		prcmu_set_ddr_opp(op);
+		prcmu_debug_ddr_opp_log(op);
 		break;
 	case PRCMU_QOS_APE_OPP:
 		switch (extreme_value) {
@@ -235,6 +237,7 @@ static void update_target(int target)
 
 		if (!ape_opp_forced_to_50_partly_25)
 			(void)prcmu_set_ape_opp(op);
+		prcmu_debug_ape_opp_log(op);
 		break;
 	case PRCMU_QOS_ARM_OPP:
 		/* TODO: Shall force_value != 0 actually set arm opp? */

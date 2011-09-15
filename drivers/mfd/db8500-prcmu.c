@@ -34,6 +34,8 @@
 #include <mach/irqs.h>
 #include <mach/db8500-regs.h>
 #include <mach/id.h>
+#include <mach/prcmu-debug.h>
+
 #include "dbx500-prcmu-regs.h"
 
 /* Offset for the firmware version within the TCPM */
@@ -894,6 +896,8 @@ int db8500_prcmu_set_arm_opp(u8 opp)
 		r = -EIO;
 
 	mutex_unlock(&mb1_transfer.lock);
+
+	prcmu_debug_arm_opp_log(opp);
 
 	return r;
 }
