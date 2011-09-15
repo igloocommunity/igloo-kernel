@@ -24,12 +24,12 @@
 #include <mach/devices.h>
 #include <mach/hardware.h>
 #include <mach/setup.h>
+#include <mach/pm.h>
 #include <video/mcde.h>
 #include <linux/mfd/dbx500-prcmu.h>
 #include <mach/hsi.h>
 #include <mach/ste-dma40-db8500.h>
 #include <trace/stm.h>
-#include "pm/pm.h"
 
 #include "pins-db8500.h"
 
@@ -39,6 +39,8 @@
 		.first_gpio	= first,				\
 		.first_irq	= NOMADIK_GPIO_TO_IRQ(first),		\
 		.num_gpio	= num,					\
+		.get_secondary_status = ux500_pm_gpio_read_wake_up_status, \
+		.set_ioforce	= ux500_pm_prcmu_set_ioforce,		\
 		.supports_sleepmode = true,				\
 	}
 
