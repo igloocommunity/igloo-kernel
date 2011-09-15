@@ -575,6 +575,7 @@ static int d40_desc_log_lli_to_lcxa(struct d40_chan *d40c,
 	struct d40_log_lli_bidir *lli = &d40d->lli_log;
 	int curr_lcla = -EINVAL;
 	int first_lcla = 0;
+	bool use_esram_lcla = d40c->base->plat_data->use_esram_lcla;
 
 	if ((d40d->lli_len - d40d->lli_current) > 1 ||
 	     d40d->cyclic || !use_lcpa) {
@@ -640,11 +641,15 @@ static int d40_desc_log_lli_to_lcxa(struct d40_chan *d40c,
 
 		if (d40d->lli_current == d40d->lli_len - 1)
 			d40d->last_lcla = lcla;
-
-		(void) dma_map_single(d40c->base->dev, lcla,
-				      2 * sizeof(struct d40_log_lli),
-				      DMA_TO_DEVICE);
-
+		/*
+		 * Cache maintenance is not needed if lcla is
+		 * mapped in esram
+		 */
+		if (!use_esram_lcla) {
+			(void) dma_map_single(d40c->base->dev, lcla,
+					      2 * sizeof(struct d40_log_lli),
+					      DMA_TO_DEVICE);
+		}
 		curr_lcla = next_lcla;
 
 		if (curr_lcla == -EINVAL || curr_lcla == first_lcla) {
@@ -3681,14 +3686,35 @@ static int __init d40_probe(struct platform_device *pdev)
 			__func__);
 		goto failure;
 	}
-
-	ret = d40_lcla_allocate(base);
-
-	if (ret) {
-		dev_err(&pdev->dev, "[%s] Failed to allocate LCLA area\n",
-			__func__);
-		goto failure;
-
+	/* If lcla has to be located in ESRAM we don't need to allocate */
+	if (base->plat_data->use_esram_lcla) {
+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+							"lcla_esram");
+		if (!res) {
+			ret = -ENOENT;
+			dev_err(&pdev->dev,
+				"[%s] No \"lcla_esram\" memory resource\n",
+				__func__);
+			goto failure;
+		}
+		base->lcla_pool.base = ioremap(res->start,
+						resource_size(res));
+		if (!base->lcla_pool.base) {
+			ret = -ENOMEM;
+			dev_err(&pdev->dev,
+				"[%s] Failed to ioremap LCLA region\n",
+				__func__);
+			goto failure;
+		}
+		writel(res->start, base->virtbase + D40_DREG_LCLA);
+	} else {
+		ret = d40_lcla_allocate(base);
+		if (ret) {
+			dev_err(&pdev->dev,
+				"[%s] Failed to allocate LCLA area\n",
+				__func__);
+			goto failure;
+		}
 	}
 
 #ifdef CONFIG_STE_DMA40_DEBUG
@@ -3736,12 +3762,17 @@ failure:
 			kmem_cache_destroy(base->desc_slab);
 		if (base->virtbase)
 			iounmap(base->virtbase);
+
+		if (base->lcla_pool.base && base->plat_data->use_esram_lcla) {
+			iounmap(base->lcla_pool.base);
+			base->lcla_pool.base = NULL;
+		}
+
 		if (!base->lcla_pool.base_unaligned && base->lcla_pool.base)
 			free_pages((unsigned long)base->lcla_pool.base,
 				   base->lcla_pool.pages);
 
 		kfree(base->lcla_pool.base_unaligned);
-
 		if (base->phy_lcpa)
 			release_mem_region(base->phy_lcpa,
 					   base->lcpa_size);
