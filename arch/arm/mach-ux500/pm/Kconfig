@@ -1,0 +1,6 @@
+config DBX500_PRCMU_QOS_POWER
+	bool "DBX500 PRCMU power QoS support"
+	depends on (MFD_DB5500_PRCMU || MFD_DB8500_PRCMU)
+	default y
+	help
+	  Add support for PRCMU power Quality of Service
