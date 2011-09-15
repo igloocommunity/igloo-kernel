@@ -172,7 +172,7 @@ static void vibra_enable(struct timed_output_dev *tdev, int timeout)
 
 	spin_lock_irqsave(&vibra->vibra_lock, flags);
 
-	if (!vibra->enable) {
+	if (!vibra->enable || timeout) {
 		vibra->enable = true;
 
 		vibra->timeout_ms = timeout;
