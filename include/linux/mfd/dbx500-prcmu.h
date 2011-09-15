@@ -485,6 +485,7 @@ static inline void prcmu_get_abb_event_buffer(void __iomem **buf)
 /* PRCMU QoS APE OPP class */
 #define PRCMU_QOS_APE_OPP 1
 #define PRCMU_QOS_DDR_OPP 2
+#define PRCMU_QOS_ARM_OPP 3
 #define PRCMU_QOS_DEFAULT_VALUE -1
 
 #ifdef CONFIG_UX500_PRCMU_QOS_POWER
