@@ -86,6 +86,13 @@ static struct regulator_consumer_supply ab8500_vana_consumers[] = {
 	REGULATOR_SUPPLY("vsmps2", "mcde.0"),
 };
 
+static struct regulator_consumer_supply ab8500_sysclkreq_2_consumers[] = {
+};
+
+static struct regulator_consumer_supply ab8500_sysclkreq_4_consumers[] = {
+
+};
+
 /* ab8500 regulator register initialization */
 struct ab8500_regulator_reg_init
 ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
@@ -393,5 +400,25 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 		},
 		.num_consumer_supplies = ARRAY_SIZE(ab8500_vana_consumers),
 		.consumer_supplies = ab8500_vana_consumers,
+	},
+	/* sysclkreq 2 pin */
+	[AB8500_SYSCLKREQ_2] = {
+		.constraints = {
+			.name = "V-SYSCLKREQ-2",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+		.num_consumer_supplies =
+			ARRAY_SIZE(ab8500_sysclkreq_2_consumers),
+		.consumer_supplies = ab8500_sysclkreq_2_consumers,
+	},
+	/* sysclkreq 4 pin */
+	[AB8500_SYSCLKREQ_4] = {
+		.constraints = {
+			.name = "V-SYSCLKREQ-4",
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		},
+		.num_consumer_supplies =
+			ARRAY_SIZE(ab8500_sysclkreq_4_consumers),
+		.consumer_supplies = ab8500_sysclkreq_4_consumers,
 	},
 };
