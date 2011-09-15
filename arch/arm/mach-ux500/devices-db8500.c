@@ -25,8 +25,7 @@
 #include <mach/hardware.h>
 #include <mach/setup.h>
 #include <video/mcde.h>
-#include <mach/prcmu.h>
-#include <mach/prcmu-regs.h>
+#include <linux/mfd/dbx500-prcmu.h>
 #include <mach/hsi.h>
 #include <mach/ste-dma40-db8500.h>
 #include <trace/stm.h>
@@ -522,6 +521,11 @@ static int stm_ste_disable_ape_on_mipi60(void)
 /*
  * Manage STM output pins connection (MIP34/MIPI60 connectors)
  */
+#define PRCM_GPIOCR	(_PRCMU_BASE + 0x138)
+#define PRCM_GPIOCR_DBG_STM_MOD_CMD1 0x800
+#define PRCM_GPIOCR_DBG_UARTMOD_CMD0 0x1
+
+
 static int stm_ste_connection(enum stm_connection_type con_type)
 {
 	int retval = -EINVAL;

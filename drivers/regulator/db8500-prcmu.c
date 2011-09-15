@@ -16,8 +16,8 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/db8500-prcmu.h>
+#include <linux/mfd/dbx500-prcmu.h>
 
-#include <mach/prcmu.h>
 
 /**
  * struct db8500_regulator_info - db8500 regulator information

@@ -30,7 +30,7 @@
 #include <linux/mfd/core.h>
 #include <linux/version.h>
 #include <linux/io.h>
-#include <mach/prcmu.h>
+#include <linux/mfd/dbx500-prcmu.h>
 
 #define AB5500_NAME_STRING "ab5500"
 #define AB5500_ID_FORMAT_STRING "AB5500 %s"

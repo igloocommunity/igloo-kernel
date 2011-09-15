@@ -73,20 +73,6 @@ config KEYLAYOUT_LAYOUT2
 
 endchoice
 
-config U8500_PRCMU
-	bool "U8500 PRCMU support"
-	depends on UX500_SOC_DB8500
-	default n
-	help
-	  Add support for PRCMU for U8500
-
-config U5500_PRCMU
-	bool "U5500 PRCMU support"
-	depends on UX500_SOC_DB5500
-	default y
-	help
-	  Add support for PRCMU for U5500
-
 config UX500_DEBUG_UART
 	int "Ux500 UART to use for low-level debug"
 	default 2
