@@ -107,12 +107,16 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
 	 */
 	INIT_REGULATOR_REGISTER(AB8500_REGUREQUESTCTRL4, 0x00),
 	/*
+	 * Vsmps1SysClkReq1HPValid  = enabled
+	 * Vsmps2SysClkReq1HPValid  = enabled
+	 * Vsmps3SysClkReq1HPValid  = enabled
 	 * VanaSysClkReq1HPValid    = disabled
+	 * VpllSysClkReq1HPValid    = enabled
 	 * Vaux1SysClkReq1HPValid   = disabled
 	 * Vaux2SysClkReq1HPValid   = disabled
 	 * Vaux3SysClkReq1HPValid   = disabled
 	 */
-	INIT_REGULATOR_REGISTER(AB8500_REGUSYSCLKREQ1HPVALID1, 0x00),
+	INIT_REGULATOR_REGISTER(AB8500_REGUSYSCLKREQ1HPVALID1, 0x17),
 	/*
 	 * VextSupply1SysClkReq1HPValid = disabled
 	 * VextSupply2SysClkReq1HPValid = disabled
@@ -199,6 +203,32 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
 	 */
 	INIT_REGULATOR_REGISTER(AB8500_REGUCTRL1VAMIC, 0x00),
 	/*
+	 * Vsmps1Regu               = HW control
+	 * Vsmps1SelCtrl            = Vsmps1 voltage defined by Vsmsp1Sel2
+	 */
+	INIT_REGULATOR_REGISTER(AB8500_VSMPS1REGU, 0x06),
+	/*
+	 * Vsmps2Regu               = HW control
+	 * Vsmps2SelCtrl            = Vsmps2 voltage defined by Vsmsp2Sel2
+	 */
+	INIT_REGULATOR_REGISTER(AB8500_VSMPS2REGU, 0x06),
+	/*
+	 * Vsmps3Sel2               = 1.2125 V
+	 * NOTE! PRCMU register
+	 */
+	INIT_REGULATOR_REGISTER(AB8500_VSMPS3SEL2, 0x29),
+	/*
+	 * Vsmps3Regu               = HW control
+	 * Vsmps3SelCtrl            = Vsmps3 voltage defined by Vsmps3Sel2
+	 * NOTE! PRCMU register
+	 */
+	INIT_REGULATOR_REGISTER(AB8500_VSMPS3REGU, 0x06),
+	/*
+	 * Vsmps3Sel1               = 0.925V
+	 * NOTE! PRCMU register
+	 */
+	INIT_REGULATOR_REGISTER(AB8500_VSMPS3SEL1, 0x12),
+	/*
 	 * VPll                     = Hw controlled
 	 * VanaRegu                 = force off
 	 */
@@ -226,9 +256,9 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
 	 */
 	INIT_REGULATOR_REGISTER(AB8500_VRF1VAUX3REGU, 0x00),
 	/*
-	 * Vsmps1                   = 1.15V
+	 * Vsmps1Sel1               = 1.2 V
 	 */
-	INIT_REGULATOR_REGISTER(AB8500_VSMPS1SEL1, 0x24),
+	INIT_REGULATOR_REGISTER(AB8500_VSMPS1SEL1, 0x28),
 	/*
 	 * Vaux1Sel                 = 2.5 V
 	 */
