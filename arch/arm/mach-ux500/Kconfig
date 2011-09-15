@@ -151,4 +151,6 @@ config UX500_L2X0_PREFETCH_CTRL
 	  Communication with Trustzone is done through TEE driver.
 
 source "arch/arm/mach-ux500/Kconfig-arch"
+source "arch/arm/mach-ux500/pm/Kconfig"
+
 endif
