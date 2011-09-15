@@ -2538,6 +2538,7 @@ static int __init ab5500_probe(struct platform_device *pdev)
 	/* Set up and register the platform devices. */
 	for (i = 0; i < AB5500_NUM_DEVICES; i++) {
 		ab5500_devs[i].platform_data = ab5500_plf_data->dev_data[i];
+		ab5500_devs[i].pdata_size = ab5500_plf_data->dev_data_sz[i];
 	}
 
 	err = mfd_add_devices(&pdev->dev, 0, ab5500_devs,
