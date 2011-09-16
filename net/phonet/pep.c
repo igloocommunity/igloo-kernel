@@ -50,6 +50,15 @@
 #define CREDITS_MAX	10
 #define CREDITS_THR	7
 
+#ifdef CONFIG_ARCH_U8500
+static struct sockaddr_pn pipe_srv = {
+	.spn_family = AF_PHONET,
+	.spn_resource = 0xD9, /* pipe service */
+	.spn_dev = 0x60, /*modem dev-id*/
+	.spn_obj = 0x30, /*modem pep*/
+};
+#endif
+
 #define pep_sb_size(s) (((s) + 5) & ~3) /* 2-bytes head, 32-bits aligned */
 
 /* Get the next TLV sub-block. */
@@ -1028,8 +1037,12 @@ static int pipe_skb_send(struct sock *sk, struct sk_buff *skb)
 	} else
 		ph->message_id = PNS_PIPE_DATA;
 	ph->pipe_handle = pn->pipe_handle;
-	err = pn_skb_send(sk, skb, NULL);
 
+#ifdef CONFIG_ARCH_U8500
+	err = pn_skb_send(sk, skb, &pipe_srv);
+#else
+	err = pn_skb_send(sk, skb, NULL);
+#endif
 	if (err && pn_flow_safe(pn->tx_fc))
 		atomic_inc(&pn->tx_credits);
 	return err;
