@@ -1,13 +1,13 @@
 /*
  * Copyright (C) STMicroelectronics 2009
- * Copyright (C) ST-Ericsson SA 2010
+ * Copyright (C) ST-Ericsson SA 2010-2011
  *
  * License Terms: GNU General Public License v2
- * Author: Sundar Iyer <sundar.iyer@stericsson.com>
- * Author: Martin Persson <martin.persson@stericsson.com>
+ * Author: Sundar Iyer
+ * Author: Martin Persson
  * Author: Jonas Aaberg <jonas.aberg@stericsson.com>
- *
  */
+
 #include <linux/kernel.h>
 #include <linux/cpufreq.h>
 #include <linux/delay.h>
@@ -15,19 +15,42 @@
 #include <linux/mfd/dbx500-prcmu.h>
 #include <mach/id.h>
 
-static struct cpufreq_frequency_table freq_table[] = {
+static struct cpufreq_frequency_table db8500_freq_table[] = {
 	[0] = {
 		.index = 0,
-		.frequency = 300000,
+		.frequency = 200000,
 	},
 	[1] = {
 		.index = 1,
-		.frequency = 600000,
+		.frequency = 300000,
 	},
 	[2] = {
-		/* Used for MAX_OPP, if available */
 		.index = 2,
+		.frequency = 600000,
+	},
+	[3] = {
+		/* Used for MAX_OPP, if available */
+		.index = 3,
 		.frequency = CPUFREQ_TABLE_END,
+	},
+	[4] = {
+		.index = 4,
+		.frequency = CPUFREQ_TABLE_END,
+	},
+};
+
+static struct cpufreq_frequency_table db5500_freq_table[] = {
+	[0] = {
+		.index = 0,
+		.frequency = 200000,
+	},
+	[1] = {
+		.index = 1,
+		.frequency = 396500,
+	},
+	[2] = {
+		.index = 2,
+		.frequency = 793000,
 	},
 	[3] = {
 		.index = 3,
@@ -35,23 +58,34 @@ static struct cpufreq_frequency_table freq_table[] = {
 	},
 };
 
-static enum arm_opp idx2opp[] = {
+static struct cpufreq_frequency_table *freq_table;
+
+static enum arm_opp db8500_idx2opp[] = {
+	ARM_EXTCLK,
 	ARM_50_OPP,
 	ARM_100_OPP,
 	ARM_MAX_OPP
 };
 
-static struct freq_attr *db8500_cpufreq_attr[] = {
+static enum arm_opp db5500_idx2opp[] = {
+	ARM_EXTCLK,
+	ARM_50_OPP,
+	ARM_100_OPP,
+};
+
+static enum arm_opp *idx2opp;
+
+static struct freq_attr *dbx500_cpufreq_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
 	NULL,
 };
 
-static int db8500_cpufreq_verify_speed(struct cpufreq_policy *policy)
+static int dbx500_cpufreq_verify_speed(struct cpufreq_policy *policy)
 {
 	return cpufreq_frequency_table_verify(policy, freq_table);
 }
 
-static int db8500_cpufreq_target(struct cpufreq_policy *policy,
+static int dbx500_cpufreq_target(struct cpufreq_policy *policy,
 				unsigned int target_freq,
 				unsigned int relation)
 {
@@ -82,7 +116,7 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
 
 	/* request the PRCM unit for opp change */
 	if (prcmu_set_arm_opp(idx2opp[idx])) {
-		pr_err("db8500-cpufreq:  Failed to set OPP level\n");
+		pr_err("ux500-cpufreq:  Failed to set OPP level\n");
 		return -EINVAL;
 	}
 
@@ -92,7 +126,7 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
 	return 0;
 }
 
-static unsigned int db8500_cpufreq_getspeed(unsigned int cpu)
+static unsigned int dbx500_cpufreq_getspeed(unsigned int cpu)
 {
 	int i;
 	/* request the prcm to get the current ARM opp */
@@ -101,32 +135,23 @@ static unsigned int db8500_cpufreq_getspeed(unsigned int cpu)
 	return freq_table[i].frequency;
 }
 
-static int __cpuinit db8500_cpufreq_init(struct cpufreq_policy *policy)
+static int __cpuinit dbx500_cpufreq_init(struct cpufreq_policy *policy)
 {
 	int res;
 	int i;
-
-	BUILD_BUG_ON(ARRAY_SIZE(idx2opp) + 1 != ARRAY_SIZE(freq_table));
-
-	if (cpu_is_u8500v2() && !prcmu_is_u8400()) {
-		freq_table[0].frequency = 400000;
-		freq_table[1].frequency = 800000;
-		if (prcmu_has_arm_maxopp())
-			freq_table[2].frequency = 1000000;
-	}
 
 	/* get policy fields based on the table */
 	res = cpufreq_frequency_table_cpuinfo(policy, freq_table);
 	if (!res)
 		cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
 	else {
-		pr_err("db8500-cpufreq : Failed to read policy table\n");
+		pr_err("dbx500-cpufreq : Failed to read policy table\n");
 		return res;
 	}
 
 	policy->min = policy->cpuinfo.min_freq;
 	policy->max = policy->cpuinfo.max_freq;
-	policy->cur = db8500_cpufreq_getspeed(policy->cpu);
+	policy->cur = dbx500_cpufreq_getspeed(policy->cpu);
 
 	for (i = 0; freq_table[i].frequency != policy->cur; i++)
 		;
@@ -145,30 +170,54 @@ static int __cpuinit db8500_cpufreq_init(struct cpufreq_policy *policy)
 
 	policy->shared_type = CPUFREQ_SHARED_TYPE_ALL;
 
-	pr_info("db8500-cpufreq : Available frequencies:\n");
+	return 0;
+}
+
+static struct cpufreq_driver dbx500_cpufreq_driver = {
+	.flags  = CPUFREQ_STICKY,
+	.verify = dbx500_cpufreq_verify_speed,
+	.target = dbx500_cpufreq_target,
+	.get    = dbx500_cpufreq_getspeed,
+	.init   = dbx500_cpufreq_init,
+	.name   = "DBX500",
+	.attr   = dbx500_cpufreq_attr,
+};
+
+static int __init dbx500_cpufreq_register(void)
+{
+	int i;
+
+	if (cpu_is_u5500() && cpu_is_u5500v1())
+		return -ENODEV;
+
+	if (cpu_is_u8500() && !cpu_is_u8500v20_or_later())
+		return -ENODEV;
+
+
+	if (cpu_is_u5500()) {
+		freq_table = db5500_freq_table;
+		idx2opp = db5500_idx2opp;
+
+	} else if (cpu_is_u8500()) {
+		freq_table = db8500_freq_table;
+		idx2opp = db8500_idx2opp;
+
+		if (!prcmu_is_u8400()) {
+			freq_table[1].frequency = 400000;
+			freq_table[2].frequency = 800000;
+			if (prcmu_has_arm_maxopp())
+				freq_table[3].frequency = 1000000;
+		}
+
+	} else {
+		ux500_unknown_soc();
+	}
+
+	pr_info("dbx500-cpufreq : Available frequencies:\n");
 
 	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
 		pr_info("  %d Mhz\n", freq_table[i].frequency / 1000);
 
-	return 0;
+	return cpufreq_register_driver(&dbx500_cpufreq_driver);
 }
-
-static struct cpufreq_driver db8500_cpufreq_driver = {
-	.flags  = CPUFREQ_STICKY,
-	.verify = db8500_cpufreq_verify_speed,
-	.target = db8500_cpufreq_target,
-	.get    = db8500_cpufreq_getspeed,
-	.init   = db8500_cpufreq_init,
-	.name   = "DB8500",
-	.attr   = db8500_cpufreq_attr,
-};
-
-static int __init db8500_cpufreq_register(void)
-{
-	if (!cpu_is_u8500v20_or_later())
-		return -ENODEV;
-
-	pr_info("cpufreq for DB8500 started\n");
-	return cpufreq_register_driver(&db8500_cpufreq_driver);
-}
-device_initcall(db8500_cpufreq_register);
+device_initcall(dbx500_cpufreq_register);
