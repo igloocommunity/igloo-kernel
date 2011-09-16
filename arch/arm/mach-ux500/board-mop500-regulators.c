@@ -39,20 +39,30 @@ struct regulator_init_data tps61052_regulator = {
 
 static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
 	/* External displays, connector on board 2v5 power supply */
-	REGULATOR_SUPPLY("vaux12v5", "mcde.0"),
+	REGULATOR_SUPPLY("vaux12v5", "mcde_disp_generic.0"),
 	/* SFH7741 proximity sensor */
 	REGULATOR_SUPPLY("vcc", "gpio-keys.0"),
 	/* BH1780GLS ambient light sensor */
 	REGULATOR_SUPPLY("vcc", "2-0029"),
 	/* lsm303dlh accelerometer */
-	REGULATOR_SUPPLY("vdd", "3-0018"),
+	REGULATOR_SUPPLY("vdd", "lsm303dlh.0"),
 	/* lsm303dlh magnetometer */
-	REGULATOR_SUPPLY("vdd", "3-001e"),
+	REGULATOR_SUPPLY("vdd", "lsm303dlh.1"),
 	/* Rohm BU21013 Touchscreen devices */
 	REGULATOR_SUPPLY("avdd", "3-005c"),
 	REGULATOR_SUPPLY("avdd", "3-005d"),
 	/* Synaptics RMI4 Touchscreen device */
 	REGULATOR_SUPPLY("vdd", "3-004b"),
+	/* L3G4200D Gyroscope device */
+	REGULATOR_SUPPLY("vdd", "l3g4200d"),
+	/* Proximity and Hal sensor device */
+	REGULATOR_SUPPLY("vdd", "sensor1p.0"),
+	/* Ambient light sensor device */
+	REGULATOR_SUPPLY("vdd", "3-0029"),
+	/* Cypress TrueTouch Touchscreen device */
+	REGULATOR_SUPPLY("vdd", "spi8.0"),
+	/* Camera device */
+	REGULATOR_SUPPLY("vaux12v5", "mmio_camera"),
 };
 
 static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
@@ -60,6 +70,12 @@ static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
 	REGULATOR_SUPPLY("vmmc", "sdi4"),
 	/* AB8500 audio codec */
 	REGULATOR_SUPPLY("vcc-N2158", "ab8500-codec.0"),
+	/* AB8500 accessory detect 1 */
+	REGULATOR_SUPPLY("vcc-N2158", "ab8500-acc-det.0"),
+	/* AB8500 Tv-out device */
+	REGULATOR_SUPPLY("vcc-N2158", "mcde_tv_ab8500.4"),
+	/* AV8100 HDMI device */
+	REGULATOR_SUPPLY("vcc-N2158", "av8100_hdmi.3"),
 };
 
 static struct regulator_consumer_supply ab8500_vaux3_consumers[] = {
@@ -72,6 +88,30 @@ static struct regulator_consumer_supply ab8500_vtvout_consumers[] = {
 	REGULATOR_SUPPLY("vtvout", "ab8500-denc.0"),
 	/* Internal general-purpose ADC */
 	REGULATOR_SUPPLY("vddadc", "ab8500-gpadc.0"),
+	/* ADC for charger */
+	REGULATOR_SUPPLY("vddadc", "ab8500-charger.0"),
+	/* AB8500 Tv-out device */
+	REGULATOR_SUPPLY("vtvout", "mcde_tv_ab8500.4"),
+};
+
+static struct regulator_consumer_supply ab8500_vaudio_consumers[] = {
+	/* AB8500 audio codec device */
+	REGULATOR_SUPPLY("v-audio", NULL),
+};
+
+static struct regulator_consumer_supply ab8500_vamic1_consumers[] = {
+	/* AB8500 audio codec device */
+	REGULATOR_SUPPLY("v-amic1", NULL),
+};
+
+static struct regulator_consumer_supply ab8500_vamic2_consumers[] = {
+	/* AB8500 audio codec device */
+	REGULATOR_SUPPLY("v-amic2", NULL),
+};
+
+static struct regulator_consumer_supply ab8500_vdmic_consumers[] = {
+	/* AB8500 audio codec device */
+	REGULATOR_SUPPLY("v-dmic", NULL),
 };
 
 static struct regulator_consumer_supply ab8500_vintcore_consumers[] = {
@@ -82,15 +122,20 @@ static struct regulator_consumer_supply ab8500_vintcore_consumers[] = {
 };
 
 static struct regulator_consumer_supply ab8500_vana_consumers[] = {
-	/* External displays, connector on board, 1v8 power supply */
-	REGULATOR_SUPPLY("vsmps2", "mcde.0"),
+	/* DB8500 DSI */
+	REGULATOR_SUPPLY("vdddsi1v2", "mcde"),
+	/* DB8500 CSI */
+	REGULATOR_SUPPLY("vddcsi1v2", "mmio_camera"),
 };
 
 static struct regulator_consumer_supply ab8500_sysclkreq_2_consumers[] = {
+	/* CG2900 device */
+	REGULATOR_SUPPLY("gbf_1v8", "cg2900-uart.0"),
 };
 
 static struct regulator_consumer_supply ab8500_sysclkreq_4_consumers[] = {
-
+	/* CW1200 device */
+	REGULATOR_SUPPLY("wlan_1v8", "cw1200_wlan.0"),
 };
 
 /* ab8500 regulator register initialization */
@@ -361,6 +406,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 			.name = "V-AUD",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vaudio_consumers),
+		.consumer_supplies = ab8500_vaudio_consumers,
 	},
 	/* supply for v-anamic1 VAMic1-LDO */
 	[AB8500_LDO_ANAMIC1] = {
@@ -368,6 +415,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 			.name = "V-AMIC1",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vamic1_consumers),
+		.consumer_supplies = ab8500_vamic1_consumers,
 	},
 	/* supply for v-amic2, VAMIC2 LDO, reuse constants for AMIC1 */
 	[AB8500_LDO_ANAMIC2] = {
@@ -375,6 +424,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 			.name = "V-AMIC2",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vamic2_consumers),
+		.consumer_supplies = ab8500_vamic2_consumers,
 	},
 	/* supply for v-dmic, VDMIC LDO */
 	[AB8500_LDO_DMIC] = {
@@ -382,6 +433,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 			.name = "V-DMIC",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vdmic_consumers),
+		.consumer_supplies = ab8500_vdmic_consumers,
 	},
 	/* supply for v-intcore12, VINTCORE12 LDO */
 	[AB8500_LDO_INTCORE] = {
@@ -392,10 +445,10 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 		.num_consumer_supplies = ARRAY_SIZE(ab8500_vintcore_consumers),
 		.consumer_supplies = ab8500_vintcore_consumers,
 	},
-	/* supply for U8500 CSI/DSI, VANA LDO */
+	/* supply for U8500 CSI-DSI, VANA LDO */
 	[AB8500_LDO_ANA] = {
 		.constraints = {
-			.name = "V-CSI/DSI",
+			.name = "V-CSI-DSI",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 		},
 		.num_consumer_supplies = ARRAY_SIZE(ab8500_vana_consumers),
