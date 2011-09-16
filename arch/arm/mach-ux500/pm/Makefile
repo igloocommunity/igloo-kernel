@@ -1,7 +1,7 @@
 #
 # Power save related files
 #
-obj-y := pm.o runtime.o
+obj-y := pm.o runtime.o no_suspend.o
 
 obj-$(CONFIG_U8500_CPUIDLE) 		+= cpuidle.o timer.o
 obj-$(CONFIG_U8500_CPUIDLE_DEBUG) 	+= cpuidle_dbg.o
