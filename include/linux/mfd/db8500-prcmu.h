@@ -510,10 +510,10 @@ void prcmu_configure_auto_pm(struct prcmu_auto_pm_config *sleep,
 bool prcmu_is_auto_pm_enabled(void);
 
 
-int prcmu_config_hotdog(u8 threshold);
-int prcmu_config_hotmon(u8 low, u8 high);
-int prcmu_start_temp_sense(u16 cycles32k);
-int prcmu_stop_temp_sense(void);
+int db8500_prcmu_config_hotdog(u8 threshold);
+int db8500_prcmu_config_hotmon(u8 low, u8 high);
+int db8500_prcmu_start_temp_sense(u16 cycles32k);
+int db8500_prcmu_stop_temp_sense(void);
 int prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size);
 int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
 
@@ -622,22 +622,22 @@ static inline bool prcmu_is_auto_pm_enabled(void)
 	return false;
 }
 
-static inline int prcmu_config_hotdog(u8 threshold)
+static inline int db8500_prcmu_config_hotdog(u8 threshold)
 {
 	return 0;
 }
 
-static inline int prcmu_config_hotmon(u8 low, u8 high)
+static inline int db8500_prcmu_config_hotmon(u8 low, u8 high)
 {
 	return 0;
 }
 
-static inline int prcmu_start_temp_sense(u16 cycles32k)
+static inline int db8500_prcmu_start_temp_sense(u16 cycles32k)
 {
 	return 0;
 }
 
-static inline int prcmu_stop_temp_sense(void)
+static inline int db8500_prcmu_stop_temp_sense(void)
 {
 	return 0;
 }

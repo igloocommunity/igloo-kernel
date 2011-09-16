@@ -1773,7 +1773,7 @@ int db8500_prcmu_config_esram0_deep_sleep(u8 state)
 	return 0;
 }
 
-int prcmu_config_hotdog(u8 threshold)
+int db8500_prcmu_config_hotdog(u8 threshold)
 {
 	mutex_lock(&mb4_transfer.lock);
 
@@ -1791,7 +1791,7 @@ int prcmu_config_hotdog(u8 threshold)
 	return 0;
 }
 
-int prcmu_config_hotmon(u8 low, u8 high)
+int db8500_prcmu_config_hotmon(u8 low, u8 high)
 {
 	mutex_lock(&mb4_transfer.lock);
 
@@ -1830,7 +1830,7 @@ static int config_hot_period(u16 val)
 	return 0;
 }
 
-int prcmu_start_temp_sense(u16 cycles32k)
+int db8500_prcmu_start_temp_sense(u16 cycles32k)
 {
 	if (cycles32k == 0xFFFF)
 		return -EINVAL;
@@ -1838,7 +1838,7 @@ int prcmu_start_temp_sense(u16 cycles32k)
 	return config_hot_period(cycles32k);
 }
 
-int prcmu_stop_temp_sense(void)
+int db8500_prcmu_stop_temp_sense(void)
 {
 	return config_hot_period(0xFFFF);
 }
