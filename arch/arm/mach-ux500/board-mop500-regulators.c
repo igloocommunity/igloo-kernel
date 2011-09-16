@@ -314,9 +314,9 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
 	 */
 	INIT_REGULATOR_REGISTER(AB8500_VSMPS1SEL1,             0x3f, 0x28),
 	/*
-	 * Vaux1Sel                 = 2.5 V
+	 * Vaux1Sel                 = 2.8 V
 	 */
-	INIT_REGULATOR_REGISTER(AB8500_VAUX1SEL,               0x0f, 0x08),
+	INIT_REGULATOR_REGISTER(AB8500_VAUX1SEL,               0x0f, 0x0C),
 	/*
 	 * Vaux2Sel                 = 2.9 V
 	 */
@@ -352,18 +352,11 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
 	[AB8500_LDO_AUX1] = {
 		.constraints = {
 			.name = "V-DISPLAY",
-			.min_uV = 2500000,
-			.max_uV = 2900000,
+			.min_uV = 2800000,
+			.max_uV = 3300000,
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
 					  REGULATOR_CHANGE_STATUS,
 			.boot_on = 1, /* display is on at boot */
-			/*
-			 * This voltage cannot be disabled right now because
-			 * it is somehow affecting the external MMC
-			 * functionality, though that typically will use
-			 * AUX3.
-			 */
-			.always_on = 1,
 		},
 		.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux1_consumers),
 		.consumer_supplies = ab8500_vaux1_consumers,
