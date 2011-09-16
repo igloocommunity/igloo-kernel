@@ -297,6 +297,11 @@ int prcmu_disable_dsipll(void);
 int prcmu_enable_dsipll(void);
 int prcmu_config_esram0_deep_sleep(u8 state);
 
+int prcmu_config_hotdog(u8 threshold);
+int prcmu_config_hotmon(u8 low, u8 high);
+int prcmu_start_temp_sense(u16 cycles32k);
+int prcmu_stop_temp_sense(void);
+
 #else
 
 static inline void __init prcmu_early_init(void) {}
@@ -424,6 +429,25 @@ static inline void prcmu_config_abb_event_readout(u32 abb_events) {}
 static inline void prcmu_get_abb_event_buffer(void __iomem **buf)
 {
 	*buf = NULL;
+}
+
+static int prcmu_config_hotdog(u8 threshold)
+{
+	return 0;
+}
+
+static int prcmu_config_hotmon(u8 low, u8 high)
+{
+	return 0;
+}
+
+static int prcmu_start_temp_sense(u16 cycles32k)
+{
+	return 0;
+}
+static int prcmu_stop_temp_sense(void)
+{
+	return 0;
 }
 
 #endif
