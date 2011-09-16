@@ -33,6 +33,7 @@ static inline int prcmu_set_clock_rate(u8 clock, unsigned long rate)
 int prcmu_resetout(u8 resoutn, u8 state);
 
 unsigned int prcmu_get_ddr_freq(void);
+int prcmu_get_hotdog(void);
 
 #else /* !CONFIG_U5500_PRCMU */
 
@@ -54,6 +55,11 @@ static inline int prcmu_resetout(u8 resoutn, u8 state)
 static inline unsigned int prcmu_get_ddr_freq(void)
 {
 	return 0;
+}
+
+static inline int prcmu_get_hotdog(void)
+{
+	return -ENOSYS;
 }
 
 #endif /* CONFIG_U5500_PRCMU */

@@ -177,10 +177,6 @@ enum ap_pwrst prcmu_get_xp70_current_state(void);
 
 /* TODO: Common API with DB5500? */
 bool prcmu_has_arm_maxopp(void);
-int prcmu_config_hotdog(u8 threshold);
-int prcmu_config_hotmon(u8 low, u8 high);
-int prcmu_start_temp_sense(u16 cycles32k);
-int prcmu_stop_temp_sense(void);
 void prcmu_enable_spi2(void);
 void prcmu_disable_spi2(void);
 
@@ -240,26 +236,6 @@ static inline enum ap_pwrst prcmu_get_xp70_current_state(void)
 static inline bool prcmu_has_arm_maxopp(void)
 {
 	return false;
-}
-
-static inline int prcmu_config_hotdog(u8 threshold)
-{
-	return 0;
-}
-
-static inline int prcmu_config_hotmon(u8 low, u8 high)
-{
-	return 0;
-}
-
-static inline int prcmu_start_temp_sense(u16 cycles32k)
-{
-	return 0;
-}
-
-static inline int prcmu_stop_temp_sense(void)
-{
-	return 0;
 }
 
 static inline int prcmu_enable_spi2(void)
