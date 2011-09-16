@@ -2,17 +2,28 @@
  * Copyright (C) ST-Ericsson SA 2011
  *
  * License Terms: GNU General Public License v2
+ *
  * Author: Johan Rudholm <johan.rudholm@stericsson.com>
+ * Author: Jonas Aaberg <jonas.aberg@stericsson.com>
  */
 
 #include <linux/kernel.h>
-#include <mach/prcmu-qos.h>
 #include <linux/genhd.h>
 #include <linux/major.h>
 #include <linux/cdev.h>
+#include <linux/kernel_stat.h>
+#include <linux/workqueue.h>
+#include <linux/kernel.h>
+#include <linux/mfd/dbx500-prcmu.h>
+#include <linux/cpu.h>
+
+#include <mach/irqs.h>
+
+#define WLAN_PROBE_DELAY 3000 /* 3 seconds */
+#define WLAN_LIMIT (3000/3) /* If we have more than 1000 irqs per second */
 
 /*
- * TODO:
+ * MMC TODO:
  * o Develop a more power-aware algorithm
  * o Make the parameters visible through debugfs
  * o Get the value of CONFIG_MMC_BLOCK_MINORS in runtime instead, since
@@ -35,6 +46,31 @@
 #define PERF_MMC_RESCAN_CYCLES 10
 
 static struct delayed_work work_mmc;
+static struct delayed_work work_wlan_workaround;
+
+static void wlan_load(struct work_struct *work)
+{
+	int cpu;
+	unsigned int num_irqs = 0;
+	static unsigned int old_num_irqs = UINT_MAX;
+
+	for_each_online_cpu(cpu)
+		num_irqs += kstat_irqs_cpu(IRQ_DB8500_SDMMC1, cpu);
+
+	if ((num_irqs > old_num_irqs) &&
+	    (num_irqs - old_num_irqs) > WLAN_LIMIT)
+		prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
+					     "wlan", 125);
+	else
+		prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
+					     "wlan", 25);
+
+	old_num_irqs = num_irqs;
+
+	schedule_delayed_work_on(0,
+				 &work_wlan_workaround,
+				 msecs_to_jiffies(WLAN_PROBE_DELAY));
+}
 
 /*
  * Loop through every CONFIG_MMC_BLOCK_MINORS'th minor device for
@@ -127,17 +163,31 @@ static void mmc_load(struct work_struct *work)
 
 }
 
-
 static int __init performance_register(void)
 {
 	int ret;
 
 	prcmu_qos_add_requirement(PRCMU_QOS_ARM_OPP, "mmc", 25);
+	prcmu_qos_add_requirement(PRCMU_QOS_ARM_OPP, "wlan", 25);
 
+	INIT_DELAYED_WORK_DEFERRABLE(&work_wlan_workaround,
+				     wlan_load);
 	INIT_DELAYED_WORK_DEFERRABLE(&work_mmc, mmc_load);
+
+
 	ret = schedule_delayed_work(&work_mmc,
 				 msecs_to_jiffies(PERF_MMC_PROBE_DELAY));
+	if (ret) {
+		pr_err("ux500: performance: Fail to schedudle mmc work\n");
+		goto out;
+	}
 
+	ret = schedule_delayed_work_on(0,
+				       &work_wlan_workaround,
+				       msecs_to_jiffies(WLAN_PROBE_DELAY));
+	if (ret)
+		pr_err("ux500: performance: Fail to schedudle wlan work\n");
+out:
 	return ret;
 }
 late_initcall(performance_register);
