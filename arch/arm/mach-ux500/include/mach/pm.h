@@ -10,7 +10,6 @@
 #define PM_COMMON_H
 
 #ifdef CONFIG_PM
-
 enum prcmu_idle_stat {
 	SLEEP_OK		= 0xf3,
 	DEEP_SLEEP_OK		= 0xf6,

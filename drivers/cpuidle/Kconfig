@@ -19,3 +19,28 @@ config CPU_IDLE_GOV_MENU
 	bool
 	depends on CPU_IDLE && NO_HZ
 	default y
+
+config UX500_CPUIDLE
+	tristate "CPUIdle support"
+	depends on CPU_IDLE && (MFD_DB5500_PRCMU || MFD_DB8500_PRCMU) && !RTC_DRV_PL031 && PM
+	default y
+	select GENERIC_CLOCKEVENTS_BROADCAST
+	select UX500_CONTEXT
+	help
+	  Add support for CPUIdle for U8500.
+
+config U8500_CPUIDLE_DEEPEST_STATE
+	int "Deepest sleep state"
+	default 4 if UX500_SOC_DB8500
+	default 1 if UX500_SOC_DB5500
+	depends on UX500_CPUIDLE
+	help
+	  Set deepest sleep state. See the cstate struct in cpuidle.c.
+	  Default is ApSleep.
+
+config U8500_CPUIDLE_APDEEPIDLE
+	bool "CPUIdle ApDeepIdle"
+	depends on U8500_CPUIDLE
+	help
+	  Adds the power level ApDeepIdle, where APE is powered on while
+	  ARM is powered off. Default n.
