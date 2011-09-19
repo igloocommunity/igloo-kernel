@@ -574,7 +574,7 @@ static void __init u5500_init_machine(void)
 	u5500_sdi_init();
 	u5500_uart_init();
 
-	mop500_wlan_init();
+	u5500_wlan_init();
 
 	db5500_add_keypad(&u5500_keypad_board);
 	u5500_cryp1_hash1_init();
