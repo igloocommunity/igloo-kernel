@@ -1736,14 +1736,32 @@ static int __devinit ab8500_regulator_debug_probe(struct platform_device *plf)
 	if ((abx500_get_chip_id(&pdev->dev) >= 0x30) && cpu_is_u8500v22()) {
 		/*
 		 * find ExtSupplyRegu register (bank 0x04, addr 0x08)
-		 * and update value (Vext1 in low-power, Vext2 and Vext3
-		 * off).
+		 * and update value (Vext1 in low-power, Vext2 off).
 		 */
 		for (i = 0; i < ARRAY_SIZE(ab8500_force_reg); i++) {
 			if (ab8500_force_reg[i].bank == 0x04 &&
 			    ab8500_force_reg[i].addr == 0x08) {
-				ab8500_force_reg[i].val = 0x03;
+				u8 val, val_mask = 0x0f;
+
+				val = ab8500_force_reg[i].val;
+				val = (val & ~val_mask) | (0x03 & val_mask);
+				ab8500_force_reg[i].val = val;
 			}
+		}
+	}
+
+	/*
+	 * find ExtSupplyRegu register (bank 0x04, addr 0x08)
+	 * and update value (Vext3 in high power).
+	 */
+	for (i = 0; i < ARRAY_SIZE(ab8500_force_reg); i++) {
+		if (ab8500_force_reg[i].bank == 0x04 &&
+		    ab8500_force_reg[i].addr == 0x08) {
+			u8 val, val_mask = 0x30;
+
+			val = ab8500_force_reg[i].val;
+			val = (val & ~val_mask) | (0x10 & val_mask);
+			ab8500_force_reg[i].val = val;
 		}
 	}
 
