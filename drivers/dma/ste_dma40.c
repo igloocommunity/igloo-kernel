@@ -1268,7 +1268,8 @@ static dma_cookie_t d40_tx_submit(struct dma_async_tx_descriptor *tx)
 
 	d40d->txd.cookie = d40c->chan.cookie;
 
-	d40_desc_queue(d40c, d40d);
+	if (!d40c->cdesc)
+		d40_desc_queue(d40c, d40d);
 
 	spin_unlock_irqrestore(&d40c->lock, flags);
 
@@ -1403,6 +1404,11 @@ static void dma_tasklet(unsigned long data)
 	if (d40c->cdesc) {
 		callback = d40c->cdesc->period_callback;
 		callback_param = d40c->cdesc->period_callback_param;
+
+		if (!callback) {
+			callback = d40d->txd.callback;
+			callback_param = d40d->txd.callback_param;
+		}
 	} else {
 		callback = d40d->txd.callback;
 		callback_param = d40d->txd.callback_param;
@@ -2567,6 +2573,11 @@ static void d40_issue_pending(struct dma_chan *chan)
 		return;
 	}
 
+	if (d40c->cdesc) {
+		stedma40_cyclic_start(chan);
+		return;
+	}
+
 	spin_lock_irqsave(&d40c->lock, flags);
 
 	/* Busy means that pending jobs are already being processed */
@@ -2598,6 +2609,9 @@ static void d40_terminate_all(struct dma_chan *chan)
 	d40c->busy = false;
 
 	spin_unlock_irqrestore(&d40c->lock, flags);
+
+	if (d40c->cdesc)
+		stedma40_cyclic_free(chan);
 }
 
 static int
@@ -2992,6 +3006,43 @@ out:
 }
 EXPORT_SYMBOL(stedma40_cyclic_prep_sg);
 
+struct dma_async_tx_descriptor *
+dma40_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
+		      size_t buf_len, size_t period_len,
+		      enum dma_data_direction direction)
+{
+	unsigned int sg_len = buf_len / period_len;
+	struct stedma40_cyclic_desc *cdesc;
+	struct dma_async_tx_descriptor *txd;
+	struct scatterlist *sg;
+	int i;
+
+	sg = kzalloc(sizeof(struct scatterlist) * sg_len, GFP_ATOMIC);
+	if (!sg)
+		return ERR_PTR(-ENOMEM);
+
+	sg_init_table(sg, sg_len);
+	for (i = 0; i < sg_len; i++) {
+	        sg_dma_address(&sg[i]) = buf_addr + i * period_len;
+	        sg_dma_len(&sg[i]) = period_len;
+	}
+
+	cdesc = stedma40_cyclic_prep_sg(chan, sg, sg_len, direction,
+					DMA_PREP_INTERRUPT);
+	kfree(sg);
+
+	if (IS_ERR(cdesc))
+		return ERR_PTR(PTR_ERR(cdesc));
+
+	txd = &cdesc->d40d->txd;
+
+	txd->flags = DMA_PREP_INTERRUPT;
+	dma_async_tx_descriptor_init(txd, chan);
+	txd->tx_submit = d40_tx_submit;
+
+	return txd;
+}
+
 /* Initialization functions */
 
 static void __init d40_chan_init(struct d40_base *base, struct dma_device *dma,
@@ -3040,6 +3091,7 @@ static int __init d40_dmaengine_init(struct d40_base *base,
 	base->dma_slave.device_free_chan_resources = d40_free_chan_resources;
 	base->dma_slave.device_prep_dma_memcpy = d40_prep_memcpy;
 	base->dma_slave.device_prep_slave_sg = d40_prep_slave_sg;
+	base->dma_slave.device_prep_dma_cyclic = dma40_prep_dma_cyclic;
 	base->dma_slave.device_tx_status = d40_tx_status;
 	base->dma_slave.device_control = d40_control;
 	base->dma_slave.device_issue_pending = d40_issue_pending;
@@ -3064,6 +3116,7 @@ static int __init d40_dmaengine_init(struct d40_base *base,
 	base->dma_memcpy.device_free_chan_resources = d40_free_chan_resources;
 	base->dma_memcpy.device_prep_dma_memcpy = d40_prep_memcpy;
 	base->dma_memcpy.device_prep_slave_sg = d40_prep_slave_sg;
+	base->dma_memcpy.device_prep_dma_cyclic = dma40_prep_dma_cyclic;
 	base->dma_memcpy.device_tx_status = d40_tx_status;
 	base->dma_memcpy.device_control = d40_control;
 	base->dma_memcpy.device_issue_pending = d40_issue_pending;
@@ -3094,6 +3147,7 @@ static int __init d40_dmaengine_init(struct d40_base *base,
 	base->dma_both.device_free_chan_resources = d40_free_chan_resources;
 	base->dma_both.device_prep_dma_memcpy = d40_prep_memcpy;
 	base->dma_both.device_prep_slave_sg = d40_prep_slave_sg;
+	base->dma_both.device_prep_dma_cyclic = dma40_prep_dma_cyclic;
 	base->dma_both.device_tx_status = d40_tx_status;
 	base->dma_both.device_control = d40_control;
 	base->dma_both.device_issue_pending = d40_issue_pending;
