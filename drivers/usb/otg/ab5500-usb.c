@@ -21,6 +21,9 @@
 #include <linux/kernel_stat.h>
 #include <mach/gpio.h>
 
+#include <linux/wakelock.h>
+static struct wake_lock ab5500_musb_wakelock;
+
 /* AB5500 USB macros
  */
 #define AB5500_USB_HOST_ENABLE 0x1
@@ -146,6 +149,7 @@ static void ab5500_usb_phy_enable(struct ab5500_usb *ab, bool sel_host)
 	bit = sel_host ? AB5500_USB_HOST_ENABLE :
 			AB5500_USB_DEVICE_ENABLE;
 
+	wake_lock(&ab5500_musb_wakelock);
 	ab->usb_gpio->enable();
 	clk_enable(ab->sysclk);
 	regulator_enable(ab->v_ape);
@@ -186,6 +190,7 @@ static void ab5500_usb_phy_disable(struct ab5500_usb *ab, bool sel_host)
 			"usb", 25);
 	}
 
+	wake_unlock(&ab5500_musb_wakelock);
 }
 
 #define ab5500_usb_peri_phy_en(ab)	ab5500_usb_phy_enable(ab, false)
@@ -692,6 +697,12 @@ static int __devinit ab5500_usb_probe(struct platform_device *pdev)
 	err = ab->usb_gpio->get(ab->dev);
 	if (err < 0)
 		goto fail1;
+
+	/*
+	 * wake lock is acquired when usb cable is connected and released when
+	 * cable is removed
+	 */
+	wake_lock_init(&ab5500_musb_wakelock, WAKE_LOCK_SUSPEND, "ab5500-usb");
 
 	err = ab5500_usb_boot_detect(ab);
 	if (err < 0)
