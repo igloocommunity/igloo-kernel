@@ -639,7 +639,7 @@ static struct clk_lookup db5500_prcc_clocks[] = {
 	CLK_LOOKUP(p1_pclk5, "gpio.1", NULL),
 	CLK_LOOKUP(p1_pclk6, "fsmc", NULL),
 
-	CLK_LOOKUP(p2_pclk0, "musb_hdrc.0", "usb"),
+	CLK_LOOKUP(p2_pclk0, "musb-ux500.0", "usb"),
 	CLK_LOOKUP(p2_pclk1, "gpio.2", NULL),
 
 	CLK_LOOKUP(p3_keypad_clk, "db5500-keypad", NULL),
