@@ -38,9 +38,16 @@ config U8500_CPUIDLE_DEEPEST_STATE
 	  Set deepest sleep state. See the cstate struct in cpuidle.c.
 	  Default is ApSleep.
 
-config U8500_CPUIDLE_APDEEPIDLE
+config UX500_CPUIDLE_APDEEPIDLE
 	bool "CPUIdle ApDeepIdle"
-	depends on U8500_CPUIDLE
+	depends on UX500_CPUIDLE
 	help
 	  Adds the power level ApDeepIdle, where APE is powered on while
 	  ARM is powered off. Default n.
+
+config UX500_CPUIDLE_DEBUG
+	bool "CPUIdle debug"
+	depends on UX500_CPUIDLE && DEBUG_FS
+	help
+	  Add debugging support for CPUIdle for Ux500.
+

@@ -24,6 +24,7 @@
 #include <plat/mtu.h>
 
 #include "cpuidle-dbx500.h"
+#include "cpuidle-dbx500_dbg.h"
 #include "../regulator-u8500.h"
 
 /*
@@ -175,7 +176,6 @@ static ktime_t time_next;  /* protected by cpuidle_lock */
 static struct clock_event_device *mtu_clkevt;
 static atomic_t idle_cpus_counter = ATOMIC_INIT(0);
 static atomic_t master_counter = ATOMIC_INIT(0);
-static int deepest_allowed_state = CONFIG_U8500_CPUIDLE_DEEPEST_STATE;
 
 struct cstate *ux500_ci_get_cstates(int *len)
 {
@@ -222,6 +222,8 @@ static void restore_sequence(struct cpu_state *state, ktime_t now)
 
 		/* Restore IO ring */
 		ux500_pm_prcmu_set_ioforce(false);
+
+		ux500_ci_dbg_console_handle_ape_resume();
 
 		ux500_rtcrtt_off();
 
@@ -315,7 +317,7 @@ static int determine_sleep_state(u32 *sleep_time)
 	 * Never go deeper than the governor recommends even though it might be
 	 * possible from a scheduled wake up point of view
 	 */
-	max_depth = deepest_allowed_state;
+	max_depth = ux500_ci_dbg_deepest_state();
 
 	for_each_online_cpu(cpu) {
 		if (max_depth > per_cpu(cpu_state, cpu)->gov_cstate)
@@ -329,7 +331,8 @@ static int determine_sleep_state(u32 *sleep_time)
 
 		if (cstates[i].APE == APE_OFF) {
 			/* This state says APE should be off */
-			if (power_state_req)
+			if (power_state_req ||
+			    ux500_ci_dbg_force_ape_on())
 				continue;
 		}
 
@@ -337,6 +340,9 @@ static int determine_sleep_state(u32 *sleep_time)
 		break;
 	}
 
+	ux500_ci_dbg_register_reason(i, power_state_req,
+				     (*sleep_time),
+				     max_depth);
 	return max(CI_WFI, i);
 }
 
@@ -371,8 +377,8 @@ static int enter_sleep(struct cpuidle_device *dev,
 	/* Retrive the cstate that the governor recommends for this CPU */
 	state->gov_cstate = (int) cpuidle_get_statedata(ci_state);
 
-	if (state->gov_cstate > deepest_allowed_state)
-		state->gov_cstate = deepest_allowed_state;
+	if (state->gov_cstate > ux500_ci_dbg_deepest_state())
+		state->gov_cstate = ux500_ci_dbg_deepest_state();
 
 	if (cstates[state->gov_cstate].ARM != ARM_ON)
 		migrate_timer = true;
@@ -480,6 +486,7 @@ static int enter_sleep(struct cpuidle_device *dev,
 
 		context_vape_save();
 
+		ux500_ci_dbg_console_handle_ape_suspend();
 		ux500_pm_prcmu_set_ioforce(true);
 
 		spin_lock(&cpuidle_lock);
@@ -518,6 +525,8 @@ static int enter_sleep(struct cpuidle_device *dev,
 		context_clean_l1_cache_all();
 	}
 
+	ux500_ci_dbg_log(target, time_enter);
+
 	if (master && cstates[target].ARM != ARM_ON)
 		prcmu_set_power_state(cstates[target].pwrst,
 				      cstates[target].UL_PLL,
@@ -537,6 +546,9 @@ static int enter_sleep(struct cpuidle_device *dev,
 	else
 		__asm__ __volatile__
 			("dsb\n\t" "wfi\n\t" : : : "memory");
+
+	if (is_last_cpu_running())
+		ux500_ci_dbg_wake_latency(target, sleep_time);
 
 	time_wake = ktime_get();
 
@@ -584,7 +596,18 @@ exit_fast:
 
 	ret = (int)diff;
 
+	ux500_ci_dbg_console_check_uart();
+	if (slept_well)
+		ux500_ci_dbg_exit_latency(target,
+					  time_exit, /* now */
+					  time_wake, /* exit from wfi */
+					  time_enter); /* enter cpuidle */
+
+	ux500_ci_dbg_log(CI_RUNNING, time_exit);
+
 	local_irq_enable();
+
+	ux500_ci_dbg_console();
 
 	return ret;
 }
@@ -637,6 +660,8 @@ static int __init cpuidle_driver_init(void)
 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
 			     PRCMU_WAKEUP(ABB));
 
+	ux500_ci_dbg_init();
+
 	for_each_possible_cpu(cpu)
 		per_cpu(cpu_state, cpu) = kzalloc(sizeof(struct cpu_state),
 						  GFP_KERNEL);
@@ -656,6 +681,7 @@ static int __init cpuidle_driver_init(void)
 		pr_err("cpuidle: Could not get MTU timer.\n");
 		goto out;
 	}
+
 	return 0;
 out:
 	pr_err("cpuidle: initialization failed.\n");
@@ -666,6 +692,8 @@ static void __exit cpuidle_driver_exit(void)
 {
 	int cpu;
 	struct cpuidle_device *dev;
+
+	ux500_ci_dbg_remove();
 
 	for_each_possible_cpu(cpu) {
 		dev = &per_cpu(cpu_state, cpu)->dev;
