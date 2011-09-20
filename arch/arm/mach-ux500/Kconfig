@@ -80,12 +80,6 @@ config UX500_DEBUG_UART
 	  Choose the UART on which kernel low-level debug messages should be
 	  output.
 
-config U8500_REGULATOR_DEBUG
-	bool "Regulator debug support"
-	depends on REGULATOR_VIRTUAL_CONSUMER
-	help
-	  Add support for U8500 regulator debug
-
 config SENSORS1P_MOP
 	tristate "HAL and Proximity sensors support"
 	depends on REGULATOR && (GPIO_STMPE2401 || GPIO_TC35892)

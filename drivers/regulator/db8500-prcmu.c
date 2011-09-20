@@ -13,11 +13,11 @@
 #include <linux/err.h>
 #include <linux/spinlock.h>
 #include <linux/platform_device.h>
+#include <linux/mfd/dbx500-prcmu.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/db8500-prcmu.h>
-#include <linux/mfd/dbx500-prcmu.h>
-
+#include "dbx500-prcmu.h"
 
 /**
  * struct db8500_regulator_info - db8500 regulator information
