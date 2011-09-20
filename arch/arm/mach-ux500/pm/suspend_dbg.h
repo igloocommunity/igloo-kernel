@@ -18,4 +18,10 @@ static inline void ux500_suspend_dbg_add_wake_on_uart(void) { }
 static inline void ux500_suspend_dbg_remove_wake_on_uart(void) { }
 #endif
 
+#ifdef CONFIG_UX500_SUSPEND_DBG
+void ux500_suspend_dbg_sleep_status(bool is_deepsleep);
+#else
+static inline void ux500_suspend_dbg_sleep_status(bool is_deepsleep) { }
+#endif
+
 #endif

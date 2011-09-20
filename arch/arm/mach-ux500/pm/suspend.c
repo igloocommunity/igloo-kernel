@@ -104,6 +104,8 @@ static int suspend(bool do_deepsleep)
 	/* If GPIO woke us up then save the pins that caused the wake up */
 	ux500_pm_gpio_save_wake_up_status();
 
+	ux500_suspend_dbg_sleep_status(do_deepsleep);
+
 	/* APE was turned off, restore IO ring */
 	ux500_pm_prcmu_set_ioforce(false);
 

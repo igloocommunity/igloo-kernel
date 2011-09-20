@@ -12,6 +12,8 @@
 #include <linux/interrupt.h>
 #include <linux/gpio.h>
 
+#include <mach/pm.h>
+
 #ifdef CONFIG_UX500_SUSPEND_DBG_WAKE_ON_UART
 void ux500_suspend_dbg_add_wake_on_uart(void)
 {
@@ -25,3 +27,20 @@ void ux500_suspend_dbg_remove_wake_on_uart(void)
 	irq_set_irq_wake(GPIO_TO_IRQ(CONFIG_UX500_CONSOLE_UART_GPIO_PIN), 0);
 }
 #endif
+
+void ux500_suspend_dbg_sleep_status(bool is_deepsleep)
+{
+	enum prcmu_idle_stat prcmu_status;
+
+	prcmu_status = ux500_pm_prcmu_idle_stat();
+
+	if (is_deepsleep) {
+		pr_info("Returning from ApDeepSleep. PRCMU ret: 0x%x - %s\n",
+			prcmu_status,
+			prcmu_status == DEEP_SLEEP_OK ? "Success" : "Fail!");
+	} else {
+		pr_info("Returning from ApSleep. PRCMU ret: 0x%x - %s\n",
+			prcmu_status,
+			prcmu_status == SLEEP_OK ? "Success" : "Fail!");
+	}
+}
