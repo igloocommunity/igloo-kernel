@@ -16,11 +16,15 @@
 #include <mach/context.h>
 #include <mach/pm.h>
 
+#include "suspend_dbg.h"
+
 static int suspend(bool do_deepsleep)
 {
 	int ret = 0;
 
 	nmk_gpio_clocks_enable();
+
+	ux500_suspend_dbg_add_wake_on_uart();
 
 	nmk_gpio_wakeups_suspend();
 
@@ -87,6 +91,8 @@ exit:
 			     PRCMU_WAKEUP(ABB));
 
 	nmk_gpio_wakeups_resume();
+
+	ux500_suspend_dbg_remove_wake_on_uart();
 
 	nmk_gpio_clocks_disable();
 
