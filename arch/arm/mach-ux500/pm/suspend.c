@@ -18,6 +18,15 @@
 
 #include "suspend_dbg.h"
 
+static void (*pins_suspend_force)(void);
+static void (*pins_suspend_force_mux)(void);
+
+void suspend_set_pins_force_fn(void (*force)(void), void (*force_mux)(void))
+{
+	pins_suspend_force = force;
+	pins_suspend_force_mux = force_mux;
+}
+
 static atomic_t block_sleep = ATOMIC_INIT(0);
 
 void suspend_block_sleep(void)
@@ -37,6 +46,7 @@ static bool sleep_is_blocked(void)
 
 static int suspend(bool do_deepsleep)
 {
+	bool pins_force = pins_suspend_force_mux && pins_suspend_force;
 	int ret = 0;
 
 	if (sleep_is_blocked()) {
@@ -54,6 +64,22 @@ static int suspend(bool do_deepsleep)
 	prcmu_enable_wakeups(PRCMU_WAKEUP(ABB));
 
 	context_vape_save();
+
+	if (pins_force) {
+		/*
+		 * Save GPIO settings before applying power save
+		 * settings
+		 */
+		context_gpio_save();
+
+		/* Apply GPIO power save mux settings */
+		context_gpio_mux_safe_switch(true);
+		pins_suspend_force_mux();
+		context_gpio_mux_safe_switch(false);
+
+		/* Apply GPIO power save settings */
+		pins_suspend_force();
+	}
 
 	ux500_pm_gic_decouple();
 
@@ -110,6 +136,14 @@ static int suspend(bool do_deepsleep)
 	ux500_pm_prcmu_set_ioforce(false);
 
 exit:
+	if (pins_force) {
+		/* Restore gpio settings */
+		context_gpio_mux_safe_switch(true);
+		context_gpio_restore_mux();
+		context_gpio_mux_safe_switch(false);
+		context_gpio_restore();
+	}
+
 	/* This is what cpuidle wants */
 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
 			     PRCMU_WAKEUP(ABB));
