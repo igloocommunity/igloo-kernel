@@ -13,6 +13,26 @@
 
 #include <mach/setup.h>
 #include <mach/hardware.h>
+#include <mach/context.h>
+
+#ifdef CONFIG_UX500_CONTEXT
+static int mtu_context_notifier_call(struct notifier_block *this,
+				     unsigned long event, void *data)
+{
+	if (event == CONTEXT_APE_RESTORE)
+		nmdk_clksrc_reset();
+	return NOTIFY_OK;
+}
+
+static struct notifier_block mtu_context_notifier = {
+	.notifier_call = mtu_context_notifier_call,
+};
+#endif
+
+static void ux500_timer_reset(void)
+{
+	nmdk_clkevt_reset();
+}
 
 static void __init ux500_timer_init(void)
 {
@@ -51,8 +71,14 @@ static void __init ux500_timer_init(void)
 
 	nmdk_timer_init();
 	clksrc_dbx500_prcmu_init();
+
+#ifdef CONFIG_UX500_CONTEXT
+	WARN_ON(context_ape_notifier_register(&mtu_context_notifier));
+#endif
+
 }
 
 struct sys_timer ux500_timer = {
 	.init		= ux500_timer_init,
+	.resume		= ux500_timer_reset,
 };
