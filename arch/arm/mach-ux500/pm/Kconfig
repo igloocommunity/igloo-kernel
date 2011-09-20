@@ -26,9 +26,22 @@ config UX500_SUSPEND
 	help
 	  Add support for suspend.
 
+config UX500_SUSPEND_STANDBY
+	bool "Suspend Standby goes to ApSleep"
+	depends on UX500_SUSPEND
+	help
+	  If yes, echo standby > /sys/power/state puts the system into ApSleep.
+
+config UX500_SUSPEND_MEM
+	bool "Suspend Mem goes to ApDeepSleep"
+	depends on UX500_SUSPEND
+	help
+	  If yes, echo mem > /sys/power/state puts the system into ApDeepSleep else
+	  it will do the same as echo standby > /sys/power/state.
+
 config UX500_SUSPEND_DBG
 	bool "Suspend debug"
-	depends on UX500_SUSPEND
+	depends on UX500_SUSPEND && DEBUG_FS
 	help
 	  Add debug support for suspend.
 
