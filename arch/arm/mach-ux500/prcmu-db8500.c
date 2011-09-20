@@ -559,6 +559,7 @@ static struct {
 int prcmu_enable_dsipll(void)
 {
 	int i;
+	int ret = 0;
 	unsigned int plldsifreq;
 
 	/* Clear DSIPLL_RESETN */
@@ -589,9 +590,15 @@ int prcmu_enable_dsipll(void)
 			break;
 		udelay(100);
 	}
+
+	if ((readl(_PRCMU_BASE + PRCM_PLLDSI_LOCKP) &
+			PRCMU_PLLDSI_LOCKP_LOCKED)
+					!= PRCMU_PLLDSI_LOCKP_LOCKED)
+		ret = -EIO;
+
 	/* Set DSIPLL_RESETN */
 	writel(PRCMU_RESET_DSIPLL, (_PRCMU_BASE + PRCM_APE_RESETN_SET));
-	return 0;
+	return ret;
 }
 
 int prcmu_disable_dsipll(void)
