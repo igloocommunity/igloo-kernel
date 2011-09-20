@@ -11,6 +11,7 @@
 
 #include <linux/suspend.h>
 #include <linux/mfd/dbx500-prcmu.h>
+#include <linux/gpio/nomadik.h>
 
 #include <mach/context.h>
 #include <mach/pm.h>
@@ -18,6 +19,10 @@
 static int suspend(bool do_deepsleep)
 {
 	int ret = 0;
+
+	nmk_gpio_clocks_enable();
+
+	nmk_gpio_wakeups_suspend();
 
 	/* configure the prcm for a sleep wakeup */
 	prcmu_enable_wakeups(PRCMU_WAKEUP(ABB));
@@ -70,6 +75,9 @@ static int suspend(bool do_deepsleep)
 
 	context_vape_restore();
 
+	/* If GPIO woke us up then save the pins that caused the wake up */
+	ux500_pm_gpio_save_wake_up_status();
+
 	/* APE was turned off, restore IO ring */
 	ux500_pm_prcmu_set_ioforce(false);
 
@@ -77,6 +85,11 @@ exit:
 	/* This is what cpuidle wants */
 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
 			     PRCMU_WAKEUP(ABB));
+
+	nmk_gpio_wakeups_resume();
+
+	nmk_gpio_clocks_disable();
+
 	return ret;
 }
 
