@@ -18,3 +18,10 @@ config UX500_PM_PERFORMANCE
 	help
 	  Enable supervision of events which may require a boost
 	  of platform performance.
+
+config UX500_SUSPEND
+	bool "Suspend to mem and standby support"
+	depends on (UX500_SOC_DB8500 || UX500_SOC_DB5500) && PM && SUSPEND
+	select UX500_CONTEXT
+	help
+	  Add support for suspend.
