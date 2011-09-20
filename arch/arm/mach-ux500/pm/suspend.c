@@ -107,15 +107,31 @@ static void ux500_suspend_wake(void)
 	(void) prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
 }
 
+static int ux500_suspend_begin(suspend_state_t state)
+{
+	(void) prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
+					    "suspend", 100);
+	return 0;
+}
+
+static void ux500_suspend_end(void)
+{
+	(void) prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
+					    "suspend", 25);
+}
+
 static struct platform_suspend_ops ux500_suspend_ops = {
 	.enter	      = ux500_suspend_enter,
 	.valid	      = ux500_suspend_valid,
 	.prepare_late = ux500_suspend_prepare_late,
 	.wake	      = ux500_suspend_wake,
+	.begin	      = ux500_suspend_begin,
+	.end	      = ux500_suspend_end,
 };
 
 static __init int ux500_suspend_init(void)
 {
+	prcmu_qos_add_requirement(PRCMU_QOS_ARM_OPP, "suspend", 25);
 	suspend_set_ops(&ux500_suspend_ops);
 	return 0;
 }
