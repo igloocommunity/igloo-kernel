@@ -125,12 +125,31 @@ exit:
 
 static int ux500_suspend_enter(suspend_state_t state)
 {
-	if (state == PM_SUSPEND_MEM)
-		return suspend(true);
-	else if (state == PM_SUSPEND_STANDBY)
-		return suspend(false);
-	else
-		return -EINVAL;
+	if (ux500_suspend_enabled()) {
+		if (ux500_suspend_deepsleep_enabled() &&
+		    state == PM_SUSPEND_MEM)
+			return suspend(true);
+		if (ux500_suspend_sleep_enabled())
+			return suspend(false);
+	}
+
+	ux500_suspend_dbg_add_wake_on_uart();
+	/*
+	 * Set IOFORCE in order to wake on GPIO the same way
+	 * as in deeper sleep.
+	 * (U5500 is not ready for IOFORCE)
+	 */
+	if (!cpu_is_u5500())
+		ux500_pm_prcmu_set_ioforce(true);
+
+	dsb();
+	__asm__ __volatile__("wfi\n\t" : : : "memory");
+
+	if (!cpu_is_u5500())
+		ux500_pm_prcmu_set_ioforce(false);
+	ux500_suspend_dbg_remove_wake_on_uart();
+
+	return 0;
 }
 
 static int ux500_suspend_valid(suspend_state_t state)
@@ -154,7 +173,7 @@ static int ux500_suspend_begin(suspend_state_t state)
 {
 	(void) prcmu_qos_update_requirement(PRCMU_QOS_ARM_OPP,
 					    "suspend", 100);
-	return 0;
+	return ux500_suspend_dbg_begin(state);
 }
 
 static void ux500_suspend_end(void)
@@ -174,6 +193,7 @@ static struct platform_suspend_ops ux500_suspend_ops = {
 
 static __init int ux500_suspend_init(void)
 {
+	ux500_suspend_dbg_init();
 	prcmu_qos_add_requirement(PRCMU_QOS_ARM_OPP, "suspend", 25);
 	suspend_set_ops(&ux500_suspend_ops);
 	return 0;
