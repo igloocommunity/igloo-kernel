@@ -18,9 +18,31 @@
 
 #include "suspend_dbg.h"
 
+static atomic_t block_sleep = ATOMIC_INIT(0);
+
+void suspend_block_sleep(void)
+{
+	atomic_inc(&block_sleep);
+}
+
+void suspend_unblock_sleep(void)
+{
+	atomic_dec(&block_sleep);
+}
+
+static bool sleep_is_blocked(void)
+{
+	return (atomic_read(&block_sleep) != 0);
+}
+
 static int suspend(bool do_deepsleep)
 {
 	int ret = 0;
+
+	if (sleep_is_blocked()) {
+		pr_info("suspend/resume: interrupted by modem.\n");
+		return -EBUSY;
+	}
 
 	nmk_gpio_clocks_enable();
 
