@@ -16,6 +16,7 @@
 #include <linux/tick.h>
 #include <linux/clockchips.h>
 #include <linux/mfd/dbx500-prcmu.h>
+#include <linux/regulator/db8500-prcmu.h>
 
 #include <mach/pm.h>
 #include <mach/pm-timer.h>
@@ -25,7 +26,6 @@
 
 #include "cpuidle-dbx500.h"
 #include "cpuidle-dbx500_dbg.h"
-#include "../regulator-u8500.h"
 
 /*
  * All measurements are with two cpus online (worst case) and at
