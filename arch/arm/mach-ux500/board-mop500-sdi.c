@@ -69,19 +69,23 @@ static u32 mop500_sdi0_vdd_handler(struct device *dev, unsigned int vdd,
 struct stedma40_chan_cfg mop500_sdi0_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
 	.dir = STEDMA40_PERIPH_TO_MEM,
-	.src_dev_type = DB8500_DMA_DEV29_SD_MM0_RX,
+	.src_dev_type = DB8500_DMA_DEV1_SD_MMC0_RX,
 	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
 	.src_info.data_width = STEDMA40_WORD_WIDTH,
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+	.use_fixed_channel = true,
+	.phy_channel = 0,
 };
 
 static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
 	.mode = STEDMA40_MODE_LOGICAL,
 	.dir = STEDMA40_MEM_TO_PERIPH,
 	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
-	.dst_dev_type = DB8500_DMA_DEV29_SD_MM0_TX,
+	.dst_dev_type = DB8500_DMA_DEV1_SD_MMC0_TX,
 	.src_info.data_width = STEDMA40_WORD_WIDTH,
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+	.use_fixed_channel = true,
+	.phy_channel = 0,
 };
 #endif
 
