@@ -33,6 +33,9 @@ static struct clk *twd_clk;
 static unsigned long twd_timer_rate;
 static DEFINE_PER_CPU(struct clock_event_device *, twd_ce);
 
+static DEFINE_PER_CPU(u32, twd_ctrl);
+static DEFINE_PER_CPU(u32, twd_load);
+
 static struct clock_event_device __percpu **twd_evt;
 
 static void twd_set_mode(enum clock_event_mode mode,
@@ -263,3 +266,24 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
 
 	enable_percpu_irq(clk->irq, 0);
 }
+
+#if defined(CONFIG_HOTPLUG) || defined(CONFIG_CPU_IDLE)
+void twd_save(void)
+{
+	int this_cpu = smp_processor_id();
+
+	per_cpu(twd_ctrl, this_cpu) = __raw_readl(twd_base + TWD_TIMER_CONTROL);
+	per_cpu(twd_load, this_cpu) = __raw_readl(twd_base + TWD_TIMER_LOAD);
+
+}
+
+void twd_restore(void)
+{
+	int this_cpu = smp_processor_id();
+
+	__raw_writel(per_cpu(twd_ctrl, this_cpu),
+		     twd_base + TWD_TIMER_CONTROL);
+	__raw_writel(per_cpu(twd_load, this_cpu),
+		     twd_base + TWD_TIMER_LOAD);
+}
+#endif
