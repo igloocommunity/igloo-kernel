@@ -57,3 +57,12 @@ config UX500_SUSPEND_DBG_WAKE_ON_UART
 	depends on UX500_SUSPEND_DBG
 	help
 	  Wake up on uart interrupts. Makes it possible for the console to wake up system.
+
+config UX500_USECASE_GOVERNOR
+	bool "UX500 use-case governor"
+	depends on (UX500_SOC_DB8500 || UX500_SOC_DB5500) && \
+			(CPU_FREQ && CPU_IDLE && HOTPLUG_CPU && \
+			EARLYSUSPEND && UX500_L2X0_PREFETCH_CTRL && PM)
+	default y
+	help
+	  Adjusts CPU_IDLE, CPU_FREQ, HOTPLUG_CPU and L2 cache parameters

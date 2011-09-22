@@ -9,3 +9,4 @@ obj-$(CONFIG_UX500_CPUIDLE) 		+= timer.o
 obj-$(CONFIG_UX500_SUSPEND)		+= suspend.o
 obj-$(CONFIG_UX500_SUSPEND_DBG)		+= suspend_dbg.o
 obj-$(CONFIG_UX500_PM_PERFORMANCE)	+= performance.o
+obj-$(CONFIG_UX500_USECASE_GOVERNOR)	+= usecase_gov.o
