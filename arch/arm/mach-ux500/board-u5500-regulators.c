@@ -48,6 +48,10 @@ static struct regulator_consumer_supply ab5500_ldo_sim_consumers[] = {
 	REGULATOR_SUPPLY("debug", "reg-virt-consumer.5"),
 };
 
+static struct regulator_consumer_supply ab5500_bias2_consumers[] = {
+	REGULATOR_SUPPLY("v-amic", NULL),
+};
+
 static struct regulator_init_data
 ab5500_regulator_init_data[AB5500_NUM_REGULATORS] = {
 	/* SD Card */
@@ -123,6 +127,13 @@ ab5500_regulator_init_data[AB5500_NUM_REGULATORS] = {
 		},
 		.consumer_supplies	= ab5500_ldo_sim_consumers,
 		.num_consumer_supplies	= ARRAY_SIZE(ab5500_ldo_sim_consumers),
+	},
+	[AB5500_BIAS2] = {
+		.constraints = {
+			.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+		},
+		.consumer_supplies	= ab5500_bias2_consumers,
+		.num_consumer_supplies	= ARRAY_SIZE(ab5500_bias2_consumers),
 	},
 };
 
