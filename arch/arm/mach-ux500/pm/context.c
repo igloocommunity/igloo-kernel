@@ -26,6 +26,7 @@
 #include <mach/context.h>
 
 #include <asm/hardware/gic.h>
+#include <asm/smp_twd.h>
 
 #include "scu.h"
 #include "../product.h"
@@ -825,9 +826,11 @@ void context_varm_save_core(void)
 	per_cpu(varm_cp15_pointer, cpu) = per_cpu(varm_cp15_backup_stack, cpu);
 
 	/* Save core */
+	twd_save();
 	save_gic_if_cpu(&per_cpu(context_gic_cpu, cpu));
 	save_gic_dist_cpu(&per_cpu(context_gic_dist_cpu, cpu));
 	context_save_cp15_registers(&per_cpu(varm_cp15_pointer, cpu));
+
 }
 
 /*
@@ -844,6 +847,7 @@ void context_varm_restore_core(void)
 	context_restore_cp15_registers(&per_cpu(varm_cp15_pointer, cpu));
 	restore_gic_dist_cpu(&per_cpu(context_gic_dist_cpu, cpu));
 	restore_gic_if_cpu(&per_cpu(context_gic_cpu, cpu));
+	twd_restore();
 
 	atomic_notifier_call_chain(&context_arm_notifier_list,
 				   CONTEXT_ARM_CORE_RESTORE, NULL);
