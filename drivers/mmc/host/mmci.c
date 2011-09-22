@@ -54,6 +54,7 @@ static unsigned int fmax = 515633;
  * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
  * @non_power_of_2_blksize: true if block sizes can be other than power of two
  * @pwrreg_powerup: power up value for MMCIPOWER register
+ * @signal_direction: input/out direction of bus signals can be indicated
  */
 struct variant_data {
 	unsigned int		clkreg;
@@ -66,6 +67,7 @@ struct variant_data {
 	bool			blksz_datactrl16;
 	bool			non_power_of_2_blksize;
 	unsigned int		pwrreg_powerup;
+	bool			signal_direction;
 };
 
 static struct variant_data variant_arm = {
@@ -89,6 +91,7 @@ static struct variant_data variant_u300 = {
 	.datalength_bits	= 16,
 	.sdio			= true,
 	.pwrreg_powerup		= MCI_PWR_ON,
+	.signal_direction	= true,
 };
 
 static struct variant_data variant_ux500 = {
@@ -100,6 +103,7 @@ static struct variant_data variant_ux500 = {
 	.sdio			= true,
 	.st_clkdiv		= true,
 	.pwrreg_powerup		= MCI_PWR_ON,
+	.signal_direction	= true,
 };
 
 static struct variant_data variant_ux500v2 = {
@@ -113,6 +117,7 @@ static struct variant_data variant_ux500v2 = {
 	.blksz_datactrl16	= true,
 	.non_power_of_2_blksize	= true,
 	.pwrreg_powerup		= MCI_PWR_ON,
+	.signal_direction	= true,
 };
 
 /*
@@ -1076,6 +1081,22 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	case MMC_POWER_ON:
 		pwr |= MCI_PWR_ON;
 		break;
+	}
+
+	if (variant->signal_direction && ios->power_mode != MMC_POWER_OFF) {
+		/*
+		 * The ST Micro variant has some additional bits
+		 * indicating signal direction for the signals in
+		 * the SD/MMC bus and feedback-clock usage.
+		 */
+		pwr |= host->plat->sigdir;
+
+		if (ios->bus_width == MMC_BUS_WIDTH_4)
+			pwr &= ~MCI_ST_DATA74DIREN;
+		else if (ios->bus_width == MMC_BUS_WIDTH_1)
+			pwr &= (~MCI_ST_DATA74DIREN &
+				~MCI_ST_DATA31DIREN &
+				~MCI_ST_DATA2DIREN);
 	}
 
 	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN) {
