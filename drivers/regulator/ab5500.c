@@ -40,12 +40,18 @@
 /* In SIM bank */
 #define AB5500_SIM_SUP		0x14
 
+#define AB5500_MBIAS2		0x01
+
 #define AB5500_LDO_MODE_MASK		(0x3 << 4)
 #define AB5500_LDO_MODE_FULLPOWER	(0x3 << 4)
 #define AB5500_LDO_MODE_PWRCTRL		(0x2 << 4)
 #define AB5500_LDO_MODE_LOWPOWER	(0x1 << 4)
 #define AB5500_LDO_MODE_OFF		(0x0 << 4)
 #define AB5500_LDO_VOLT_MASK		0x07
+
+#define AB5500_MBIAS2_ENABLE		(0x1 << 1)
+#define AB5500_MBIAS2_VOLT_MASK		(0x1 << 2)
+#define AB5500_MBIAS2_MODE_MASK		(0x1 << 1)
 
 struct ab5500_regulator {
 	struct regulator_desc desc;
@@ -57,6 +63,10 @@ struct ab5500_regulator {
 	u8 bank;
 	u8 reg;
 	u8 mode;
+	u8 update_mask;
+	u8 update_val_idle;
+	u8 update_val_normal;
+	u8 voltage_mask;
 };
 
 struct ab5500_regulators {
@@ -80,7 +90,7 @@ static int ab5500_regulator_enable(struct regulator_dev *rdev)
 	int ret;
 
 	ret = abx500_mask_and_set(ab5500->dev, r->bank, r->reg,
-				  AB5500_LDO_MODE_MASK, r->mode);
+				  r->update_mask, r->mode);
 	if (ret < 0)
 		return ret;
 
@@ -97,7 +107,7 @@ static int ab5500_regulator_disable(struct regulator_dev *rdev)
 	int ret;
 
 	ret = abx500_mask_and_set(ab5500->dev, r->bank, r->reg,
-				  AB5500_LDO_MODE_MASK, regval);
+				  r->update_mask, regval);
 	if (ret < 0)
 		return ret;
 
@@ -111,7 +121,7 @@ static unsigned int ab5500_regulator_get_mode(struct regulator_dev *rdev)
 	struct ab5500_regulators *ab5500 = rdev_get_drvdata(rdev);
 	struct ab5500_regulator *r = ab5500->regulator[rdev_get_id(rdev)];
 
-	if (r->mode == AB5500_LDO_MODE_LOWPOWER)
+	if (r->mode == r->update_val_idle)
 		return REGULATOR_MODE_IDLE;
 
 	return REGULATOR_MODE_NORMAL;
@@ -125,10 +135,10 @@ static int ab5500_regulator_set_mode(struct regulator_dev *rdev,
 
 	switch (mode) {
 	case REGULATOR_MODE_NORMAL:
-		r->mode = AB5500_LDO_MODE_FULLPOWER;
+		r->mode = r->update_val_normal;
 		break;
 	case REGULATOR_MODE_IDLE:
-		r->mode = AB5500_LDO_MODE_LOWPOWER;
+		r->mode = r->update_val_idle;
 		break;
 	default:
 		return -EINVAL;
@@ -155,7 +165,7 @@ static int ab5500_regulator_is_enabled(struct regulator_dev *rdev)
 		return err;
 	}
 
-	switch (regval & AB5500_LDO_MODE_MASK) {
+	switch (regval & r->update_mask) {
 	case AB5500_LDO_MODE_PWRCTRL:
 	case AB5500_LDO_MODE_OFF:
 		r->enabled = false;
@@ -216,7 +226,7 @@ static int ab5500_regulator_get_voltage(struct regulator_dev *rdev)
 		return ret;
 	}
 
-	regval &= AB5500_LDO_VOLT_MASK;
+	regval &= r->voltage_mask;
 	if (regval >= r->desc.n_voltages + r->num_holes)
 	       return -EINVAL;
 
@@ -279,7 +289,7 @@ static int ab5500_regulator_set_voltage(struct regulator_dev *rdev,
 	*selector = bestindex;
 
 	return abx500_mask_and_set_register_interruptible(ab5500->dev,
-			r->bank, r->reg, AB5500_LDO_VOLT_MASK, bestindex);
+			r->bank, r->reg, r->voltage_mask, bestindex);
 
 }
 
@@ -338,98 +348,149 @@ static const int ab5500_ldo_sim_voltages[] = {
 	[0x02] = 2900000,
 };
 
+static const int ab5500_bias2_voltages[] = {
+	[0x00] = 2000000,
+	[0x01] = 2200000,
+};
+
 static struct ab5500_regulator ab5500_regulators[] = {
 	[AB5500_LDO_L] = {
 		.desc = {
-			.name	= "LDO_L",
-			.id	= AB5500_LDO_L,
-			.ops	= &ab5500_regulator_variable_ops,
-			.type	= REGULATOR_VOLTAGE,
-			.owner	= THIS_MODULE,
-			.n_voltages = ARRAY_SIZE(ab5500_ldo_lg_voltages) - 2,
+			.name		= "LDO_L",
+			.id		= AB5500_LDO_L,
+			.ops		= &ab5500_regulator_variable_ops,
+			.type		= REGULATOR_VOLTAGE,
+			.owner		= THIS_MODULE,
+			.n_voltages	= ARRAY_SIZE(ab5500_ldo_lg_voltages) -
+				2,
 		},
-		.bank		= AB5500_BANK_STARTUP,
-		.reg		= AB5500_LDO_L_ST,
-		.voltages	= ab5500_ldo_lg_voltages,
-		.num_holes	= 2, /* 2 register values unused */
-		.enable_time	= 400,
-		.mode		= AB5500_LDO_MODE_FULLPOWER,
+		.bank			= AB5500_BANK_STARTUP,
+		.reg			= AB5500_LDO_L_ST,
+		.voltages		= ab5500_ldo_lg_voltages,
+		.num_holes		= 2, /* 2 register values unused */
+		.enable_time		= 400,
+		.mode			= AB5500_LDO_MODE_FULLPOWER,
+		.update_mask		= AB5500_LDO_MODE_MASK,
+		.update_val_normal	= AB5500_LDO_MODE_FULLPOWER,
+		.update_val_idle	= AB5500_LDO_MODE_LOWPOWER,
+		.voltage_mask		= AB5500_LDO_VOLT_MASK,
 	},
 	[AB5500_LDO_G] = {
 		.desc = {
-			.name	= "LDO_G",
-			.id	= AB5500_LDO_G,
-			.ops	= &ab5500_regulator_variable_ops,
-			.type	= REGULATOR_VOLTAGE,
-			.owner	= THIS_MODULE,
-			.n_voltages = ARRAY_SIZE(ab5500_ldo_lg_voltages) - 2,
+			.name		= "LDO_G",
+			.id		= AB5500_LDO_G,
+			.ops		= &ab5500_regulator_variable_ops,
+			.type		= REGULATOR_VOLTAGE,
+			.owner		= THIS_MODULE,
+			.n_voltages 	= ARRAY_SIZE(ab5500_ldo_lg_voltages) -
+				2,
 		},
-		.bank		= AB5500_BANK_STARTUP,
-		.reg		= AB5500_LDO_G_ST,
-		.voltages	= ab5500_ldo_lg_voltages,
-		.num_holes	= 2, /* 2 register values unused */
-		.enable_time	= 400,
-		.mode		= AB5500_LDO_MODE_FULLPOWER,
+		.bank			= AB5500_BANK_STARTUP,
+		.reg			= AB5500_LDO_G_ST,
+		.voltages		= ab5500_ldo_lg_voltages,
+		.num_holes		= 2, /* 2 register values unused */
+		.enable_time		= 400,
+		.mode			= AB5500_LDO_MODE_FULLPOWER,
+		.update_mask		= AB5500_LDO_MODE_MASK,
+		.update_val_normal	= AB5500_LDO_MODE_FULLPOWER,
+		.update_val_idle	= AB5500_LDO_MODE_LOWPOWER,
+		.voltage_mask		= AB5500_LDO_VOLT_MASK,
 	},
 	[AB5500_LDO_K] = {
 		.desc = {
-			.name	= "LDO_K",
-			.id	= AB5500_LDO_K,
-			.ops	= &ab5500_regulator_variable_ops,
-			.type	= REGULATOR_VOLTAGE,
-			.owner	= THIS_MODULE,
-			.n_voltages = ARRAY_SIZE(ab5500_ldo_kh_voltages),
+			.name		= "LDO_K",
+			.id		= AB5500_LDO_K,
+			.ops		= &ab5500_regulator_variable_ops,
+			.type		= REGULATOR_VOLTAGE,
+			.owner		= THIS_MODULE,
+			.n_voltages 	= ARRAY_SIZE(ab5500_ldo_kh_voltages),
 		},
-		.bank		= AB5500_BANK_STARTUP,
-		.reg		= AB5500_LDO_K_ST,
-		.voltages	= ab5500_ldo_kh_voltages,
-		.enable_time	= 400,
-		.mode		= AB5500_LDO_MODE_FULLPOWER,
+		.bank			= AB5500_BANK_STARTUP,
+		.reg			= AB5500_LDO_K_ST,
+		.voltages		= ab5500_ldo_kh_voltages,
+		.enable_time		= 400,
+		.mode			= AB5500_LDO_MODE_FULLPOWER,
+		.update_mask		= AB5500_LDO_MODE_MASK,
+		.update_val_normal	= AB5500_LDO_MODE_FULLPOWER,
+		.update_val_idle	= AB5500_LDO_MODE_LOWPOWER,
+		.voltage_mask		= AB5500_LDO_VOLT_MASK,
 	},
 	[AB5500_LDO_H] = {
 		.desc = {
-			.name	= "LDO_H",
-			.id	= AB5500_LDO_H,
-			.ops	= &ab5500_regulator_variable_ops,
-			.type	= REGULATOR_VOLTAGE,
-			.owner	= THIS_MODULE,
-			.n_voltages = ARRAY_SIZE(ab5500_ldo_kh_voltages),
+			.name		= "LDO_H",
+			.id		= AB5500_LDO_H,
+			.ops		= &ab5500_regulator_variable_ops,
+			.type		= REGULATOR_VOLTAGE,
+			.owner		= THIS_MODULE,
+			.n_voltages	= ARRAY_SIZE(ab5500_ldo_kh_voltages),
 		},
-		.bank		= AB5500_BANK_STARTUP,
-		.reg		= AB5500_LDO_H_ST,
-		.voltages	= ab5500_ldo_kh_voltages,
-		.enable_time	= 400,
-		.mode		= AB5500_LDO_MODE_FULLPOWER,
+		.bank			= AB5500_BANK_STARTUP,
+		.reg			= AB5500_LDO_H_ST,
+		.voltages		= ab5500_ldo_kh_voltages,
+		.enable_time		= 400,
+		.mode			= AB5500_LDO_MODE_FULLPOWER,
+		.update_mask		= AB5500_LDO_MODE_MASK,
+		.update_val_normal	= AB5500_LDO_MODE_FULLPOWER,
+		.update_val_idle	= AB5500_LDO_MODE_LOWPOWER,
+		.voltage_mask		= AB5500_LDO_VOLT_MASK,
 	},
 	[AB5500_LDO_VDIGMIC] = {
 		.desc = {
-			.name	= "LDO_VDIGMIC",
-			.id	= AB5500_LDO_VDIGMIC,
-			.ops	= &ab5500_regulator_fixed_ops,
-			.type	= REGULATOR_VOLTAGE,
-			.owner	= THIS_MODULE,
-			.n_voltages = ARRAY_SIZE(ab5500_ldo_vdigmic_voltages),
+			.name		= "LDO_VDIGMIC",
+			.id		= AB5500_LDO_VDIGMIC,
+			.ops		= &ab5500_regulator_fixed_ops,
+			.type		= REGULATOR_VOLTAGE,
+			.owner		= THIS_MODULE,
+			.n_voltages	=
+				ARRAY_SIZE(ab5500_ldo_vdigmic_voltages),
 		},
-		.bank		= AB5500_BANK_STARTUP,
-		.reg		= AB5500_LDO_VDIGMIC_ST,
-		.voltages	= ab5500_ldo_vdigmic_voltages,
-		.enable_time	= 450,
-		.mode		= AB5500_LDO_MODE_FULLPOWER,
+		.bank			= AB5500_BANK_STARTUP,
+		.reg			= AB5500_LDO_VDIGMIC_ST,
+		.voltages		= ab5500_ldo_vdigmic_voltages,
+		.enable_time		= 450,
+		.mode			= AB5500_LDO_MODE_FULLPOWER,
+		.update_mask		= AB5500_LDO_MODE_MASK,
+		.update_val_normal	= AB5500_LDO_MODE_FULLPOWER,
+		.update_val_idle	= AB5500_LDO_MODE_LOWPOWER,
+		.voltage_mask		= AB5500_LDO_VOLT_MASK,
 	},
 	[AB5500_LDO_SIM] = {
 		.desc = {
-			.name	= "LDO_SIM",
-			.id	= AB5500_LDO_SIM,
-			.ops	= &ab5500_regulator_variable_ops,
-			.type	= REGULATOR_VOLTAGE,
-			.owner	= THIS_MODULE,
-			.n_voltages = ARRAY_SIZE(ab5500_ldo_sim_voltages),
+			.name		= "LDO_SIM",
+			.id		= AB5500_LDO_SIM,
+			.ops		= &ab5500_regulator_variable_ops,
+			.type		= REGULATOR_VOLTAGE,
+			.owner		= THIS_MODULE,
+			.n_voltages	= ARRAY_SIZE(ab5500_ldo_sim_voltages),
 		},
-		.bank		= AB5500_BANK_SIM_USBSIM,
-		.reg		= AB5500_SIM_SUP,
-		.voltages	= ab5500_ldo_sim_voltages,
-		.enable_time	= 1000,
-		.mode		= AB5500_LDO_MODE_FULLPOWER,
+		.bank			= AB5500_BANK_SIM_USBSIM,
+		.reg			= AB5500_SIM_SUP,
+		.voltages		= ab5500_ldo_sim_voltages,
+		.enable_time		= 1000,
+		.mode			= AB5500_LDO_MODE_FULLPOWER,
+		.update_mask		= AB5500_LDO_MODE_MASK,
+		.update_val_normal	= AB5500_LDO_MODE_FULLPOWER,
+		.update_val_idle	= AB5500_LDO_MODE_LOWPOWER,
+		.voltage_mask		= AB5500_LDO_VOLT_MASK,
+	},
+	[AB5500_BIAS2] = {
+		.desc = {
+			.name		= "BIAS2",
+			.id		= AB5500_BIAS2,
+			.ops		= &ab5500_regulator_variable_ops,
+			.type		= REGULATOR_VOLTAGE,
+			.owner		= THIS_MODULE,
+			.n_voltages	= ARRAY_SIZE(ab5500_bias2_voltages),
+		},
+		.bank			= AB5500_BANK_AUDIO_HEADSETUSB,
+		.reg			= AB5500_MBIAS2,
+		.voltages		= ab5500_bias2_voltages,
+		.enable_time		= 1000,
+		.mode			= AB5500_MBIAS2_ENABLE,
+		.update_mask		= AB5500_MBIAS2_MODE_MASK,
+		.update_val_normal	= AB5500_MBIAS2_ENABLE,
+		.update_val_idle	= AB5500_MBIAS2_ENABLE,
+		.voltage_mask		= AB5500_MBIAS2_VOLT_MASK,
 	},
 };
 
