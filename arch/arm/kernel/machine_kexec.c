@@ -123,3 +123,13 @@ void machine_kexec(struct kimage *image)
 	flush_cache_all();
 	cpu_reset(reboot_code_buffer_phys);
 }
+
+void machine_crash_swreset(void)
+{
+	printk(KERN_INFO "Software reset on panic!\n");
+
+	flush_cache_all();
+	outer_flush_all();
+	outer_disable();
+	arm_pm_restart(0, NULL);
+}
