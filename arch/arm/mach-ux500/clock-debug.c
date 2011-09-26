@@ -72,8 +72,6 @@ static ssize_t clk_enable_write(struct file *file, const char __user *user_buf,
 	size_t count, loff_t *ppos)
 {
 	struct clk_debug_info *cdi;
-	char buf[32];
-	ssize_t buf_size;
 	long user_val;
 	int err;
 
