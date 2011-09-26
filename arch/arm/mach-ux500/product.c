@@ -11,6 +11,7 @@
 
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/io.h>
 #include <linux/tee.h>
 #include <linux/module.h>
 #include <mach/hardware.h>
@@ -21,12 +22,26 @@
 #define STATIC_TEE_TA_START_CLOCKSEQ  \
 	{0x8E, 0x12, 0xEC, 0xDB, 0xDF, 0xD7, 0x20, 0x85}
 
+#define U5500_PRCMU_DBG_PWRCTRL         (U5500_PRCMU_BASE + 0x4AC)
+#define PRCMU_DBG_PWRCTRL_A9DBGCLKEN    (1 << 4)
+
 static struct tee_product_config product_config;
 
 bool ux500_jtag_enabled(void)
 {
-	return (product_config.rt_flags & TEE_RT_FLAGS_JTAG_ENABLED) ==
-		TEE_RT_FLAGS_JTAG_ENABLED;
+#ifdef CONFIG_UX500_DEBUG_NO_LAUTERBACH
+        return false;
+#else
+        if (cpu_is_u5500())
+                return readl_relaxed(__io_address(U5500_PRCMU_DBG_PWRCTRL))
+                        & PRCMU_DBG_PWRCTRL_A9DBGCLKEN;
+
+        if (cpu_is_u8500())
+		return (product_config.rt_flags & TEE_RT_FLAGS_JTAG_ENABLED) ==
+			TEE_RT_FLAGS_JTAG_ENABLED;
+
+	return true;
+#endif
 }
 
 static int __init product_detect(void)

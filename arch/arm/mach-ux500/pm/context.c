@@ -93,9 +93,6 @@
 #define STM_MMC_OFFSET	0x08
 #define STM_TER_OFFSET	0x10
 
-#define U5500_PRCMU_DBG_PWRCTRL		(U5500_PRCMU_BASE + 0x4AC)
-#define PRCMU_DBG_PWRCTRL_A9DBGCLKEN	(1 << 4)
-
 #define TPIU_PORT_SIZE 0x4
 #define TPIU_TRIGGER_COUNTER 0x104
 #define TPIU_TRIGGER_MULTIPLIER 0x108
@@ -310,20 +307,9 @@ static void restore_stm_ape(void)
 	       context_stm_ape.base + STM_CR_OFFSET);
 }
 
-static bool tpiu_clocked(void)
+static bool inline tpiu_clocked(void)
 {
-#ifdef CONFIG_UX500_DEBUG_NO_LAUTERBACH
-	return false;
-#else
-	if (cpu_is_u5500())
-		return readl_relaxed(__io_address(U5500_PRCMU_DBG_PWRCTRL))
-			& PRCMU_DBG_PWRCTRL_A9DBGCLKEN;
-
-	if (cpu_is_u8500())
-		return ux500_jtag_enabled();
-
-	return true;
-#endif
+	return ux500_jtag_enabled();
 }
 
 /*
