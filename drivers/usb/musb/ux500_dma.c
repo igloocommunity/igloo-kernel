@@ -258,14 +258,13 @@ static void ux500_dma_channel_release(struct dma_channel *channel)
 static int ux500_dma_is_compatible(struct dma_channel *channel,
 		u16 maxpacket, void *buf, u32 length)
 {
-	/*if ((maxpacket & 0x3)		||
+	if ((maxpacket & 0x3)		||
 		((int)buf & 0x3)	||
 		(length < 512)		||
 		(length & 0x3))
 		return false;
 	else
-		return true;*/
-	return false;
+		return true;
 }
 
 /**
