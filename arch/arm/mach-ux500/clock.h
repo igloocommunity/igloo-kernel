@@ -78,6 +78,9 @@ extern struct clkops prcc_pclk_ops;
 extern struct clkops prcc_kclk_ops;
 extern struct clkops sga_clk_ops;
 
+#define CLK_LOOKUP(_clk, _dev_id, _con_id) \
+	{ .dev_id = _dev_id, .con_id = _con_id, .clk = &_clk }
+
 /* Define PRCMU Clock */
 #define DEF_PRCMU_CLK(_name, _cg_sel, _rate) \
 	struct clk _name = { \
@@ -128,6 +131,14 @@ extern struct clkops sga_clk_ops;
 	struct clk _name = { \
 		.name = #_name, \
 		.parent = _parent, \
+		.bus_parent = _bus_parent, \
+	}
+
+#define DEF_MTU_CLK(_cg_sel, _name, _bus_parent) \
+	struct clk _name = { \
+		.name = #_name, \
+		.ops = &mtu_clk_ops, \
+		.cg_sel = _cg_sel, \
 		.bus_parent = _bus_parent, \
 	}
 
