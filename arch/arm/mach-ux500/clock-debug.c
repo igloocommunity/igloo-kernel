@@ -12,6 +12,7 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/clk.h>
+#include <mach/hardware.h>
 
 #include "clock.h"
 
@@ -37,15 +38,17 @@ static int clk_show_print(struct seq_file *s, void *p)
 	int i;
 	int enabled_only = (int)s->private;
 
-	seq_printf(s, "\n%-20s %s\n", "name", "enabled (kernel + debug)");
+	seq_printf(s, "\n%-20s %10s %s\n", "name", "rate",
+		"enabled (kernel + debug)");
 	for (i = 0; i < num_clks; i++) {
 		if (enabled_only && !cdi[i].clk->enabled)
 			continue;
 		seq_printf(s,
-			   "%-20s %5d + %d\n",
-			   cdi[i].clk->name,
-			   cdi[i].clk->enabled - cdi[i].enabled,
-			   cdi[i].enabled);
+			"%-20s %10lu %5d + %d\n",
+			cdi[i].clk->name,
+			clk_get_rate(cdi[i].clk),
+			cdi[i].clk->enabled - cdi[i].enabled,
+			cdi[i].enabled);
 	}
 
 	return 0;
@@ -219,5 +222,16 @@ no_dir:
 	kfree(cdi);
 	return -ENOMEM;
 }
+
+static int __init clk_debug_init(void)
+{
+	if (cpu_is_u8500())
+		db8500_clk_debug_init();
+	else if (cpu_is_u5500())
+		db5500_clk_debug_init();
+
+	return 0;
+}
+module_init(clk_debug_init);
 
 #endif /* CONFIG_DEBUG_FS */

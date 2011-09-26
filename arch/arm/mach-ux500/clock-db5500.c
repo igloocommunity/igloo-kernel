@@ -820,9 +820,8 @@ int __init db5500_clk_init(void)
 	return 0;
 }
 
-static int __init db5500_clk_debug_init(void)
+int __init db5500_clk_debug_init(void)
 {
 	return dbx500_clk_debug_init(db5500_dbg_clks,
 				     ARRAY_SIZE(db5500_dbg_clks));
 }
-module_init(db5500_clk_debug_init);
