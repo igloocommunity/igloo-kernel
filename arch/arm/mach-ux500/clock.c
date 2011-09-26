@@ -428,8 +428,6 @@ struct clkops prcc_kclk_ops = {
 	.disable = prcc_kclk_disable,
 };
 
-/* TODO: Move to proper place */
-#define PRCM_DBG_PWRCTL 0x4AC
 
 int __init clk_init(void)
 {
@@ -444,14 +442,8 @@ int __init clk_init(void)
 
 	if (cpu_is_u8500())
 		db8500_clk_init();
-	else if (cpu_is_u5500()) {
-		unsigned int temp = 0;
+	else if (cpu_is_u5500())
 		db5500_clk_init();
-		if (cpu_is_u5500v1())
-			temp = readl(prcmu_base + PRCM_DBG_PWRCTL);
-		temp |= 0x18;
-		writel(temp, (prcmu_base + PRCM_DBG_PWRCTL));
-	}
 
 	return 0;
 }
