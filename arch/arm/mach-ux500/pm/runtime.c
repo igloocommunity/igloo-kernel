@@ -17,7 +17,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/platform_device.h>
 #include <linux/amba/bus.h>
-#include <linux/mfd/dbx500-prcmu.h>
+#include <linux/regulator/dbx500-prcmu.h>
 #include <linux/clk.h>
 #include <plat/pincfg.h>
 
