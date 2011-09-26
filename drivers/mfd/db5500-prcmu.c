@@ -28,7 +28,7 @@
 #include <mach/hardware.h>
 #include <mach/irqs.h>
 #include <mach/db5500-regs.h>
-#include "dbx500-prcmu-regs.h"
+#include "db5500-prcmu-regs.h"
 
 #define PRCM_SW_RST_REASON (tcdm_base + 0xFF8) /* 2 bytes */
 
@@ -414,7 +414,7 @@ struct clk_mgt {
 static DEFINE_SPINLOCK(clk_mgt_lock);
 
 #define CLK_MGT_ENTRY(_name)[PRCMU_##_name] = {	\
-	(PRCM_##_name##_MGT_OFF), 0			\
+	(DB5500_PRCM_##_name##_MGT), 0			\
 }
 static struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
 	CLK_MGT_ENTRY(SGACLK),
@@ -455,7 +455,7 @@ static int request_sysclk(bool enable)
 	r = 0;
 	mutex_lock(&mb3_transfer.sysclk_lock);
 
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(3))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(3))
 		cpu_relax();
 
 	if (enable)
@@ -466,7 +466,7 @@ static int request_sysclk(bool enable)
 	writeb(mb3_transfer.req_st, (PRCM_REQ_MB3_REFCLK_MGT));
 
 	writeb(MB3H_REFCLK_REQUEST, (PRCM_REQ_MB3_HEADER));
-	writel(MBOX_BIT(3), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(3), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 
 	/*
 	 * The firmware only sends an ACK if we want to enable the
@@ -498,7 +498,7 @@ static int request_timclk(bool enable)
 
 	if (!enable)
 		val |= PRCM_TCR_STOP_TIMERS;
-	writel(val, PRCM_TCR);
+	writel(val, _PRCMU_BASE + PRCM_TCR);
 
 	return 0;
 }
@@ -513,7 +513,7 @@ static int request_reg_clock(u8 clock, bool enable)
 	spin_lock_irqsave(&clk_mgt_lock, flags);
 
 	/* Grab the HW semaphore. */
-	while ((readl(PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
+	while ((readl(_PRCMU_BASE + PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
 		cpu_relax();
 
 	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
@@ -526,7 +526,7 @@ static int request_reg_clock(u8 clock, bool enable)
 	writel(val, (_PRCMU_BASE + clk_mgt[clock].offset));
 
 	/* Release the HW semaphore. */
-	writel(0, PRCM_SEM);
+	writel(0, _PRCMU_BASE + PRCM_SEM);
 
 	spin_unlock_irqrestore(&clk_mgt_lock, flags);
 
@@ -548,7 +548,7 @@ static int request_pll(u8 pll, bool enable)
 	BUG_ON(pll >= DB5500_NUM_PLL_ID);
 	mutex_lock(&mb2_transfer.lock);
 
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(2))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(2))
 		cpu_relax();
 
 	mb2_transfer.req.pll_st[pll] = enable;
@@ -559,7 +559,7 @@ static int request_pll(u8 pll, bool enable)
 
 	writeb(MB2H_PLL_REQUEST, PRCM_REQ_MB2_HEADER);
 
-	writel(MBOX_BIT(2), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(2), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 	if (!wait_for_completion_timeout(&mb2_transfer.work,
 		msecs_to_jiffies(500))) {
 		pr_err("prcmu: set_pll() failed.\n"
@@ -619,13 +619,13 @@ static void config_wakeups(void)
 	if ((dbb_events == last_dbb_events) && (abb_events == last_abb_events))
 		return;
 
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(0))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(0))
 		cpu_relax();
 
 	writel(dbb_events, PRCM_REQ_MB0_WAKEUP_DBB);
 	writel(abb_events, PRCM_REQ_MB0_WAKEUP_ABB);
 	writeb(MB0H_WAKE_UP_CFG, PRCM_REQ_MB0_HEADER);
-	writel(MBOX_BIT(0), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(0), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 
 	last_dbb_events = dbb_events;
 	last_abb_events = abb_events;
@@ -661,7 +661,7 @@ int db5500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll)
 
 	spin_lock_irqsave(&mb0_transfer.lock, flags);
 
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(0))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(0))
 		cpu_relax();
 
 	switch (state) {
@@ -684,7 +684,7 @@ int db5500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll)
 	writeb((keep_ulp_clk ? 1 : 0), PRCM_REQ_MB0_ULP_CLOCK_STATE);
 
 	writeb(MB0H_PWR_STATE_TRANS, PRCM_REQ_MB0_HEADER);
-	writel(MBOX_BIT(0), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(0), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 
 unlock_return:
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
@@ -756,14 +756,14 @@ int db5500_prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size)
 
 	mutex_lock(&mb5_transfer.lock);
 
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(5))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(5))
 		cpu_relax();
 	writeb(slave, PRCM_REQ_MB5_I2C_SLAVE);
 	writeb(reg, PRCM_REQ_MB5_I2C_REG);
 	writeb(size, PRCM_REQ_MB5_I2C_SIZE);
 	writeb(MB5H_I2C_READ, PRCM_REQ_MB5_HEADER);
 
-	writel(MBOX_BIT(5), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(5), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 	wait_for_completion(&mb5_transfer.work);
 
 	r = 0;
@@ -797,7 +797,7 @@ int db5500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
 
 	mutex_lock(&mb5_transfer.lock);
 
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(5))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(5))
 		cpu_relax();
 	writeb(slave, PRCM_REQ_MB5_I2C_SLAVE);
 	writeb(reg, PRCM_REQ_MB5_I2C_REG);
@@ -805,7 +805,7 @@ int db5500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
 	memcpy_toio(PRCM_REQ_MB5_I2C_DATA, value, size);
 	writeb(MB5H_I2C_WRITE, PRCM_REQ_MB5_HEADER);
 
-	writel(MBOX_BIT(5), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(5), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 	wait_for_completion(&mb5_transfer.work);
 
 	if ((mb5_transfer.ack.header == MB5H_I2C_WRITE) &&
@@ -852,13 +852,13 @@ int db5500_prcmu_set_arm_opp(u8 opp)
 
 	mutex_lock(&mb1_transfer.lock);
 
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(1))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(1))
 		cpu_relax();
 
 	writeb(MB1H_ARM_OPP, PRCM_REQ_MB1_HEADER);
 
 	writeb(db5500_opp, PRCM_REQ_MB1_ARM_OPP);
-	writel(MBOX_BIT(1), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(1), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 
 	if (!wait_for_completion_timeout(&mb1_transfer.work,
 		msecs_to_jiffies(500))) {
@@ -890,7 +890,10 @@ int db5500_prcmu_get_arm_opp(void)
 
 int prcmu_resetout(u8 resoutn, u8 state)
 {
+	int offset;
 	int pin = -1;
+
+	offset = state > 0 ? PRCM_RESOUTN_SET_OFFSET : PRCM_RESOUTN_CLR_OFFSET;
 
 	switch (resoutn) {
 	case 0:
@@ -906,7 +909,7 @@ int prcmu_resetout(u8 resoutn, u8 state)
 	}
 
 	if (pin > 0)
-		writel(pin, state > 0 ? PRCM_RESOUTN_SET : PRCM_RESOUTN_CLR);
+		writel(pin, _PRCMU_BASE + offset);
 	else
 		return -EINVAL;
 
@@ -918,37 +921,37 @@ int db5500_prcmu_enable_dsipll(void)
 	int i;
 
 	/* Enable DSIPLL_RESETN resets */
-	writel(PRCMU_RESET_DSIPLL, PRCM_APE_RESETN_CLR);
+	writel(PRCMU_RESET_DSIPLL, _PRCMU_BASE + PRCM_APE_RESETN_CLR);
 	/* Unclamp DSIPLL in/out */
-	writel(PRCMU_UNCLAMP_DSIPLL, PRCM_MMIP_LS_CLAMP_CLR);
+	writel(PRCMU_UNCLAMP_DSIPLL, _PRCMU_BASE + PRCM_MMIP_LS_CLAMP_CLR);
 	/* Set DSI PLL FREQ */
-	writel(PRCMU_PLLDSI_FREQ_SETTING, PRCM_PLLDSI_FREQ);
+	writel(PRCMU_PLLDSI_FREQ_SETTING, _PRCMU_BASE + PRCM_PLLDSI_FREQ);
 	writel(PRCMU_DSI_PLLOUT_SEL_SETTING,
-		PRCM_DSI_PLLOUT_SEL);
+		_PRCMU_BASE + PRCM_DSI_PLLOUT_SEL);
 	/* Enable Escape clocks */
-	writel(PRCMU_ENABLE_ESCAPE_CLOCK_DIV, PRCM_DSITVCLK_DIV);
+	writel(PRCMU_ENABLE_ESCAPE_CLOCK_DIV, _PRCMU_BASE + PRCM_DSITVCLK_DIV);
 
 	/* Start DSI PLL */
-	writel(PRCMU_ENABLE_PLLDSI, PRCM_PLLDSI_ENABLE);
+	writel(PRCMU_ENABLE_PLLDSI, _PRCMU_BASE + PRCM_PLLDSI_ENABLE);
 	/* Reset DSI PLL */
-	writel(PRCMU_DSI_RESET_SW, PRCM_DSI_SW_RESET);
+	writel(PRCMU_DSI_RESET_SW, _PRCMU_BASE + PRCM_DSI_SW_RESET);
 	for (i = 0; i < 10; i++) {
-		if ((readl(PRCM_PLLDSI_LOCKP) &
+		if ((readl(_PRCMU_BASE + PRCM_PLLDSI_LOCKP) &
 			PRCMU_PLLDSI_LOCKP_LOCKED) == PRCMU_PLLDSI_LOCKP_LOCKED)
 			break;
 		udelay(100);
 	}
 	/* Release DSIPLL_RESETN */
-	writel(PRCMU_RESET_DSIPLL, PRCM_APE_RESETN_SET);
+	writel(PRCMU_RESET_DSIPLL, _PRCMU_BASE + PRCM_APE_RESETN_SET);
 	return 0;
 }
 
 int db5500_prcmu_disable_dsipll(void)
 {
 	/* Disable dsi pll */
-	writel(PRCMU_DISABLE_PLLDSI, PRCM_PLLDSI_ENABLE);
+	writel(PRCMU_DISABLE_PLLDSI, _PRCMU_BASE + PRCM_PLLDSI_ENABLE);
 	/* Disable  escapeclock */
-	writel(PRCMU_DISABLE_ESCAPE_CLOCK_DIV, PRCM_DSITVCLK_DIV);
+	writel(PRCMU_DISABLE_ESCAPE_CLOCK_DIV, _PRCMU_BASE + PRCM_DSITVCLK_DIV);
 	return 0;
 }
 
@@ -956,9 +959,9 @@ int db5500_prcmu_set_display_clocks(void)
 {
 	/* HDMI and TVCLK Should be handled somewhere else */
 	/* PLLDIV=8, PLLSW=2, CLKEN=1 */
-	writel(PRCMU_DSI_CLOCK_SETTING, PRCM_HDMICLK_MGT);
+	writel(PRCMU_DSI_CLOCK_SETTING, _PRCMU_BASE + DB5500_PRCM_HDMICLK_MGT);
 	/* PLLDIV=14, PLLSW=2, CLKEN=1 */
-	writel(PRCMU_DSI_LP_CLOCK_SETTING, PRCM_TVCLK_MGT);
+	writel(PRCMU_DSI_LP_CLOCK_SETTING, _PRCMU_BASE + DB5500_PRCM_TVCLK_MGT);
 	return 0;
 }
 
@@ -971,7 +974,7 @@ int db5500_prcmu_set_display_clocks(void)
 void db5500_prcmu_system_reset(u16 reset_code)
 {
 	writew(reset_code, PRCM_SW_RST_REASON);
-	writel(1, PRCM_APE_SOFTRST);
+	writel(1, _PRCMU_BASE + PRCM_APE_SOFTRST);
 }
 
 /**
@@ -991,11 +994,11 @@ static void ack_dbb_wakeup(void)
 
 	spin_lock_irqsave(&mb0_transfer.lock, flags);
 
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(0))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(0))
 		cpu_relax();
 
 	writeb(MB0H_RD_WAKE_UP_ACK, PRCM_REQ_MB0_HEADER);
-	writel(MBOX_BIT(0), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(0), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 
 	spin_unlock_irqrestore(&mb0_transfer.lock, flags);
 }
@@ -1020,7 +1023,7 @@ int db5500_prcmu_set_epod(u16 epod, u8 epod_state)
 	mutex_lock(&mb2_transfer.lock);
 
 	/* wait for mailbox */
-	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(2))
+	while (readl(_PRCMU_BASE + PRCM_MBOX_CPU_VAL) & MBOX_BIT(2))
 		cpu_relax();
 
 	/* Retention is allowed only for ESRAM12 */
@@ -1062,7 +1065,7 @@ int db5500_prcmu_set_epod(u16 epod, u8 epod_state)
 
 	writeb(MB2H_EPOD_REQUEST, PRCM_REQ_MB2_HEADER);
 
-	writel(MBOX_BIT(2), PRCM_MBOX_CPU_SET);
+	writel(MBOX_BIT(2), _PRCMU_BASE + PRCM_MBOX_CPU_SET);
 
 	if (!wait_for_completion_timeout(&mb2_transfer.work,
 		msecs_to_jiffies(500))) {
@@ -1117,7 +1120,7 @@ static bool read_mailbox_0(void)
 		r = false;
 		break;
 	}
-	writel(MBOX_BIT(0), PRCM_ARM_IT1_CLR);
+	writel(MBOX_BIT(0), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return r;
 }
 
@@ -1145,7 +1148,7 @@ static bool read_mailbox_1(void)
 		break;
 	}
 
-	writel(MBOX_BIT(1), PRCM_ARM_IT1_CLR);
+	writel(MBOX_BIT(1), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 
 	if (do_complete)
 		complete(&mb1_transfer.work);
@@ -1170,12 +1173,12 @@ static bool read_mailbox_2(void)
 		mb2_transfer.ack.status = readb(PRCM_ACK_MB2_PLL_STATUS);
 		break;
 	default:
-		writel(MBOX_BIT(2), PRCM_ARM_IT1_CLR);
+		writel(MBOX_BIT(2), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 		pr_err("prcmu: Wrong ACK received for MB2 request \n");
 		return false;
 		break;
 	}
-	writel(MBOX_BIT(2), PRCM_ARM_IT1_CLR);
+	writel(MBOX_BIT(2), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	complete(&mb2_transfer.work);
 	return false;
 }
@@ -1189,11 +1192,11 @@ static bool read_mailbox_3(void)
 	switch (header) {
 	case MB3H_REFCLK_REQUEST:
 		mb3_transfer.ack.status = readb(PRCM_ACK_MB3_REFCLK_REQ);
-		writel(MBOX_BIT(3), PRCM_ARM_IT1_CLR);
+		writel(MBOX_BIT(3), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 		complete(&mb3_transfer.sysclk_work);
 		break;
 	default:
-		writel(MBOX_BIT(3), PRCM_ARM_IT1_CLR);
+		writel(MBOX_BIT(3), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 		pr_err("prcmu: wrong MB3 header\n");
 		break;
 	}
@@ -1203,7 +1206,7 @@ static bool read_mailbox_3(void)
 
 static bool read_mailbox_4(void)
 {
-	writel(MBOX_BIT(4), PRCM_ARM_IT1_CLR);
+	writel(MBOX_BIT(4), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
@@ -1224,19 +1227,19 @@ static bool read_mailbox_5(void)
 		print_unknown_header_warning(5, header);
 		break;
 	}
-	writel(MBOX_BIT(5), PRCM_ARM_IT1_CLR);
+	writel(MBOX_BIT(5), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
 static bool read_mailbox_6(void)
 {
-	writel(MBOX_BIT(6), PRCM_ARM_IT1_CLR);
+	writel(MBOX_BIT(6), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
 static bool read_mailbox_7(void)
 {
-	writel(MBOX_BIT(7), PRCM_ARM_IT1_CLR);
+	writel(MBOX_BIT(7), _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 	return false;
 }
 
@@ -1257,7 +1260,7 @@ static irqreturn_t prcmu_irq_handler(int irq, void *data)
 	u8 n;
 	irqreturn_t r;
 
-	bits = (readl(PRCM_ARM_IT1_VAL) & ALL_MBOX_BITS);
+	bits = (readl(_PRCMU_BASE + PRCM_ARM_IT1_VAL) & ALL_MBOX_BITS);
 	if (unlikely(!bits))
 		return IRQ_NONE;
 
@@ -1443,7 +1446,7 @@ static int __init db5500_prcmu_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 	/* Clean up the mailbox interrupts after pre-kernel code. */
-	writel(ALL_MBOX_BITS, PRCM_ARM_IT1_CLR);
+	writel(ALL_MBOX_BITS, _PRCMU_BASE + PRCM_ARM_IT1_CLEAR);
 
 	err = request_threaded_irq(IRQ_DB5500_PRCMU1, prcmu_irq_handler,
 		prcmu_irq_thread_fn, IRQF_NO_SUSPEND, "prcmu", NULL);
