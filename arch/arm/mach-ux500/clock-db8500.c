@@ -1281,9 +1281,9 @@ late_initcall(init_clock_states);
 int __init db8500_clk_init(void)
 {
 
-	clks_register(u8500_v2_sysclks,
+	clkdev_add_table(u8500_v2_sysclks,
 		      ARRAY_SIZE(u8500_v2_sysclks));
-	clks_register(u8500_clocks,
+	clkdev_add_table(u8500_clocks,
 		      ARRAY_SIZE(u8500_clocks));
 
 	u8500_amba_clk_enable();

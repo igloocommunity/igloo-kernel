@@ -806,13 +806,13 @@ int __init db5500_clk_init(void)
 	if (cpu_is_u5500v1())
 		p1_sdi0_kclk.parent = &sdmmcclk;
 
-	clks_register(u8500_common_clock_sources,
+	clkdev_add_table(u8500_common_clock_sources,
 		ARRAY_SIZE(u8500_common_clock_sources));
 
-	clks_register(db5500_prcmu_clocks, ARRAY_SIZE(db5500_prcmu_clocks));
-	clks_register(db5500_prcc_clocks, ARRAY_SIZE(db5500_prcc_clocks));
-	clks_register(db5500_clkouts, ARRAY_SIZE(db5500_clkouts));
-	clks_register(u5500_clocks, ARRAY_SIZE(u5500_clocks));
+	clkdev_add_table(db5500_prcmu_clocks, ARRAY_SIZE(db5500_prcmu_clocks));
+	clkdev_add_table(db5500_prcc_clocks, ARRAY_SIZE(db5500_prcc_clocks));
+	clkdev_add_table(db5500_clkouts, ARRAY_SIZE(db5500_clkouts));
+	clkdev_add_table(u5500_clocks, ARRAY_SIZE(u5500_clocks));
 
 	db5500_boot_clk_enable();
 

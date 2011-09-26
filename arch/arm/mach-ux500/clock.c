@@ -428,13 +428,6 @@ struct clkops prcc_kclk_ops = {
 	.disable = prcc_kclk_disable,
 };
 
-void clks_register(struct clk_lookup *clks, size_t num)
-{
-	unsigned int i;
-
-	for (i = 0; i < num; i++)
-		clkdev_add(&clks[i]);
-}
 /* TODO: Move to proper place */
 #define PRCM_DBG_PWRCTL 0x4AC
 
