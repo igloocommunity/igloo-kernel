@@ -225,14 +225,6 @@ static struct clkops clkout1_ops = {
 #define DEF_PER6_KCLK(_cg_bit, _name, _parent) \
 	DEF_PRCC_KCLK(_name, U5500_CLKRST6_BASE, _cg_bit, _parent, &per6clk)
 
-#define DEF_MTU_CLK(_cg_sel, _name, _bus_parent) \
-	struct clk _name = { \
-		.name = #_name, \
-		.ops = &mtu_clk_ops, \
-		.cg_sel = _cg_sel, \
-		.bus_parent = _bus_parent, \
-	}
-
 /* Clock sources. */
 
 static struct clk soc0_pll = {
@@ -583,9 +575,6 @@ static struct clk *db5500_dbg_clks[] __initdata = {
 	&clkout1,
 	&rtc_clk1,
 };
-
-#define CLK_LOOKUP(_clk, _dev_id, _con_id) \
-	{ .dev_id = _dev_id, .con_id = _con_id, .clk = &_clk }
 
 static struct clk_lookup u8500_common_clock_sources[] = {
 	CLK_LOOKUP(soc0_pll, NULL, "soc0_pll"),

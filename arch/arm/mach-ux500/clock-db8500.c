@@ -976,9 +976,6 @@ module_exit(clk_debug_exit);
  * when all drivers use the clk API.
  */
 
-#define CLK_LOOKUP(_clk, _dev_id, _con_id) \
-	{ .dev_id = _dev_id, .con_id = _con_id, .clk = &_clk }
-
 static struct clk_lookup u8500_clocks[] = {
 	CLK_LOOKUP(soc0_pll, NULL, "soc0_pll"),
 	CLK_LOOKUP(soc1_pll, NULL, "soc1_pll"),
