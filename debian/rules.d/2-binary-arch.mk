@@ -349,7 +349,12 @@ endif
 
 $(stampdir)/stamp-build-perarch: prepare-perarch
 ifeq ($(do_tools),true)
-	cd $(builddir)/tools-$*/tools/perf && make
+	cd $(builddir)/tools/tools/perf && \
+		make HAVE_CPLUS_DEMANGLE=1 CROSS_COMPILE=$(CROSS_COMPILE) $(conc_level)
+	if [ "$(arch)" = "amd64" ] || [ "$(arch)" = "i386" ]; then \
+		cd $(builddir)/tools/tools/power/x86/x86_energy_perf_policy && make CROSS_COMPILE=$(CROSS_COMPILE); \
+		cd $(builddir)/tools/tools/power/x86/turbostat && make CROSS_COMPILE=$(CROSS_COMPILE); \
+	fi
 endif
 	@touch $@
 
