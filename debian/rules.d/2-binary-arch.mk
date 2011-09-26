@@ -325,14 +325,18 @@ ifneq ($(skipdbg),true)
 	# package from being mirrored. It is instead, through some
 	# archive admin hackery, copied to http://ddebs.ubuntu.com.
 	#
-	mv ../$(dbgpkg)_$(release)-$(revision)_$(arch).deb \
-		../$(dbgpkg)_$(release)-$(revision)_$(arch).ddeb
+	# Only do this for PRIMARY archive for now
+	#
 	set -e; \
-	if grep -qs '^Build-Debug-Symbols: yes$$' /CurrentlyBuilding; then \
-		sed -i '/^$(dbgpkg)_/s/\.deb /.ddeb /' debian/files; \
-	else \
-		grep -v '^$(dbgpkg)_.*$$' debian/files > debian/files.new; \
-		mv debian/files.new debian/files; \
+	if grep -qs '^Purpose: PRIMARY$$' /CurrentlyBuilding; then \
+		mv ../$(dbgpkg)_$(release)-$(revision)_$(arch).deb \
+			../$(dbgpkg)_$(release)-$(revision)_$(arch).ddeb; \
+		if grep -qs '^Build-Debug-Symbols: yes$$' /CurrentlyBuilding; then \
+			sed -i '/^$(dbgpkg)_/s/\.deb /.ddeb /' debian/files; \
+		else \
+			grep -v '^$(dbgpkg)_.*$$' debian/files > debian/files.new; \
+			mv debian/files.new debian/files; \
+		fi; \
 	fi
 	# Now, the package wont get into the archive, but it will get put
 	# into the debug system.
