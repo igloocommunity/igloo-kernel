@@ -21,15 +21,14 @@
 #include <linux/gpio/nomadik.h>
 #include <linux/regulator/consumer.h>
 #include <linux/mfd/abx500.h>
+#include <linux/mfd/dbx500-prcmu.h>
 
 #include <plat/pincfg.h>
 
 #include <mach/hardware.h>
-#include <mach/prcmu.h>
 
 #include "clock.h"
 #include "pins-db5500.h"
-#include "prcmu-regs-db5500.h"
 
 static DEFINE_MUTEX(sysclk_mutex);
 static DEFINE_MUTEX(pll_mutex);
