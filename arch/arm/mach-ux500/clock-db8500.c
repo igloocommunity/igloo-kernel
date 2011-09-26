@@ -1114,32 +1114,6 @@ static struct clk_lookup u8500_v2_sysclks[] = {
 	CLK_LOOKUP(sysclk4, NULL, "sysclk4"),
 };
 
-/* these are the clocks which are default from the bootloader */
-static const char *u8500_boot_clk[] = {
-	"uart0",
-	"uart1",
-	"uart2",
-	"gpioblock0",
-	"gpioblock1",
-	"gpioblock2",
-	"gpioblock3",
-	"mtu0",
-	"mtu1",
-	"ssp0",
-	"ssp1",
-	"spi0",
-	"spi1",
-	"spi2",
-	"spi3",
-	"msp0",
-	"msp2",
-	"nmk-i2c.0",
-	"nmk-i2c.1",
-	"nmk-i2c.2",
-	"nmk-i2c.3",
-	"nmk-i2c.4",
-};
-
 static void sysclk_init_disable(struct work_struct *not_used)
 {
 	int i;
@@ -1174,55 +1148,53 @@ unlock_and_exit:
 	mutex_unlock(&sysclk_mutex);
 }
 
-static struct clk *boot_clks[ARRAY_SIZE(u8500_boot_clk)];
 
-/* we disable a majority of peripherals enabled by default
- * but without drivers
- */
-static int __init u8500_boot_clk_disable(void)
-{
-	unsigned int i = 0;
-
-	for (i = 0; i < ARRAY_SIZE(u8500_boot_clk); i++) {
-		if (!boot_clks[i])
-			continue;
-
-		clk_disable(boot_clks[i]);
-		clk_put(boot_clks[i]);
-	}
-
-	INIT_DELAYED_WORK(&sysclk_disable_work, sysclk_init_disable);
-	schedule_delayed_work(&sysclk_disable_work, 10 * HZ);
-
-	return 0;
-}
-late_initcall_sync(u8500_boot_clk_disable);
-
-static void u8500_amba_clk_enable(void)
-{
-	unsigned int i = 0;
-
-	writel(~0x0  & ~(1 << 9), __io_address(U8500_PER1_BASE + 0xF000
-					       + 0x04));
-	writel(~0x0, __io_address(U8500_PER1_BASE + 0xF000 + 0x0C));
-
-	writel(~0x0 & ~(1 << 11), __io_address(U8500_PER2_BASE + 0xF000
-					       + 0x04));
-	writel(~0x0, __io_address(U8500_PER2_BASE + 0xF000 + 0x0C));
-
-	/*GPIO,UART2 are enabled for booting*/
-	writel(0xBF, __io_address(U8500_PER3_BASE + 0xF000 + 0x04));
-	writel(~0x0 & ~(1 << 6), __io_address(U8500_PER3_BASE + 0xF000
-					      + 0x0C));
-
-	for (i = 0; i < ARRAY_SIZE(u8500_boot_clk); i++) {
-		boot_clks[i] = clk_get_sys(u8500_boot_clk[i], NULL);
-		clk_enable(boot_clks[i]);
-	}
-}
+/* List of clocks which might be enabled from the bootloader */
+static struct clk *loader_enabled_clk[] __initdata = {
+	&p1_uart0_clk,	/* uart0 */
+	&p1_uart1_clk,	/* uart1 */
+	&p3_uart2_clk,	/* uart2 */
+	&p1_pclk9,	/* gpioblock0 */
+	&p2_pclk11,	/* gpioblock1 */
+	&p3_pclk8,	/* gpioblock2 */
+	&p5_pclk1,	/* gpioblock3 */
+	&p6_mtu0_clk,	/* mtu0 */
+	&p6_mtu1_clk,	/* mtu1 */
+	&p3_ssp0_clk,	/* ssp0 */
+	&p3_ssp1_clk,	/* ssp1 */
+	&p2_pclk8,	/* spi0 */
+	&p2_pclk2,	/* spi1 */
+	&p2_pclk1,	/* spi2 */
+	&p1_pclk7,	/* spi3 */
+	&p1_msp0_clk,	/* msp0 */
+	&p2_msp2_clk,	/* msp2 */
+	&p3_i2c0_clk,	/* nmk-i2c.0 */
+	&p1_i2c1_clk,	/* nmk-i2c.1 */
+	&p1_i2c2_clk,	/* nmk-i2c.2 */
+	&p2_i2c3_clk,	/* nmk-i2c.3 */
+	&p1_i2c4_clk,	/* nmk-i2c.4 */
+	&bmlclk,	/* bml */
+	&dsialtclk,	/* dsialt */
+	&hsirxclk,	/* hsirx */
+	&hsitxclk,	/* hsitx */
+	&ipi2cclk,	/* ipi2 */
+	&lcdclk,	/* mcde */
+	&per7clk,	/* PERIPH7 */
+	&b2r2clk,	/* b2r2_bus */
+};
 
 static int __init init_clock_states(void)
 {
+	unsigned int i = 0;
+
+	/*
+	 * Disable peripheral clocks enabled by bootloadr/defualt
+	 * but without drivers
+	 */
+	for (i = 0; i < ARRAY_SIZE(loader_enabled_clk); i++)
+		if (!clk_enable(loader_enabled_clk[i]))
+			clk_disable(loader_enabled_clk[i]);
+
 	/*
 	 * The following clks are shared with secure world.
 	 * Currently this leads to a limitation where we need to
@@ -1232,45 +1204,23 @@ static int __init init_clock_states(void)
 	clk_enable(&p6_pclk2);
 	clk_enable(&p6_pclk3);
 	clk_enable(&p6_rng_clk);
-	/*
-	 * Disable clocks that are on at boot, but should be off.
-	 */
-	if (!clk_enable(&bmlclk))
-		clk_disable(&bmlclk);
-	if (!clk_enable(&dsialtclk))
-		clk_disable(&dsialtclk);
-	if (!clk_enable(&hsirxclk))
-		clk_disable(&hsirxclk);
-	if (!clk_enable(&hsitxclk))
-		clk_disable(&hsitxclk);
-	if (!clk_enable(&ipi2cclk))
-		clk_disable(&ipi2cclk);
-	if (!clk_enable(&lcdclk))
-		clk_disable(&lcdclk);
-	if (!clk_enable(&per7clk))
-		clk_disable(&per7clk);
-	if (!clk_enable(&b2r2clk))
-		clk_disable(&b2r2clk);
+
 	/*
 	 * APEATCLK and APETRACECLK are enabled at boot and needed
 	 * in order to debug with Lauterbach
 	 */
 	if (!clk_enable(&apeatclk)) {
-#ifdef CONFIG_UX500_DEBUG_NO_LAUTERBACH
-		clk_disable(&apeatclk);
-#else
 		if (!ux500_jtag_enabled())
 			clk_disable(&apeatclk);
-#endif
 	}
 	if (!clk_enable(&apetraceclk)) {
-#ifdef CONFIG_UX500_DEBUG_NO_LAUTERBACH
-		clk_disable(&apetraceclk);
-#else
 		if (!ux500_jtag_enabled())
 			clk_disable(&apetraceclk);
-#endif
 	}
+
+	INIT_DELAYED_WORK(&sysclk_disable_work, sysclk_init_disable);
+	schedule_delayed_work(&sysclk_disable_work, 10 * HZ);
+
 	return 0;
 }
 late_initcall(init_clock_states);
@@ -1282,8 +1232,6 @@ int __init db8500_clk_init(void)
 		      ARRAY_SIZE(u8500_v2_sysclks));
 	clkdev_add_table(u8500_clocks,
 		      ARRAY_SIZE(u8500_clocks));
-
-	u8500_amba_clk_enable();
 
 	return 0;
 }
