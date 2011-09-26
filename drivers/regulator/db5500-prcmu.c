@@ -17,7 +17,7 @@
 #include <linux/regulator/machine.h>
 #include <linux/regulator/db5500-prcmu.h>
 
-#include <mach/prcmu.h>
+#include <linux/mfd/dbx500-prcmu.h>
 
 #include "dbx500-prcmu.h"
 static int db5500_regulator_enable(struct regulator_dev *rdev)
