@@ -150,6 +150,7 @@
 #define CY_DELAY_DFLT               20 /* ms */
 #define CY_DELAY_MAX                (500/CY_DELAY_DFLT) /* half second */
 #define CY_DELAY_SYSINFO            20 /* ms */
+#define CY_MODE_CHANGE_DELAY        30 /* ms */
 #define CY_DELAY_BL                 300
 #define CY_DELAY_DNLOAD             100 /* ms */
 #define CY_HNDSHK_BIT               0x80
@@ -1698,6 +1699,7 @@ static int cyttsp_suspend(struct cyttsp *ts)
 			CY_REG_BASE, sizeof(sleep_mode), &sleep_mode);
 		if (!(retval < 0))
 			ts->platform_data->power_state = CY_SLEEP_STATE;
+		msleep(CY_MODE_CHANGE_DELAY);
 	}
 	DBG(printk(KERN_INFO"%s: Sleep Power state is %s\n", __func__,
 		(ts->platform_data->power_state == CY_ACTIVE_STATE) ?
