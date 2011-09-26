@@ -16,7 +16,6 @@
 #include <linux/debugfs.h>
 #include <linux/module.h>
 #include <linux/gpio.h>
-#include <linux/mfd/ab8500/sysctrl.h>
 #include <linux/workqueue.h>
 #include <linux/gpio/nomadik.h>
 #include <linux/regulator/consumer.h>
@@ -32,8 +31,6 @@
 
 static DEFINE_MUTEX(sysclk_mutex);
 static DEFINE_MUTEX(pll_mutex);
-static DEFINE_MUTEX(ab_ulpclk_mutex);
-static DEFINE_MUTEX(audioclk_mutex);
 
 /* SysClk operations. */
 static int sysclk_enable(struct clk *clk)
@@ -51,88 +48,6 @@ static void sysclk_disable(struct clk *clk)
 static struct clkops sysclk_ops = {
 	.enable = sysclk_enable,
 	.disable = sysclk_disable,
-};
-
-/* AB8500 UlpClk operations */
-
-static int ab_ulpclk_enable(struct clk *clk)
-{
-	int err;
-
-	if (clk->regulator == NULL) {
-		struct regulator *reg;
-
-		reg = regulator_get(NULL, "v-intcore");
-		if (IS_ERR(reg))
-			return PTR_ERR(reg);
-		clk->regulator = reg;
-	}
-	err = regulator_enable(clk->regulator);
-	if (err)
-		return err;
-	err = ab8500_sysctrl_clear(AB8500_SYSULPCLKCONF,
-		AB8500_SYSULPCLKCONF_ULPCLKCONF_MASK);
-	if (err)
-		return err;
-	return ab8500_sysctrl_set(AB8500_SYSULPCLKCTRL1,
-		AB8500_SYSULPCLKCTRL1_ULPCLKREQ);
-}
-
-static void ab_ulpclk_disable(struct clk *clk)
-{
-	if (ab8500_sysctrl_clear(AB8500_SYSULPCLKCTRL1,
-		AB8500_SYSULPCLKCTRL1_ULPCLKREQ))
-		goto out_err;
-	if (clk->regulator != NULL) {
-		if (regulator_disable(clk->regulator))
-			goto out_err;
-	}
-	return;
-
-out_err:
-	pr_err("clock: %s failed to disable %s.\n", __func__, clk->name);
-}
-
-static struct clkops ab_ulpclk_ops = {
-	.enable = ab_ulpclk_enable,
-	.disable = ab_ulpclk_disable,
-};
-
-/* AB8500 audio clock operations */
-
-static int audioclk_enable(struct clk *clk)
-{
-	return ab8500_sysctrl_set(AB8500_SYSULPCLKCTRL1,
-		AB8500_SYSULPCLKCTRL1_AUDIOCLKENA);
-}
-
-static void audioclk_disable(struct clk *clk)
-{
-	if (ab8500_sysctrl_clear(AB8500_SYSULPCLKCTRL1,
-		AB8500_SYSULPCLKCTRL1_AUDIOCLKENA)) {
-		pr_err("clock: %s failed to disable %s.\n", __func__,
-			clk->name);
-	}
-}
-
-static int audioclk_set_parent(struct clk *clk, struct clk *parent)
-{
-	if (parent->ops == &sysclk_ops) {
-		return ab8500_sysctrl_clear(AB8500_SYSULPCLKCTRL1,
-			AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK);
-	} else if (parent->ops == &ab_ulpclk_ops) {
-		return ab8500_sysctrl_write(AB8500_SYSULPCLKCTRL1,
-			AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK,
-			(1 << AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_SHIFT));
-	} else {
-		return -EINVAL;
-	}
-}
-
-static struct clkops audioclk_ops = {
-	.enable = audioclk_enable,
-	.disable = audioclk_disable,
-	.set_parent = audioclk_set_parent,
 };
 
 static int rtc_clk_enable(struct clk *clk)
@@ -248,10 +163,6 @@ static struct clk ddr_pll = {
 	.cg_sel = PRCMU_PLLDDR,
 };
 
-static struct clk ulp38m4 = {
-	.name = "ulp38m4",
-};
-
 static struct clk sysclk = {
 	.name = "sysclk",
 	.ops = &sysclk_ops,
@@ -292,23 +203,6 @@ static struct clk clkout1 = {
 	.ops = &clkout1_ops,
 	.parent = &sysclk,
 	.mutex = &sysclk_mutex,
-};
-
-static struct clk ab_ulpclk = {
-	.name = "ab_ulpclk",
-	.ops = &ab_ulpclk_ops,
-	.rate = 38400000,
-	.mutex = &ab_ulpclk_mutex,
-};
-
-static struct clk *audioclk_parents[] = { &sysclk, &ab_ulpclk, NULL };
-
-static struct clk audioclk = {
-	.name = "audioclk",
-	.ops = &audioclk_ops,
-	.mutex = &audioclk_mutex,
-	.parent = &sysclk,
-	.parents = audioclk_parents,
 };
 
 static DEFINE_MUTEX(parented_prcmu_mutex);
@@ -495,7 +389,6 @@ static struct clk *db5500_dbg_clks[] __initdata = {
 	&soc0_pll,
 	&soc1_pll,
 	&ddr_pll,
-	&ulp38m4,
 	&sysclk,
 	&rtc32k,
 
@@ -580,13 +473,8 @@ static struct clk_lookup u8500_common_clock_sources[] = {
 	CLK_LOOKUP(soc0_pll, NULL, "soc0_pll"),
 	CLK_LOOKUP(soc1_pll, NULL, "soc1_pll"),
 	CLK_LOOKUP(ddr_pll, NULL, "ddr_pll"),
-	CLK_LOOKUP(ulp38m4, NULL, "ulp38m4"),
 	CLK_LOOKUP(sysclk, NULL, "sysclk"),
 	CLK_LOOKUP(rtc32k, NULL, "clk32k"),
-	CLK_LOOKUP(sysclk, "ab8500-usb.0", "sysclk"),
-	CLK_LOOKUP(sysclk, "ab8500-codec.0", "sysclk"),
-	CLK_LOOKUP(ab_ulpclk, "ab8500-codec.0", "ulpclk"),
-	CLK_LOOKUP(audioclk, "ab8500-codec.0", "audioclk"),
 };
 
 static struct clk_lookup db5500_prcmu_clocks[] = {
