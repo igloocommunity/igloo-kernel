@@ -16,4 +16,8 @@
 #define gpio_cansleep   __gpio_cansleep
 #define gpio_to_irq     __gpio_to_irq
 
+#define MOP500_EGPIO(x)		(NOMADIK_NR_GPIO + (x))
+#define MOP500_EGPIO_END	MOP500_EGPIO(24)
+#define AB8500_GPIO_BASE	MOP500_EGPIO_END
+
 #endif /* __ASM_ARCH_GPIO_H */
