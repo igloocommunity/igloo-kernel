@@ -8,6 +8,8 @@
 #ifndef _AB8500_GPIO_H
 #define _AB8500_GPIO_H
 
+#include <mach/gpio.h>
+
 /*
  * Platform data to register a block: only the initial gpio/irq number.
  */
@@ -21,7 +23,7 @@ struct ab8500_gpio_platform_data {
 };
 
 enum ab8500_pin {
-	AB8500_PIN_GPIO1 = 0,
+	AB8500_PIN_GPIO1 = AB8500_GPIO_BASE,
 	AB8500_PIN_GPIO2,
 	AB8500_PIN_GPIO3,
 	AB8500_PIN_GPIO4,
