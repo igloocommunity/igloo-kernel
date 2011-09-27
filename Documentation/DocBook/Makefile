@@ -18,7 +18,7 @@ DOCBOOKS := z8530book.xml mcabook.xml device-drivers.xml \
 	    i2s.xml msp.xml shrm.xml stmpe.xml touchp.xml \
 	    tc_keypad.xml prcmu-fw-api.xml cg2900_fm_radio.xml \
 	    synaptics_rmi4_touchp.xml db5500_keypad.xml \
-	    u5500_LogicalMailbox.xml \
+	    u5500_LogicalMailbox.xml cg2900.xml\
 	    lsm303dlh.xml ste_timed_vibra.xml ste_ff_vibra.xml ux500_usb.xml
 
 ###
