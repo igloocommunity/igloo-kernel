@@ -167,7 +167,7 @@ void __init u8500_init_devices(void)
 
 #ifdef CONFIG_STM_TRACE
 	/* Early init for STM tracing */
-	platform_device_register(&ux500_stm_device);
+	platform_device_register(&u8500_stm_device);
 #endif
 
 	db8500_dma_init();
