@@ -71,7 +71,7 @@ static void ux500_tx_work(struct work_struct *data)
 	struct musb *musb = hw_ep->musb;
 	unsigned long flags;
 
-	pr_warning("DMA tx transfer done on hw_ep=%d\n", hw_ep->epnum);
+	pr_debug("DMA tx transfer done on hw_ep=%d\n", hw_ep->epnum);
 
 	spin_lock_irqsave(&musb->lock, flags);
 	ux500_channel->channel.actual_len = ux500_channel->cur_len;
@@ -96,7 +96,7 @@ static void ux500_rx_work(struct work_struct *data)
 	struct musb *musb = hw_ep->musb;
 	unsigned long flags;
 
-	pr_warning("DMA rx transfer done on hw_ep=%d\n", hw_ep->epnum);
+	pr_debug("DMA rx transfer done on hw_ep=%d\n", hw_ep->epnum);
 
 	spin_lock_irqsave(&musb->lock, flags);
 	ux500_channel->channel.actual_len = ux500_channel->cur_len;
@@ -147,7 +147,7 @@ static bool ux500_configure_channel(struct dma_channel *channel,
 	dma_addr_t usb_fifo_addr = (MUSB_FIFO_OFFSET(hw_ep->epnum) +
 					ux500_channel->controller->phy_base);
 
-	pr_warning("packet_sz=%d, mode=%d, dma_addr=0x%x, len=%d is_tx=%d\n",
+	pr_debug("packet_sz=%d, mode=%d, dma_addr=0x%x, len=%d is_tx=%d\n",
 			packet_sz, mode, dma_addr, len, ux500_channel->is_tx);
 
 	ux500_channel->cur_len = len;
@@ -312,7 +312,7 @@ static int ux500_dma_channel_abort(struct dma_channel *channel)
 	void __iomem *epio = musb->endpoints[ux500_channel->hw_ep->epnum].regs;
 	u16 csr;
 
-	pr_warning("channel=%d, is_tx=%d\n", ux500_channel->ch_num,
+	pr_debug("channel=%d, is_tx=%d\n", ux500_channel->ch_num,
 						ux500_channel->is_tx);
 
 	if (channel->status == MUSB_DMA_STATUS_BUSY) {
