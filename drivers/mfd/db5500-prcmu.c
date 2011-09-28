@@ -1532,32 +1532,38 @@ static struct regulator_consumer_supply db5500_vape_consumers[] = {
 	REGULATOR_SUPPLY("vcore", "sdi2"),
 	REGULATOR_SUPPLY("vcore", "sdi3"),
 	REGULATOR_SUPPLY("vcore", "sdi4"),
-	REGULATOR_SUPPLY("vcore", "uart0"),
-	REGULATOR_SUPPLY("vcore", "uart1"),
-	REGULATOR_SUPPLY("vcore", "uart2"),
-	REGULATOR_SUPPLY("vcore", "uart3"),
+	REGULATOR_SUPPLY("v-uart", "uart0"),
+	REGULATOR_SUPPLY("v-uart", "uart1"),
+	REGULATOR_SUPPLY("v-uart", "uart2"),
+	REGULATOR_SUPPLY("v-uart", "uart3"),
+	REGULATOR_SUPPLY("v-ape", "db5500-keypad"),
 };
 
 static struct regulator_consumer_supply db5500_sga_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.0"),
 	REGULATOR_SUPPLY("v-mali", NULL),
 };
 
 static struct regulator_consumer_supply db5500_hva_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.1"),
 	REGULATOR_SUPPLY("v-hva", NULL),
 };
 
 static struct regulator_consumer_supply db5500_sia_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.2"),
 	REGULATOR_SUPPLY("v-sia", "mmio_camera"),
 };
 
 static struct regulator_consumer_supply db5500_disp_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.3"),
 	REGULATOR_SUPPLY("vsupply", "b2r2_bus"),
 	REGULATOR_SUPPLY("vsupply", "mcde"),
 };
 
 static struct regulator_consumer_supply db5500_esram12_consumers[] = {
+	REGULATOR_SUPPLY("debug", "reg-virt-consumer.4"),
 	REGULATOR_SUPPLY("v-esram12", "mcde"),
-	REGULATOR_SUPPLY("esram12", "cm_control"),
+	REGULATOR_SUPPLY("esram12", "hva"),
 };
 
 #define DB5500_REGULATOR_SWITCH(lower, upper)                           \
