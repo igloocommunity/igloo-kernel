@@ -31,6 +31,20 @@ bool db5500_prcmu_is_ac_wake_requested(void);
 int db5500_prcmu_set_arm_opp(u8 opp);
 int db5500_prcmu_get_arm_opp(void);
 
+static inline unsigned long prcmu_clock_rate(u8 clock)
+{
+	return 0;
+}
+
+static inline long prcmu_round_clock_rate(u8 clock, unsigned long rate)
+{
+	return 0;
+}
+
+static inline int prcmu_set_clock_rate(u8 clock, unsigned long rate)
+{
+	return 0;
+}
 #else /* !CONFIG_UX500_SOC_DB5500 */
 
 static inline void db5500_prcmu_early_init(void) {}
