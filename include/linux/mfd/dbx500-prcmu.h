@@ -11,7 +11,6 @@
 #include <linux/interrupt.h>
 #include <linux/notifier.h>
 #include <linux/err.h>
-#include <asm/mach-types.h>
 
 /* PRCMU Wakeup defines */
 enum prcmu_wakeup_index {
@@ -246,9 +245,11 @@ enum ddr_pwrst {
 
 #if defined(CONFIG_UX500_SOC_DB8500) || defined(CONFIG_UX500_SOC_DB5500)
 
+#include <mach/id.h>
+
 static inline void __init prcmu_early_init(void)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_early_init();
 	else
 		return db8500_prcmu_early_init();
@@ -257,7 +258,7 @@ static inline void __init prcmu_early_init(void)
 static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 		bool keep_ap_pll)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_set_power_state(state, keep_ulp_clk,
 			keep_ap_pll);
 	else
@@ -267,7 +268,7 @@ static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 
 static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_set_epod(epod_id, epod_state);
 	else
 		return db8500_prcmu_set_epod(epod_id, epod_state);
@@ -275,7 +276,7 @@ static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
 
 static inline void prcmu_enable_wakeups(u32 wakeups)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		db5500_prcmu_enable_wakeups(wakeups);
 	else
 		db8500_prcmu_enable_wakeups(wakeups);
@@ -288,7 +289,7 @@ static inline void prcmu_disable_wakeups(void)
 
 static inline void prcmu_config_abb_event_readout(u32 abb_events)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		db5500_prcmu_config_abb_event_readout(abb_events);
 	else
 		db8500_prcmu_config_abb_event_readout(abb_events);
@@ -296,7 +297,7 @@ static inline void prcmu_config_abb_event_readout(u32 abb_events)
 
 static inline void prcmu_get_abb_event_buffer(void __iomem **buf)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		db5500_prcmu_get_abb_event_buffer(buf);
 	else
 		db8500_prcmu_get_abb_event_buffer(buf);
@@ -309,7 +310,7 @@ int prcmu_config_clkout(u8 clkout, u8 source, u8 div);
 
 static inline int prcmu_request_clock(u8 clock, bool enable)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_request_clock(clock, enable);
 	else
 		return db8500_prcmu_request_clock(clock, enable);
@@ -326,7 +327,7 @@ int prcmu_get_ddr_opp(void);
 
 static inline int prcmu_set_arm_opp(u8 opp)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_set_arm_opp(opp);
 	else
 		return db8500_prcmu_set_arm_opp(opp);
@@ -334,7 +335,7 @@ static inline int prcmu_set_arm_opp(u8 opp)
 
 static inline int prcmu_get_arm_opp(void)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_get_arm_opp();
 	else
 		return db8500_prcmu_get_arm_opp();
@@ -342,7 +343,7 @@ static inline int prcmu_get_arm_opp(void)
 
 static inline void prcmu_system_reset(u16 reset_code)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_system_reset(reset_code);
 	else
 		return db8500_prcmu_system_reset(reset_code);
@@ -350,7 +351,7 @@ static inline void prcmu_system_reset(u16 reset_code)
 
 static inline u16 prcmu_get_reset_code(void)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_get_reset_code();
 	else
 		return db8500_prcmu_get_reset_code();
@@ -361,7 +362,7 @@ void prcmu_ac_sleep_req(void);
 void prcmu_modem_reset(void);
 static inline bool prcmu_is_ac_wake_requested(void)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_is_ac_wake_requested();
 	else
 		return db8500_prcmu_is_ac_wake_requested();
@@ -369,7 +370,7 @@ static inline bool prcmu_is_ac_wake_requested(void)
 
 static inline int prcmu_set_display_clocks(void)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_set_display_clocks();
 	else
 		return db8500_prcmu_set_display_clocks();
@@ -377,7 +378,7 @@ static inline int prcmu_set_display_clocks(void)
 
 static inline int prcmu_disable_dsipll(void)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_disable_dsipll();
 	else
 		return db8500_prcmu_disable_dsipll();
@@ -385,7 +386,7 @@ static inline int prcmu_disable_dsipll(void)
 
 static inline int prcmu_enable_dsipll(void)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_enable_dsipll();
 	else
 		return db8500_prcmu_enable_dsipll();
@@ -393,7 +394,7 @@ static inline int prcmu_enable_dsipll(void)
 
 static inline int prcmu_config_esram0_deep_sleep(u8 state)
 {
-	if (machine_is_u5500())
+	if (cpu_is_u5500())
 		return db5500_prcmu_config_esram0_deep_sleep(state);
 	else
 		return db8500_prcmu_config_esram0_deep_sleep(state);
