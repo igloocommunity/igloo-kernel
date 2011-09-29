@@ -1953,26 +1953,6 @@ _exit:
 
 }
 
-static struct d40_desc *
-d40_prep_desc(struct d40_chan *chan, struct scatterlist *sg,
-	      unsigned int sg_len, unsigned long dma_flags)
-{
-	struct d40_desc *desc;
-
-	desc = d40_desc_get(chan);
-	if (!desc)
-		return NULL;
-
-	desc->lli_len = sg_len;
-	desc->lli_current = 0;
-	desc->txd.flags = dma_flags;
-	desc->txd.tx_submit = d40_tx_submit;
-
-	dma_async_tx_descriptor_init(&desc->txd, &chan->chan);
-
-	return desc;
-}
-
 struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
 						   struct scatterlist *sgl_dst,
 						   struct scatterlist *sgl_src,
@@ -1991,11 +1971,14 @@ struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
 	}
 
 	spin_lock_irqsave(&d40c->lock, flags);
+	d40d = d40_desc_get(d40c);
 
-	d40d = d40_prep_desc(d40c, sgl_dst, sgl_len, dma_flags);
-
-	if (!d40d)
+	if (d40d == NULL)
 		goto err;
+
+	d40d->lli_len = sgl_len;
+	d40d->lli_current = 0;
+	d40d->txd.flags = dma_flags;
 
 	if (chan_is_logical(d40c)) {
 
@@ -2053,6 +2036,10 @@ struct dma_async_tx_descriptor *stedma40_memcpy_sg(struct dma_chan *chan,
 						d40d->lli_pool.dma_addr,
 						d40d->lli_pool.size, DMA_TO_DEVICE);
 	}
+
+	dma_async_tx_descriptor_init(&d40d->txd, chan);
+
+	d40d->txd.tx_submit = d40_tx_submit;
 
 	spin_unlock_irqrestore(&d40c->lock, flags);
 
@@ -2293,6 +2280,9 @@ static int d40_prep_slave_sg_log(struct d40_desc *d40d,
 		return -ENOMEM;
 	}
 
+	d40d->lli_len = sg_len;
+	d40d->lli_current = 0;
+
 	if (direction == DMA_FROM_DEVICE)
 		dev_addr = d40_dev_rx_addr(d40c);
 	else if (direction == DMA_TO_DEVICE)
@@ -2328,6 +2318,9 @@ static int d40_prep_slave_sg_phy(struct d40_desc *d40d,
 		chan_err(d40c, "Out of memory\n");
 		return -ENOMEM;
 	}
+
+	d40d->lli_len = sgl_len;
+	d40d->lli_current = 0;
 
 	if (direction == DMA_FROM_DEVICE) {
 		dst_dev_addr = 0;
@@ -2387,7 +2380,7 @@ d40_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 	}
 
 	spin_lock_irqsave(&d40c->lock, flags);
-	d40d = d40_prep_desc(d40c, sgl, sg_len, dma_flags);
+	d40d = d40_desc_get(d40c);
 
 	if (d40d == NULL)
 		goto err;
@@ -2406,6 +2399,12 @@ d40_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 			chan_is_logical(d40c) ? "log" : "phy", err);
 		goto err;
 	}
+
+	d40d->txd.flags = dma_flags;
+
+	dma_async_tx_descriptor_init(&d40d->txd, chan);
+
+	d40d->txd.tx_submit = d40_tx_submit;
 
 	spin_unlock_irqrestore(&d40c->lock, flags);
 	return &d40d->txd;
