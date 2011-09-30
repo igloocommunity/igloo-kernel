@@ -616,6 +616,7 @@ static void __init mop500_i2c_init(void)
 	db8500_add_i2c3(&u8500_i2c3_data);
 }
 
+#ifdef CONFIG_UX500_GPIO_KEYS
 static struct gpio_keys_button mop500_gpio_keys[] = {
 	{
 		.desc			= "SFH7741 Proximity Sensor",
@@ -634,6 +635,7 @@ static struct gpio_keys_button mop500_gpio_keys[] = {
 };
 
 static struct regulator *sensors1p_regulator;
+struct ux500_pins *sensors1p_pins;
 static int mop500_sensors1p_activate(struct device *dev);
 static void mop500_sensors1p_deactivate(struct device *dev);
 
@@ -654,6 +656,11 @@ static struct platform_device mop500_gpio_keys_device = {
 
 static int mop500_sensors1p_activate(struct device *dev)
 {
+	if (sensors1p_pins == NULL)
+		return -EINVAL;
+
+	ux500_pins_enable(sensors1p_pins);
+
 	sensors1p_regulator = regulator_get(&mop500_gpio_keys_device.dev,
 						"vcc");
 	if (IS_ERR(sensors1p_regulator)) {
@@ -661,14 +668,41 @@ static int mop500_sensors1p_activate(struct device *dev)
 		return PTR_ERR(sensors1p_regulator);
 	}
 	regulator_enable(sensors1p_regulator);
+
+	/*
+	 * Please be aware that the start-up time of the SFH7741 is
+	 * 120 ms and during that time the output is undefined.
+	 */
+
 	return 0;
 }
 
 static void mop500_sensors1p_deactivate(struct device *dev)
 {
-	regulator_disable(sensors1p_regulator);
-	regulator_put(sensors1p_regulator);
+	if (!IS_ERR(sensors1p_regulator)) {
+		regulator_disable(sensors1p_regulator);
+		regulator_put(sensors1p_regulator);
+	}
+
+	if (sensors1p_pins != NULL)
+		ux500_pins_disable(sensors1p_pins);
 }
+
+static __init void mop500_sensors1p_init(void)
+{
+	sensors1p_pins = ux500_pins_get("gpio-keys.0");
+
+	if (sensors1p_pins == NULL) {
+		pr_err("sensors1p: Fail to get keys\n");
+		return;
+	}
+
+	mop500_gpio_keys[0].gpio = PIN_NUM(sensors1p_pins->cfg[0]);
+	mop500_gpio_keys[1].gpio = PIN_NUM(sensors1p_pins->cfg[1]);
+}
+#else
+static inline void mop500_sensors1p_init(void) { }
+#endif
 
 #ifdef CONFIG_LEDS_PWM
 static struct led_pwm pwm_leds_data[] = {
@@ -897,7 +931,9 @@ static struct platform_device *mop500_platform_devs[] __initdata = {
 #ifdef CONFIG_STE_TRACE_MODEM
 	&u8500_trace_modem,
 #endif
+#ifdef CONFIG_UX500_GPIO_KEYS
 	&mop500_gpio_keys_device,
+#endif
 #ifdef CONFIG_LEDS_PWM
 	&ux500_leds_device,
 #endif
@@ -1150,21 +1186,6 @@ static void __init mop500_init_machine(void)
 {
 	int i2c0_devs;
 
-	/*
-	 * The HREFv60 board removed a GPIO expander and routed
-	 * all these GPIO pins to the internal GPIO controller
-	 * instead.
-	 */
-	if (!machine_is_snowball()) {
-		if (machine_is_hrefv60()) {
-			mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
-			mop500_gpio_keys[1].gpio = HREFV60_HAL_SW_GPIO;
-		} else {
-			mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
-			mop500_gpio_keys[1].gpio = GPIO_HAL_SENSOR;
-		}
-	}
-
 	accessory_detect_config();
 
 	u8500_init_devices();
@@ -1178,12 +1199,14 @@ static void __init mop500_init_machine(void)
 				ARRAY_SIZE(u8500_hsi_devices));
 #endif
 
-	if (machine_is_snowball())
+	if (machine_is_snowball()) {
 		platform_add_devices(snowball_platform_devs,
 					ARRAY_SIZE(snowball_platform_devs));
-	else
+	} else {
+		mop500_sensors1p_init();
 		platform_add_devices(mop500_platform_devs,
 					ARRAY_SIZE(mop500_platform_devs));
+	}
 
 	mop500_i2c_init();
 	mop500_sdi_init();
