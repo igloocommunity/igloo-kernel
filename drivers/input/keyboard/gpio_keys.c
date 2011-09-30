@@ -42,6 +42,8 @@ struct gpio_keys_drvdata {
 	struct input_dev *input;
 	struct mutex disable_lock;
 	unsigned int n_buttons;
+	bool enabled;
+	bool enable_after_suspend;
 	int (*enable)(struct device *dev);
 	void (*disable)(struct device *dev);
 	struct gpio_button_data data[0];
@@ -437,6 +439,7 @@ static int gpio_keys_open(struct input_dev *input)
 {
 	struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
 
+	ddata->enabled = true;
 	return ddata->enable ? ddata->enable(input->dev.parent) : 0;
 }
 
@@ -446,6 +449,7 @@ static void gpio_keys_close(struct input_dev *input)
 
 	if (ddata->disable)
 		ddata->disable(input->dev.parent);
+	ddata->enabled = false;
 }
 
 /*
@@ -578,6 +582,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	ddata->n_buttons = pdata->nbuttons;
 	ddata->enable = pdata->enable;
 	ddata->disable = pdata->disable;
+	ddata->enabled = false;
 	mutex_init(&ddata->disable_lock);
 
 	platform_set_drvdata(pdev, ddata);
@@ -709,6 +714,10 @@ static int gpio_keys_suspend(struct device *dev)
 				enable_irq_wake(irq);
 			}
 		}
+	} else {
+		ddata->enable_after_suspend = ddata->enabled;
+		if (ddata->enabled)
+			gpio_keys_close(ddata->input);
 	}
 
 	return 0;
@@ -729,6 +738,10 @@ static int gpio_keys_resume(struct device *dev)
 
 		gpio_keys_report_event(&ddata->data[i]);
 	}
+
+	if (!device_may_wakeup(dev) && ddata->enable_after_suspend)
+		gpio_keys_open(ddata->input);
+
 	input_sync(ddata->input);
 
 	return 0;
