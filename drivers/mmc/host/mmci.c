@@ -19,6 +19,7 @@
 #include <linux/err.h>
 #include <linux/highmem.h>
 #include <linux/log2.h>
+#include <linux/pm_runtime.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/amba/bus.h>
@@ -1381,6 +1382,10 @@ static int __devinit mmci_probe(struct amba_device *dev,
 
 	amba_set_drvdata(dev, mmc);
 
+	pm_runtime_enable(mmc->parent);
+	if (pm_runtime_get_sync(mmc->parent) < 0)
+		dev_err(mmc_dev(mmc), "failed pm_runtime_get_sync\n");
+
 	dev_info(&dev->dev, "%s: PL%03x manf %x rev%u at 0x%08llx irq %d,%d (pio)\n",
 		 mmc_hostname(mmc), amba_part(dev), amba_manf(dev),
 		 amba_rev(dev), (unsigned long long)dev->res.start,
@@ -1473,6 +1478,9 @@ static int mmci_suspend(struct amba_device *dev, pm_message_t state)
 		ret = mmc_suspend_host(mmc);
 		if (ret == 0)
 			writel(0, host->base + MMCIMASK0);
+
+		if (pm_runtime_put_sync(mmc->parent) < 0)
+			dev_err(mmc_dev(mmc), "failed pm_runtime_put_sync\n");
 	}
 
 	return ret;
@@ -1485,6 +1493,9 @@ static int mmci_resume(struct amba_device *dev)
 
 	if (mmc) {
 		struct mmci_host *host = mmc_priv(mmc);
+
+		if (pm_runtime_get_sync(mmc->parent) < 0)
+			dev_err(mmc_dev(mmc), "failed pm_runtime_get_sync\n");
 
 		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
 
