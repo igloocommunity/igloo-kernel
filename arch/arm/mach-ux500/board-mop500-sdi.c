@@ -56,6 +56,7 @@ static int mop500_sdi0_ios_handler(struct device *dev, struct mmc_ios *ios)
 	return 0;
 }
 
+#ifdef MMC_SUSPEND_WORKAROUND
 #ifdef CONFIG_STE_DMA40
 struct stedma40_chan_cfg mop500_sdi0_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
@@ -79,6 +80,7 @@ static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
 	.phy_channel = 0,
 };
 #endif
+#endif
 
 static struct mmci_platform_data mop500_sdi0_data = {
 	.ios_handler	= mop500_sdi0_ios_handler,
@@ -92,10 +94,12 @@ static struct mmci_platform_data mop500_sdi0_data = {
 				MCI_ST_CMDDIREN |
 				MCI_ST_DATA0DIREN |
 				MCI_ST_DATA2DIREN,
+#ifdef MMC_SUSPEND_WORKAROUND
 #ifdef CONFIG_STE_DMA40
 	.dma_filter	= stedma40_filter,
 	.dma_rx_param	= &mop500_sdi0_dma_cfg_rx,
 	.dma_tx_param	= &mop500_sdi0_dma_cfg_tx,
+#endif
 #endif
 };
 
@@ -178,6 +182,7 @@ void mop500_sdi_tc35892_init(void)
 /*
  * SDI 2 (POP eMMC, not on DB8500ed)
  */
+#ifdef MMC_SUSPEND_WORKAROUND
 #ifdef CONFIG_STE_DMA40
 struct stedma40_chan_cfg mop500_sdi2_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
@@ -197,6 +202,7 @@ static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
 };
 #endif
+#endif
 
 static struct mmci_platform_data mop500_sdi2_data = {
 	.ocr_mask	= MMC_VDD_165_195,
@@ -205,10 +211,12 @@ static struct mmci_platform_data mop500_sdi2_data = {
 				MMC_CAP_8_BIT_DATA,
 	.gpio_cd	= -1,
 	.gpio_wp	= -1,
+#ifdef MMC_SUSPEND_WORKAROUND
 #ifdef CONFIG_STE_DMA40
 	.dma_filter	= stedma40_filter,
 	.dma_rx_param	= &mop500_sdi2_dma_cfg_rx,
 	.dma_tx_param	= &mop500_sdi2_dma_cfg_tx,
+#endif
 #endif
 };
 
@@ -216,6 +224,7 @@ static struct mmci_platform_data mop500_sdi2_data = {
  * SDI 4 (on-board eMMC)
  */
 
+#ifdef MMC_SUSPEND_WORKAROUND
 #ifdef CONFIG_STE_DMA40
 struct stedma40_chan_cfg mop500_sdi4_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
@@ -235,6 +244,7 @@ static struct stedma40_chan_cfg mop500_sdi4_dma_cfg_tx = {
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
 };
 #endif
+#endif
 
 static struct mmci_platform_data mop500_sdi4_data = {
 	.ocr_mask	= MMC_VDD_29_30,
@@ -244,10 +254,12 @@ static struct mmci_platform_data mop500_sdi4_data = {
 				MMC_CAP_MMC_HIGHSPEED,
 	.gpio_cd	= -1,
 	.gpio_wp	= -1,
+#ifdef MMC_SUSPEND_WORKAROUND
 #ifdef CONFIG_STE_DMA40
 	.dma_filter	= stedma40_filter,
 	.dma_rx_param	= &mop500_sdi4_dma_cfg_rx,
 	.dma_tx_param	= &mop500_sdi4_dma_cfg_tx,
+#endif
 #endif
 };
 
