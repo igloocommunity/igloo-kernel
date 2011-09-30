@@ -64,6 +64,7 @@
 #define SNOWBALL_PME_ETH_GPIO		AB8500_PIN_GPIO24	/* SYSCLKREQ7/GPIO24 */
 #define SNOWBALL_EN_3V3_ETH_GPIO	AB8500_PIN_GPIO26	/* GPIO26 */
 
+
 struct i2c_board_info;
 
 extern void mop500_sdi_init(void);
