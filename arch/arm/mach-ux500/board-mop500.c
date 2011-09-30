@@ -452,11 +452,10 @@ static struct ske_keypad_platform_data mop500_ske_keypad_data = {
 #endif
 
 
-
+#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
 /*
  * GPIO-regulator wlan vbat data
  */
-
 static struct fixed_voltage_config snowball_gpio_wlan_vbat_data = {
 	.supply_name		= "WLAN-VBAT",
 	.gpio			= SNOWBALL_EN_3V6_GPIO,
@@ -465,6 +464,20 @@ static struct fixed_voltage_config snowball_gpio_wlan_vbat_data = {
 	.init_data		= &gpio_wlan_vbat_regulator,
 	.startup_delay		= 3500, /* Startup time */
 };
+
+/*
+ * GPIO-regulator en 3v3 vbat data
+ */
+
+static struct fixed_voltage_config snowball_gpio_en_3v3_data = {
+	.supply_name		= "EN-3V3",
+	.gpio			= SNOWBALL_EN_3V3_ETH_GPIO,
+	.microvolts		= 3300000,
+	.enable_high		= 1,
+	.init_data		= &gpio_en_3v3_regulator,
+	.startup_delay		= 5000, /* 1200us according to data sheet */
+};
+#endif
 
 /*
  * TC35892
@@ -649,6 +662,7 @@ static struct platform_device mop500_gpio_keys_device = {
 	},
 };
 
+#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
 static struct platform_device snowball_gpio_wlan_vbat_regulator_device = {
 	.name	= "reg-fixed-voltage",
 	.id	= 0,
@@ -656,6 +670,15 @@ static struct platform_device snowball_gpio_wlan_vbat_regulator_device = {
 		.platform_data	= &snowball_gpio_wlan_vbat_data,
 	},
 };
+
+static struct platform_device snowball_gpio_en_3v3_regulator_device = {
+	.name	= "reg-fixed-voltage",
+	.id	= 1,
+	.dev	= {
+		.platform_data	= &snowball_gpio_en_3v3_data,
+	},
+};
+#endif
 
 static int mop500_sensors1p_activate(struct device *dev)
 {
@@ -1073,8 +1096,13 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
 	&ux500_hwmem_device,
 	&snowball_led_dev,
 	&snowball_key_dev,
-	&snowball_sbnet_dev,
+#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
+	&snowball_gpio_en_3v3_regulator_device,
+#endif
+#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
 	&snowball_gpio_wlan_vbat_regulator_device,
+#endif
+	&snowball_sbnet_dev,
 	&u8500_mcde_device,
 	&u8500_b2r2_device,
 };
