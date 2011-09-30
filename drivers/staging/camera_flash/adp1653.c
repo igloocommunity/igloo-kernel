@@ -16,7 +16,6 @@
 #include <asm/mach-types.h>
 #include "flash_common.h"
 #include "adp1653.h"
-#include "camera_flash.h"
 
 /* This data is platform specific for 8500 href-v1 platform,
  * Ideally this should be supplied from platform code

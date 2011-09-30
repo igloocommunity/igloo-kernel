@@ -18,7 +18,7 @@
 #include <linux/vmalloc.h>
 #include <linux/workqueue.h>
 #include <linux/mfd/dbx500-prcmu.h>
-#include "mmio.h"
+#include <linux/mmio.h>
 
 #define ISP_REGION_IO				(0xE0000000)
 #define SIA_ISP_REG_ADDR			(0x521E4)

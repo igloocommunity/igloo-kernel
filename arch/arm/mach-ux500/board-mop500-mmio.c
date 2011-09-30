@@ -28,7 +28,7 @@
 #include "pins-db8500.h"
 #include "pins.h"
 #include "board-mop500.h"
-#include "../drivers/staging/mmio/mmio.h"
+#include <linux/mmio.h>
 
 static pin_cfg_t i2c2_pins[] = {
 	GPIO8_I2C2_SDA,
