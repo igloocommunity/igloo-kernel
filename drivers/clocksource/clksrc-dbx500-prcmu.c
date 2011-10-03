@@ -32,7 +32,7 @@
 
 #define SCHED_CLOCK_MIN_WRAP 131072 /* 2^32 / 32768 */
 
-void __iomem *clksrc_dbx500_timer_base;
+static void __iomem *clksrc_dbx500_timer_base;
 
 static cycle_t clksrc_dbx500_prcmu_read(struct clocksource *cs)
 {
@@ -97,8 +97,10 @@ static struct boottime_timer __initdata boottime_timer = {
 };
 #endif
 
-void __init clksrc_dbx500_prcmu_init(void)
+void __init clksrc_dbx500_prcmu_init(void __iomem *base)
 {
+	clksrc_dbx500_timer_base = base;
+
 	/*
 	 * The A9 sub system expects the timer to be configured as
 	 * a continous looping timer.
