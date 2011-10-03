@@ -466,10 +466,10 @@ static int ecm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 			usb_ep_disable(ecm->notify);
 		} else {
 			VDBG(cdev, "init ecm ctrl %d\n", intf);
-			ecm->notify_desc = ep_choose(cdev->gadget,
-					ecm->hs.notify,
-					ecm->fs.notify);
 		}
+		ecm->notify_desc = ep_choose(cdev->gadget,
+				ecm->hs.notify,
+				ecm->fs.notify);
 		usb_ep_enable(ecm->notify, ecm->notify_desc);
 		ecm->notify->driver_data = ecm;
 
@@ -483,13 +483,13 @@ static int ecm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 			gether_disconnect(&ecm->port);
 		}
 
-		if (!ecm->port.in) {
+		if (!ecm->port.in)
 			DBG(cdev, "init ecm\n");
-			ecm->port.in = ep_choose(cdev->gadget,
-					ecm->hs.in, ecm->fs.in);
-			ecm->port.out = ep_choose(cdev->gadget,
-					ecm->hs.out, ecm->fs.out);
-		}
+
+		ecm->port.in = ep_choose(cdev->gadget,
+				ecm->hs.in, ecm->fs.in);
+		ecm->port.out = ep_choose(cdev->gadget,
+				ecm->hs.out, ecm->fs.out);
 
 		/* CDC Ethernet only sends data in non-default altsettings.
 		 * Changing altsettings resets filters, statistics, etc.
