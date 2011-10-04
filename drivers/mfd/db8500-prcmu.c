@@ -424,7 +424,7 @@ static DEFINE_SPINLOCK(gpiocr_lock);
 static __iomem void *tcdm_base;
 
 struct clk_mgt {
-	unsigned int offset;
+	void __iomem *reg;
 	u32 pllsw;
 	int branch;
 	bool clk38div;
@@ -439,7 +439,7 @@ enum {
 static DEFINE_SPINLOCK(clk_mgt_lock);
 
 #define CLK_MGT_ENTRY(_name, _branch, _clk38div)[PRCMU_##_name] = \
-	{ (PRCM_##_name##_MGT_OFF), 0 , _branch, _clk38div}
+	{ (PRCM_##_name##_MGT), 0 , _branch, _clk38div}
 struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
 	CLK_MGT_ENTRY(SGACLK, PLL_DIV, false),
 	CLK_MGT_ENTRY(UARTCLK, PLL_FIX, true),
@@ -954,9 +954,9 @@ int db8500_prcmu_set_ddr_opp(u8 opp)
 /* Divide the frequency of certain clocks by 2 for APE_50_PARTLY_25_OPP. */
 static void request_even_slower_clocks(bool enable)
 {
-	const u8 clock_reg[] = {
-		PRCM_ACLK_MGT_OFF,
-		PRCM_DMACLK_MGT_OFF
+	void __iomem *clock_reg[] = {
+		PRCM_ACLK_MGT,
+		PRCM_DMACLK_MGT
 	};
 	unsigned long flags;
 	unsigned int i;
@@ -971,7 +971,7 @@ static void request_even_slower_clocks(bool enable)
 		u32 val;
 		u32 div;
 
-		val = readl(_PRCMU_BASE + clock_reg[i]);
+		val = readl(clock_reg[i]);
 		div = (val & PRCM_CLK_MGT_CLKPLLDIV_MASK);
 		if (enable) {
 			if ((div <= 1) || (div > 15)) {
@@ -987,7 +987,7 @@ static void request_even_slower_clocks(bool enable)
 		}
 		val = ((val & ~PRCM_CLK_MGT_CLKPLLDIV_MASK) |
 			(div & PRCM_CLK_MGT_CLKPLLDIV_MASK));
-		writel(val, (_PRCMU_BASE + clock_reg[i]));
+		writel(val, clock_reg[i]);
 	}
 
 unlock_and_return:
@@ -1465,14 +1465,14 @@ static int request_clock(u8 clock, bool enable)
 	while ((readl(PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
 		cpu_relax();
 
-	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
+	val = readl(clk_mgt[clock].reg);
 	if (enable) {
 		val |= (PRCM_CLK_MGT_CLKEN | clk_mgt[clock].pllsw);
 	} else {
 		clk_mgt[clock].pllsw = (val & PRCM_CLK_MGT_CLKPLLSW_MASK);
 		val &= ~(PRCM_CLK_MGT_CLKEN | PRCM_CLK_MGT_CLKPLLSW_MASK);
 	}
-	writel(val, (_PRCMU_BASE + clk_mgt[clock].offset));
+	writel(val, clk_mgt[clock].reg);
 
 	/* Release the HW semaphore. */
 	writel(0, PRCM_SEM);
@@ -1529,7 +1529,7 @@ int db8500_prcmu_request_clock(u8 clock, bool enable)
 	return -EINVAL;
 }
 
-static unsigned long pll_rate(unsigned int reg_offset, unsigned long src_rate,
+static unsigned long pll_rate(void __iomem *reg, unsigned long src_rate,
 	int branch)
 {
 	u64 rate;
@@ -1537,7 +1537,7 @@ static unsigned long pll_rate(unsigned int reg_offset, unsigned long src_rate,
 	u32 d;
 	u32 div = 1;
 
-	val = readl(_PRCMU_BASE + reg_offset);
+	val = readl(reg);
 
 	rate = src_rate;
 	rate *= ((val & PRCM_PLL_FREQ_D_MASK) >> PRCM_PLL_FREQ_D_SHIFT);
@@ -1555,8 +1555,8 @@ static unsigned long pll_rate(unsigned int reg_offset, unsigned long src_rate,
 
 	if ((branch == PLL_FIX) || ((branch == PLL_DIV) &&
 		(val & PRCM_PLL_FREQ_DIV2EN) &&
-		((reg_offset == PRCM_PLLSOC0_FREQ) ||
-		 (reg_offset == PRCM_PLLDDR_FREQ))))
+		((reg == PRCM_PLLSOC0_FREQ) ||
+		 (reg == PRCM_PLLDDR_FREQ))))
 		div *= 2;
 
 	(void)do_div(rate, div);
@@ -1572,7 +1572,7 @@ static unsigned long clock_rate(u8 clock)
 	u32 pllsw;
 	unsigned long rate = ROOT_CLOCK_RATE;
 
-	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
+	val = readl(clk_mgt[clock].reg);
 
 	if (val & PRCM_CLK_MGT_CLK38) {
 		if (clk_mgt[clock].clk38div && (val & PRCM_CLK_MGT_CLK38DIV))
@@ -1660,7 +1660,7 @@ static long round_clock_rate(u8 clock, unsigned long rate)
 	unsigned long src_rate;
 	long rounded_rate;
 
-	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
+	val = readl(clk_mgt[clock].reg);
 	src_rate = clock_source_rate((val | clk_mgt[clock].pllsw),
 		clk_mgt[clock].branch);
 	div = clock_divider(src_rate, rate);
@@ -1704,7 +1704,7 @@ static void set_clock_rate(u8 clock, unsigned long rate)
 	while ((readl(PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
 		cpu_relax();
 
-	val = readl(_PRCMU_BASE + clk_mgt[clock].offset);
+	val = readl(clk_mgt[clock].reg);
 	src_rate = clock_source_rate((val | clk_mgt[clock].pllsw),
 		clk_mgt[clock].branch);
 	div = clock_divider(src_rate, rate);
@@ -1732,7 +1732,7 @@ static void set_clock_rate(u8 clock, unsigned long rate)
 		val &= ~PRCM_CLK_MGT_CLKPLLDIV_MASK;
 		val |= div;
 	}
-	writel(val, (_PRCMU_BASE + clk_mgt[clock].offset));
+	writel(val, clk_mgt[clock].reg);
 
 	/* Release the HW semaphore. */
 	writel(0, PRCM_SEM);
