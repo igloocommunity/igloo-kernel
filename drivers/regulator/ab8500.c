@@ -1163,6 +1163,11 @@ static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
 		}
 	}
 
+	/* register external regulators (before Vaux1, 2 and 3) */
+	err = ab8500_ext_regulator_init(pdev);
+	if (err)
+		return err;
+
 	/* register all regulators */
 	for (i = 0; i < ARRAY_SIZE(ab8500_regulator_info); i++) {
 		struct ab8500_regulator_info *info = NULL;
@@ -1207,7 +1212,7 @@ static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
 
 static __devexit int ab8500_regulator_remove(struct platform_device *pdev)
 {
-	int i;
+	int i, err;
 
 	for (i = 0; i < ARRAY_SIZE(ab8500_regulator_info); i++) {
 		struct ab8500_regulator_info *info = NULL;
@@ -1218,6 +1223,11 @@ static __devexit int ab8500_regulator_remove(struct platform_device *pdev)
 
 		regulator_unregister(info->regulator);
 	}
+
+	/* remove external regulators (after Vaux1, 2 and 3) */
+	err = ab8500_ext_regulator_exit(pdev);
+	if (err)
+		return err;
 
 	return 0;
 }
