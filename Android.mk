@@ -87,7 +87,7 @@ ifeq ($(shell [ -f kernel/net/compat-wireless-openmac/Makefile ] && echo "OK"), 
 		--module CONFIG_CW1200 \
 		--enable CONFIG_CW1200_WAPI_SUPPORT \
 		--enable CONFIG_CW1200_USE_STE_EXTENSIONS \
-		--disable CONFIG_CW1200_NON_POWER_OF_TWO_BLOCKSIZES \
+		--enable CONFIG_CW1200_NON_POWER_OF_TWO_BLOCKSIZES \
 		--enable CONFIG_CW1200_USE_GPIO_IRQ \
 		--disable CONFIG_CW1200_5GHZ_SUPPORT \
 		--enable CONFIG_CW1200_STA_DEBUG \
