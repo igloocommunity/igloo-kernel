@@ -467,6 +467,30 @@ struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
 	CLK_MGT_ENTRY(UICCCLK, PLL_FIX, false),
 };
 
+struct dsiescclk {
+	u32 en;
+	u32 div_mask;
+	u32 div_shift;
+};
+
+static struct dsiescclk dsiescclk[3] = {
+	{
+		.en = PRCM_DSITVCLK_DIV_DSI0_ESC_CLK_EN,
+		.div_mask = PRCM_DSITVCLK_DIV_DSI0_ESC_CLK_DIV_MASK,
+		.div_shift = PRCM_DSITVCLK_DIV_DSI0_ESC_CLK_DIV_SHIFT,
+	},
+	{
+		.en = PRCM_DSITVCLK_DIV_DSI1_ESC_CLK_EN,
+		.div_mask = PRCM_DSITVCLK_DIV_DSI1_ESC_CLK_DIV_MASK,
+		.div_shift = PRCM_DSITVCLK_DIV_DSI1_ESC_CLK_DIV_SHIFT,
+	},
+	{
+		.en = PRCM_DSITVCLK_DIV_DSI2_ESC_CLK_EN,
+		.div_mask = PRCM_DSITVCLK_DIV_DSI2_ESC_CLK_DIV_MASK,
+		.div_shift = PRCM_DSITVCLK_DIV_DSI2_ESC_CLK_DIV_SHIFT,
+	}
+};
+
 static struct regulator *hwacc_regulator[NUM_HW_ACC];
 static struct regulator *hwacc_ret_regulator[NUM_HW_ACC];
 
@@ -1537,6 +1561,16 @@ static int request_sga_clock(u8 clock, bool enable)
 	return ret;
 }
 
+static int request_dsiescclk(u8 n, bool enable)
+{
+	u32 val;
+
+	val = readl(PRCM_DSITVCLK_DIV);
+	enable ? (val |= dsiescclk[n].en) : (val &= ~dsiescclk[n].en);
+	writel(val, PRCM_DSITVCLK_DIV);
+	return 0;
+}
+
 /**
  * db8500_prcmu_request_clock() - Request for a clock to be enabled or disabled.
  * @clock:      The clock for which the request is made.
@@ -1561,6 +1595,8 @@ int db8500_prcmu_request_clock(u8 clock, bool enable)
 	}
 	if (clock < PRCMU_NUM_REG_CLOCKS)
 		return request_clock(clock, enable);
+	else if ((PRCMU_DSI0ESCCLK <= clock) && (clock <= PRCMU_DSI2ESCCLK))
+		return request_dsiescclk((clock - PRCMU_DSI0ESCCLK), enable);
 	return -EINVAL;
 }
 
@@ -1641,6 +1677,15 @@ static unsigned long clock_rate(u8 clock)
 		return 0;
 }
 
+static unsigned long dsiescclk_rate(u8 n)
+{
+	u32 div;
+
+	div = readl(PRCM_DSITVCLK_DIV);
+	div = ((div & dsiescclk[n].div_mask) >> (dsiescclk[n].div_shift));
+	return clock_rate(PRCMU_TVCLK) / max((u32)1, div);
+}
+
 unsigned long prcmu_clock_rate(u8 clock)
 {
 	if (clock < PRCMU_NUM_REG_CLOCKS)
@@ -1655,6 +1700,8 @@ unsigned long prcmu_clock_rate(u8 clock)
 		return pll_rate(PRCM_PLLSOC1_FREQ, ROOT_CLOCK_RATE, PLL_RAW);
 	else if (clock == PRCMU_PLLDDR)
 		return pll_rate(PRCM_PLLDDR_FREQ, ROOT_CLOCK_RATE, PLL_RAW);
+	else if ((PRCMU_DSI0ESCCLK <= clock) && (clock <= PRCMU_DSI2ESCCLK))
+		return dsiescclk_rate(clock - PRCMU_DSI0ESCCLK);
 	else
 		return 0;
 }
@@ -1683,8 +1730,6 @@ static u32 clock_divider(unsigned long src_rate, unsigned long rate)
 		return 1;
 	if (rate < (src_rate / div))
 		div++;
-	if (div > 31)
-		div = 31;
 	return div;
 }
 
@@ -1713,7 +1758,20 @@ static long round_clock_rate(u8 clock, unsigned long rate)
 		if (r <= rate)
 			return (unsigned long)r;
 	}
-	rounded_rate = (src_rate / div);
+	rounded_rate = (src_rate / min(div, (u32)31));
+
+	return rounded_rate;
+}
+
+static long round_dsiescclk_rate(unsigned long rate)
+{
+	u32 div;
+	unsigned long src_rate;
+	long rounded_rate;
+
+	src_rate = clock_rate(PRCMU_TVCLK);
+	div = clock_divider(src_rate, rate);
+	rounded_rate = (src_rate / min(div, (u32)255));
 
 	return rounded_rate;
 }
@@ -1722,6 +1780,8 @@ long prcmu_round_clock_rate(u8 clock, unsigned long rate)
 {
 	if (clock < PRCMU_NUM_REG_CLOCKS)
 		return round_clock_rate(clock, rate);
+	else if ((PRCMU_DSI0ESCCLK <= clock) && (clock <= PRCMU_DSI2ESCCLK))
+		return round_dsiescclk_rate(rate);
 	else
 		return (long)prcmu_clock_rate(clock);
 }
@@ -1762,10 +1822,10 @@ static void set_clock_rate(u8 clock, unsigned long rate)
 				div = 0;
 			}
 		}
-		val |= div;
+		val |= min(div, (u32)31);
 	} else {
 		val &= ~PRCM_CLK_MGT_CLKPLLDIV_MASK;
-		val |= div;
+		val |= min(div, (u32)31);
 	}
 	writel(val, clk_mgt[clock].reg);
 
@@ -1775,10 +1835,24 @@ static void set_clock_rate(u8 clock, unsigned long rate)
 	spin_unlock_irqrestore(&clk_mgt_lock, flags);
 }
 
+static void set_dsiescclk_rate(u8 n, unsigned long rate)
+{
+	u32 val;
+	u32 div;
+
+	div = clock_divider(clock_rate(PRCMU_TVCLK), rate);
+	val = readl(PRCM_DSITVCLK_DIV);
+	val &= ~dsiescclk[n].div_mask;
+	val |= (min(div, (u32)255) << dsiescclk[n].div_shift);
+	writel(val, PRCM_DSITVCLK_DIV);
+}
+
 int prcmu_set_clock_rate(u8 clock, unsigned long rate)
 {
 	if (clock < PRCMU_NUM_REG_CLOCKS)
 		set_clock_rate(clock, rate);
+	else if ((PRCMU_DSI0ESCCLK <= clock) && (clock <= PRCMU_DSI2ESCCLK))
+		set_dsiescclk_rate((clock - PRCMU_DSI0ESCCLK), rate);
 	return 0;
 }
 
