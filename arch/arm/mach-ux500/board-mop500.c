@@ -50,13 +50,12 @@
 #include <mach/sensors1p.h>
 #include <mach/abx500-accdet.h>
 #include <mach/irqs.h>
-#include <mach/ste_audio.h>
 #include <mach/ste-dma40-db8500.h>
 #ifdef CONFIG_U8500_SIM_DETECT
 #include <mach/sim_detect.h>
 #endif
 #include <mach/crypto-ux500.h>
-#include <mach/ste_audio_io_vibrator.h>
+
 #include <video/av8100.h>
 
 #ifdef CONFIG_KEYBOARD_NOMADIK_SKE
@@ -78,11 +77,6 @@ static struct ab8500_denc_platform_data ab8500_denc_pdata = {
 	.ddr_little_endian = false,
 };
 #endif
-
-static struct ab8500_audio_platform_data ab8500_audio_plat_data = {
-	.ste_gpio_altf_init = msp13_i2s_init,
-	.ste_gpio_altf_exit = msp13_i2s_exit,
-};
 
 static struct gpio_led snowball_led_array[] = {
 	{
@@ -261,7 +255,6 @@ static struct ab8500_platform_data ab8500_platdata = {
 #ifdef CONFIG_AB8500_DENC
 	.denc		= &ab8500_denc_pdata,
 #endif
-	.audio		= &ab8500_audio_plat_data,
 	.battery	= &ab8500_bm_data,
 	.charger	= &ab8500_charger_plat_data,
 	.btemp		= &ab8500_btemp_plat_data,
