@@ -116,7 +116,7 @@ static struct usecase_config usecase_conf[UX500_UC_MAX] = {
 	},
 	[UX500_UC_VC] = {
 		.name			= "voice-call",
-		.max_freq		= 400000,
+		.max_freq		= 800000,
 		.min_freq		= 400000,
 		.cpuidle_multiplier	= 0,
 		.second_cpu_online	= false,
