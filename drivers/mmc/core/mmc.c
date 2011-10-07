@@ -339,6 +339,15 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		card->ext_csd.rel_sectors = ext_csd[EXT_CSD_REL_WR_SEC_C];
 
 		/*
+		 * Note that the call to mmc_part_add defaults to read
+		 * only. If this default assumption is changed, the call must
+		 * take into account the value of boot_locked below.
+		 */
+		card->ext_csd.boot_locked = ext_csd[EXT_CSD_BOOT_WP] &
+			(EXT_CSD_BOOT_WP_B_PERM_WP_EN |
+			 EXT_CSD_BOOT_WP_B_PWR_WP_EN);
+
+		/*
 		 * There are two boot regions of equal size, defined in
 		 * multiples of 128K.
 		 */
@@ -347,7 +356,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 				part_size = ext_csd[EXT_CSD_BOOT_MULT] << 17;
 				mmc_part_add(card, part_size,
 					EXT_CSD_PART_CONFIG_ACC_BOOT0 + idx,
-					"boot%d", idx, true);
+					"boot%d", idx, true, MMC_BLK_DATA_AREA_BOOT);
 			}
 		}
 	}
@@ -434,7 +443,8 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 					hc_wp_grp_sz);
 				mmc_part_add(card, part_size << 19,
 					EXT_CSD_PART_CONFIG_ACC_GP0 + idx,
-					"gp%d", idx, false);
+					"gp%d", idx, false,
+					MMC_BLK_DATA_AREA_GP);
 			}
 		}
 		card->ext_csd.sec_trim_mult =
