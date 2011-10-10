@@ -16,6 +16,7 @@
 #include <linux/version.h>
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
+#include <linux/regulator/consumer.h>
 #include <linux/err.h>
 
 #include <plat/ste_dma40.h>
@@ -315,6 +316,7 @@ struct d40_chan {
  * to phy_chans entries.
  * @plat_data: Pointer to provided platform_data which is the driver
  * configuration.
+ * @lcpa_regulator: Pointer to hold the regulator for the esram bank for lcla.
  * @phy_res: Vector containing all physical channels.
  * @lcla_pool: lcla pool settings and data.
  * @lcpa_base: The virtual mapped address of LCPA.
@@ -351,6 +353,7 @@ struct d40_base {
 	struct d40_chan			**lookup_log_chans;
 	struct d40_chan			**lookup_phy_chans;
 	struct stedma40_platform_data	 *plat_data;
+	struct regulator		 *lcpa_regulator;
 	/* Physical half channels */
 	struct d40_phy_res		 *phy_res;
 	struct d40_lcla_pool		  lcla_pool;
@@ -3065,6 +3068,9 @@ static int dma40_pm_suspend(struct device *dev)
 
 	spin_unlock_irqrestore(&base->usage_lock, flags);
 
+	if (base->lcpa_regulator)
+		ret = regulator_disable(base->lcpa_regulator);
+
 	return ret;
 }
 
@@ -3089,10 +3095,23 @@ static int dma40_runtime_resume(struct device *dev)
 	return 0;
 }
 
+static int dma40_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct d40_base *base = platform_get_drvdata(pdev);
+	int ret = 0;
+
+	if (base->lcpa_regulator)
+		ret = regulator_enable(base->lcpa_regulator);
+
+	return ret;
+}
+
 static const struct dev_pm_ops dma40_pm_ops = {
 	.suspend		= dma40_pm_suspend,
 	.runtime_suspend	= dma40_runtime_suspend,
 	.runtime_resume		= dma40_runtime_resume,
+	.resume			= dma40_resume,
 };
 #define DMA40_PM_OPS	(&dma40_pm_ops)
 #else
@@ -3581,6 +3600,7 @@ static int __init d40_probe(struct platform_device *pdev)
 			goto failure;
 		}
 		writel(res->start, base->virtbase + D40_DREG_LCLA);
+
 	} else {
 		ret = d40_lcla_allocate(base);
 		if (ret) {
@@ -3611,6 +3631,25 @@ static int __init d40_probe(struct platform_device *pdev)
 	pm_runtime_use_autosuspend(base->dev);
 	pm_runtime_enable(base->dev);
 	pm_runtime_resume(base->dev);
+
+	if (base->plat_data->use_esram_lcla) {
+
+		base->lcpa_regulator = regulator_get(base->dev, "lcla_esram");
+		if (IS_ERR(base->lcpa_regulator)) {
+			d40_err(&pdev->dev, "Failed to get lcpa_regulator\n");
+			base->lcpa_regulator = NULL;
+			goto failure;
+		}
+
+		ret = regulator_enable(base->lcpa_regulator);
+		if (ret) {
+			d40_err(&pdev->dev,
+				"Failed to enable lcpa_regulator\n");
+			regulator_put(base->lcpa_regulator);
+			base->lcpa_regulator = NULL;
+			goto failure;
+		}
+	}
 
 	base->initialized = true;
 
@@ -3660,6 +3699,11 @@ failure:
 			clk_put(base->clk);
 		}
 
+		if (base->lcpa_regulator) {
+			regulator_disable(base->lcpa_regulator);
+			regulator_put(base->lcpa_regulator);
+		}
+
 		kfree(base->lcla_pool.alloc_map);
 		kfree(base->lookup_log_chans);
 		kfree(base->lookup_phy_chans);
@@ -3683,4 +3727,4 @@ static int __init stedma40_init(void)
 {
 	return platform_driver_probe(&d40_driver, d40_probe);
 }
-arch_initcall(stedma40_init);
+subsys_initcall(stedma40_init);
