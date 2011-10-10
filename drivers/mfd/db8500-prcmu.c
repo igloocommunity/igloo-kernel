@@ -2486,6 +2486,7 @@ static struct regulator_consumer_supply db8500_esram12_consumers[] = {
 static struct regulator_consumer_supply db8500_esram34_consumers[] = {
 	REGULATOR_SUPPLY("v-esram34", "mcde"),
 	REGULATOR_SUPPLY("esram34", "cm_control"),
+	REGULATOR_SUPPLY("lcla_esram", "dma40.0"),
 };
 
 static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
