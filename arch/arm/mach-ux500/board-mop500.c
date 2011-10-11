@@ -778,6 +778,7 @@ static void __init hrefv60_init_machine(void)
 
 	mop500_i2c_init();
 	mop500_sdi_init();
+	mop500_msp_init();
 	mop500_spi_init();
 	mop500_uart_init();
 
