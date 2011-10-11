@@ -706,6 +706,9 @@ static struct mfd_cell __devinitdata ab8500_devs[] = {
 		.name = "ab8500-regulator",
 	},
 	{
+		.name = "ab8500-regulator-debug",
+	},
+	{
 		.name = "ab8500-gpio",
 		.num_resources = ARRAY_SIZE(ab8500_gpio_resources),
 		.resources = ab8500_gpio_resources,
