@@ -41,11 +41,6 @@
 /* Offset for the firmware version within the TCPM */
 #define PRCMU_FW_VERSION_OFFSET 0xA4
 
-/* PRCMU project numbers, defined by PRCMU FW */
-#define PRCMU_PROJECT_ID_8500V1_0 1
-#define PRCMU_PROJECT_ID_8500V2_0 2
-#define PRCMU_PROJECT_ID_8400V2_0 3
-
 /* Index of different voltages to be used when accessing AVSData */
 #define PRCM_AVS_BASE		0x2FC
 #define PRCM_AVS_VBB_RET	(PRCM_AVS_BASE + 0x0)
@@ -516,9 +511,6 @@ static const char *hwacc_ret_regulator_name[NUM_HW_ACC] = {
 /* PLLDIV=12, PLLSW=4 (PLLDDR) */
 #define PRCMU_DSI_CLOCK_SETTING		0x0000008C
 
-/* PLLDIV=8, PLLSW=4 (PLLDDR) */
-#define PRCMU_DSI_CLOCK_SETTING_U8400	0x00000088
-
 /* DPI 50000000 Hz */
 #define PRCMU_DPI_CLOCK_SETTING		((1 << PRCMU_CLK_PLL_SW_SHIFT) | \
 					  (16 << PRCMU_CLK_PLL_DIV_SHIFT))
@@ -526,9 +518,6 @@ static const char *hwacc_ret_regulator_name[NUM_HW_ACC] = {
 
 /* D=101, N=1, R=4, SELDIV2=0 */
 #define PRCMU_PLLDSI_FREQ_SETTING	0x00040165
-
-/* D=70, N=1, R=3, SELDIV2=0 */
-#define PRCMU_PLLDSI_FREQ_SETTING_U8400	0x00030146
 
 #define PRCMU_ENABLE_PLLDSI		0x00000001
 #define PRCMU_DISABLE_PLLDSI		0x00000000
@@ -552,19 +541,14 @@ static struct {
 int db8500_prcmu_enable_dsipll(void)
 {
 	int i;
-	unsigned int plldsifreq;
 
 	/* Clear DSIPLL_RESETN */
 	writel(PRCMU_RESET_DSIPLL, PRCM_APE_RESETN_CLR);
 	/* Unclamp DSIPLL in/out */
 	writel(PRCMU_UNCLAMP_DSIPLL, PRCM_MMIP_LS_CLAMP_CLR);
 
-	if (prcmu_is_u8400())
-		plldsifreq = PRCMU_PLLDSI_FREQ_SETTING_U8400;
-	else
-		plldsifreq = PRCMU_PLLDSI_FREQ_SETTING;
 	/* Set DSI PLL FREQ */
-	writel(plldsifreq, PRCM_PLLDSI_FREQ);
+	writel(PRCMU_PLLDSI_FREQ_SETTING, PRCM_PLLDSI_FREQ);
 	writel(PRCMU_DSI_PLLOUT_SEL_SETTING, PRCM_DSI_PLLOUT_SEL);
 	/* Enable Escape clocks */
 	writel(PRCMU_ENABLE_ESCAPE_CLOCK_DIV, PRCM_DSITVCLK_DIV);
@@ -596,12 +580,6 @@ int db8500_prcmu_disable_dsipll(void)
 int db8500_prcmu_set_display_clocks(void)
 {
 	unsigned long flags;
-	unsigned int dsiclk;
-
-	if (prcmu_is_u8400())
-		dsiclk = PRCMU_DSI_CLOCK_SETTING_U8400;
-	else
-		dsiclk = PRCMU_DSI_CLOCK_SETTING;
 
 	spin_lock_irqsave(&clk_mgt_lock, flags);
 
@@ -609,7 +587,7 @@ int db8500_prcmu_set_display_clocks(void)
 	while ((readl(PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
 		cpu_relax();
 
-	writel(dsiclk, PRCM_HDMICLK_MGT);
+	writel(PRCMU_DSI_CLOCK_SETTING, PRCM_HDMICLK_MGT);
 	writel(PRCMU_DSI_LP_CLOCK_SETTING, PRCM_TVCLK_MGT);
 	writel(PRCMU_DPI_CLOCK_SETTING, PRCM_LCDCLK_MGT);
 
@@ -653,11 +631,6 @@ bool prcmu_has_arm_maxopp(void)
 {
 	return (readb(tcdm_base + PRCM_AVS_VARM_MAX_OPP) &
 		PRCM_AVS_ISMODEENABLE_MASK) == PRCM_AVS_ISMODEENABLE_MASK;
-}
-
-bool prcmu_is_u8400(void)
-{
-	return prcmu_version.project_number == PRCMU_PROJECT_ID_8400V2_0;
 }
 
 /**
