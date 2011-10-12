@@ -242,12 +242,15 @@ enum ab5500_banks {
 	AB5500_NUM_BANKS = 15,
 };
 
+struct ab5500_regulator_platform_data;
+
 struct ab5500_platform_data {
 	struct {unsigned int base; unsigned int count; } irq;
 	void *dev_data[AB5500_NUM_DEVICES];
 	size_t dev_data_sz[AB5500_NUM_DEVICES];
 	struct abx500_init_settings *init_settings;
 	unsigned int init_settings_sz;
+	struct ab5500_regulator_platform_data *regulator;
 };
 
 int abx500_set_register_interruptible(struct device *dev, u8 bank, u8 reg,
