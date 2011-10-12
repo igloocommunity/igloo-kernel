@@ -12,6 +12,7 @@
 #include <plat/pincfg.h>
 #include <plat/gpio-nomadik.h>
 #include <mach/hardware.h>
+#include <mach/suspend.h>
 
 #include "pins-db8500.h"
 #include "pins.h"
@@ -395,7 +396,7 @@ static struct ux500_pin_lookup mop500_pins[] = {
  * This is a temporary solution until all drivers are
  * controlling their pin settings when in inactive mode.
  */
-void mop500_pins_suspend_force(void)
+static void mop500_pins_suspend_force(void)
 {
 	u32 bankaddr;
 	u32 w_imsc;
@@ -578,7 +579,7 @@ void mop500_pins_suspend_force(void)
  * This is a temporary solution until all drivers are
  * controlling their pin settings when in inactive mode.
  */
-void mop500_pins_suspend_force_mux(void)
+static void mop500_pins_suspend_force_mux(void)
 {
 	u32 bankaddr;
 
@@ -678,6 +679,9 @@ void __init mop500_pins_init(void)
 	default:
 		break;
 	}
+
+	suspend_set_pins_force_fn(mop500_pins_suspend_force,
+				  mop500_pins_suspend_force_mux);
 }
 
 void __init snowball_pins_init(void)
