@@ -22,7 +22,7 @@
  * SDI0 (EMMC)
  */
 #ifdef CONFIG_STE_DMA40
-struct stedma40_chan_cfg u5500_sdi0_dma_cfg_rx = {
+struct stedma40_chan_cfg sdi0_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
 	.dir = STEDMA40_PERIPH_TO_MEM,
 	.src_dev_type = DB5500_DMA_DEV24_SDMMC0_RX,
@@ -31,7 +31,7 @@ struct stedma40_chan_cfg u5500_sdi0_dma_cfg_rx = {
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
 };
 
-static struct stedma40_chan_cfg u5500_sdi0_dma_cfg_tx = {
+static struct stedma40_chan_cfg sdi0_dma_cfg_tx = {
 	.mode = STEDMA40_MODE_LOGICAL,
 	.dir = STEDMA40_MEM_TO_PERIPH,
 	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
@@ -39,11 +39,11 @@ static struct stedma40_chan_cfg u5500_sdi0_dma_cfg_tx = {
 	.src_info.data_width = STEDMA40_WORD_WIDTH,
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
 };
-#endif
+
 /*
  * SDI1 (SD/MMC)
  */
-#ifdef CONFIG_STE_DMA40
+
 static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
 	.dir = STEDMA40_PERIPH_TO_MEM,
 	.src_dev_type = DB5500_DMA_DEV25_SDMMC1_RX,
@@ -59,6 +59,26 @@ static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
 	.src_info.data_width = STEDMA40_WORD_WIDTH,
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
 };
+
+/*
+ * SDI3 (SDIO)
+ */
+static struct stedma40_chan_cfg sdi3_dma_cfg_rx = {
+	.dir = STEDMA40_PERIPH_TO_MEM,
+	.src_dev_type = DB5500_DMA_DEV27_SDMMC3_RX,
+	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
+	.src_info.data_width = STEDMA40_WORD_WIDTH,
+	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+};
+
+static struct stedma40_chan_cfg sdi3_dma_cfg_tx = {
+	.dir = STEDMA40_MEM_TO_PERIPH,
+	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
+	.dst_dev_type = DB5500_DMA_DEV27_SDMMC3_TX,
+	.src_info.data_width = STEDMA40_WORD_WIDTH,
+	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+};
+
 #endif
 
 static struct mmci_platform_data u5500_sdi0_data = {
@@ -71,8 +91,8 @@ static struct mmci_platform_data u5500_sdi0_data = {
 	.gpio_wp	= -1,
 #ifdef CONFIG_STE_DMA40
 	.dma_filter	= stedma40_filter,
-	.dma_rx_param	= &u5500_sdi0_dma_cfg_rx,
-	.dma_tx_param	= &u5500_sdi0_dma_cfg_tx,
+	.dma_rx_param	= &sdi0_dma_cfg_rx,
+	.dma_tx_param	= &sdi0_dma_cfg_tx,
 #endif
 };
 
@@ -134,10 +154,29 @@ static void sdi1_configure(void)
 
 }
 
+/*
+ * SDI3 (SDIO WLAN)
+ */
+
+static struct mmci_platform_data u5500_sdi3_data = {
+	.ocr_mask	= MMC_VDD_29_30,
+	.f_max		= 50000000,
+	.capabilities	= MMC_CAP_4_BIT_DATA |
+				MMC_CAP_SDIO_IRQ |
+				MMC_CAP_BROKEN_SDIO_CMD53,
+	.gpio_cd	= -1,
+	.gpio_wp	= -1,
+#ifdef CONFIG_STE_DMA40
+	.dma_filter	= stedma40_filter,
+	.dma_rx_param	= &sdi3_dma_cfg_rx,
+	.dma_tx_param	= &sdi3_dma_cfg_tx,
+#endif
+};
+
 void __init u5500_sdi_init(void)
 {
 	db5500_add_sdi0(&u5500_sdi0_data);
 	sdi1_configure();
 	db5500_add_sdi1(&u5500_sdi1_data);
+	db5500_add_sdi3(&u5500_sdi3_data);
 }
-
