@@ -134,6 +134,7 @@ struct ab5500 {
 struct ab5500_regulator_platform_data;
 struct ab5500_platform_data {
 	struct {unsigned int base; unsigned int count; } irq;
+	bool pm_power_off;
 	void *dev_data[AB5500_NUM_DEVICES];
 	size_t dev_data_sz[AB5500_NUM_DEVICES];
 	struct ab5500_regulator_platform_data *regulator;
