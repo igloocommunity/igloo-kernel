@@ -835,6 +835,7 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
 	.timer		= &ux500_timer,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= mop500_init_machine,
+	.restart	= ux500_restart,
 MACHINE_END
 
 MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
@@ -844,6 +845,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
 	.timer		= &ux500_timer,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= hrefv60_init_machine,
+	.restart	= ux500_restart,
 MACHINE_END
 
 MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
@@ -854,4 +856,5 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
 	.timer		= &ux500_timer,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= snowball_init_machine,
+	.restart	= ux500_restart,
 MACHINE_END
