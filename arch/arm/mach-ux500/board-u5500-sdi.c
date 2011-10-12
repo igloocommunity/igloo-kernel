@@ -88,6 +88,7 @@ static int u5500_sdi1_ios_handler(struct device *dev, struct mmc_ios *ios)
 	return 0;
 }
 
+#ifdef SD_WORKAROUND
 static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
 	.dir = STEDMA40_PERIPH_TO_MEM,
@@ -105,7 +106,7 @@ static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
 	.src_info.data_width = STEDMA40_WORD_WIDTH,
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
 };
-
+#endif
 static struct mmci_platform_data u5500_sdi1_data = {
 	.ios_handler    = u5500_sdi1_ios_handler,
 	.ocr_mask       = MMC_VDD_29_30,
@@ -116,10 +117,12 @@ static struct mmci_platform_data u5500_sdi1_data = {
 	.gpio_cd        = GPIO_SDMMC_CD,
 	.gpio_wp        = -1,
 	.cd_invert	= true,
+#ifdef SD_WORKAROUND
 #ifdef CONFIG_STE_DMA40
 	.dma_filter	= stedma40_filter,
 	.dma_rx_param	= &sdi1_dma_cfg_rx,
 	.dma_tx_param	= &sdi1_dma_cfg_tx,
+#endif
 #endif
 };
 
