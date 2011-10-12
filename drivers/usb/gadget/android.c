@@ -67,6 +67,10 @@ static const char longname[] = "Gadget Android";
 /* Default vendor and product IDs, overridden by userspace */
 #define VENDOR_ID		0x18D1
 #define PRODUCT_ID		0x0001
+#define MAX_USB_SERIAL_NUMBER_LEN 32
+#if !defined(CONFIG_UX500_SOC_DB5500)
+#define PUBLIC_ID_BACKUPRAM1 (U8500_BACKUPRAM1_BASE + 0x0FC0)
+#endif
 
 struct android_usb_function {
 	char *name;
@@ -218,10 +222,14 @@ struct acm_function_config {
 
 static int acm_function_init(struct android_usb_function *f, struct usb_composite_dev *cdev)
 {
-	f->config = kzalloc(sizeof(struct acm_function_config), GFP_KERNEL);
-	if (!f->config)
+	struct acm_function_config *config;
+
+	config = kzalloc(sizeof(struct acm_function_config), GFP_KERNEL);
+	if (!config)
 		return -ENOMEM;
 
+	config->instances = 1;
+	f->config = config;
 	return gserial_setup(cdev->gadget, MAX_ACM_INSTANCES);
 }
 
@@ -990,6 +998,62 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 	return size;
 }
 
+static void set_default_values(struct android_dev *dev)
+{
+	char *name;
+	char buf[256] = "adb,mass_storage,acm,ecm", *b;
+	int err;
+	char sbuf[MAX_USB_SERIAL_NUMBER_LEN];
+
+#if !defined(CONFIG_UX500_SOC_DB5500)
+	u32 bufer[5];
+	int i;
+	void __iomem *backup_ram = NULL;
+
+	backup_ram = ioremap(PUBLIC_ID_BACKUPRAM1, 0x14);
+
+	if (backup_ram) {
+		for (i = 0; i < 5; i++)
+			bufer[i] = readl(backup_ram + i*4);
+
+		snprintf(sbuf, MAX_USB_SERIAL_NUMBER_LEN,
+				"%.8X%.8X%.8X%.8X%.8X",
+			bufer[0], bufer[1], bufer[2], bufer[3], bufer[4]);
+
+		iounmap(backup_ram);
+	} else
+			pr_err("$$ ioremap failed\n");
+#else
+	strcpy(sbuf, "0123456789ABCDEF");
+#endif
+
+	strncpy(manufacturer_string, "ST-Ericsson",
+					sizeof(manufacturer_string) - 1);
+	strncpy(product_string, "Android Phone", sizeof(product_string) - 1);
+	strncpy(serial_string, sbuf, sizeof(serial_string) - 1);
+
+	INIT_LIST_HEAD(&dev->enabled_functions);
+
+	b = strim(buf);
+
+	while (b) {
+		name = strsep(&b, ",");
+		if (name) {
+			err = android_enable_function(dev, name);
+			if (err)
+				pr_err("android_usb: Cannot enable '%s'", name);
+		}
+	}
+
+	device_desc.idVendor = 0x04CC;
+	device_desc.idProduct = 0x2323;
+	device_desc.bDeviceClass = USB_CLASS_COMM;
+	usb_add_config(dev->cdev, &android_config_driver,
+			android_bind_config);
+	usb_gadget_connect(dev->cdev->gadget);
+	dev->enabled = true;
+}
+
 static ssize_t state_show(struct device *pdev, struct device_attribute *attr,
 			   char *buf)
 {
@@ -1171,6 +1235,8 @@ static int android_bind(struct usb_composite_dev *cdev)
 	}
 
 	dev->cdev = cdev;
+
+	set_default_values(dev);
 
 	return 0;
 }
