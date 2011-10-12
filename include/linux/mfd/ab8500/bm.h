@@ -312,6 +312,10 @@ struct ab8500_maxim_parameters {
  * @charge_full_design:		Maximum battery capacity in mAh
  * @nominal_voltage:		Nominal voltage of the battery in mV
  * @termination_vol:		max voltage upto which battery can be charged
+ * @termination_curr		battery charging termination current in mA
+ * @recharge_vol		battery voltage limit that will trigger a new
+ *				full charging cycle in the case where maintenan-
+ *				-ce charging has been disabled
  * @normal_cur_lvl:		charger current in normal state in mA
  * @normal_vol_lvl:		charger voltage in normal state in mV
  * @maint_a_cur_lvl:		charger current in maintenance A state in mA
@@ -336,6 +340,7 @@ struct battery_type {
 	int nominal_voltage;
 	int termination_vol;
 	int termination_curr;
+	int recharge_vol;
 	int normal_cur_lvl;
 	int normal_vol_lvl;
 	int maint_a_cur_lvl;
@@ -393,6 +398,7 @@ struct ab8500_bm_charger_parameters {
  * @usb_safety_tmr_h	safety timer for usb charger
  * @bkup_bat_v		voltage which we charge the backup battery with
  * @bkup_bat_i		current which we charge the backup battery with
+ * @no_maintenance	indicates that maintenance charging is disabled
  * @adc_therm		placement of thermistor, batctrl or battemp adc
  * @chg_unknown_bat	flag to enable charging of unknown batteries
  * @enable_overshoot	flag to enable VBAT overshoot control
@@ -417,6 +423,7 @@ struct ab8500_bm_data {
 	int usb_safety_tmr_h;
 	int bkup_bat_v;
 	int bkup_bat_i;
+	bool no_maintenance;
 	bool chg_unknown_bat;
 	bool enable_overshoot;
 	enum adc_therm adc_therm;
