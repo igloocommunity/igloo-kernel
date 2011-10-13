@@ -1157,9 +1157,14 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 		}
 	}
 
-	if (changed)
+	if (changed) {
 		power_supply_changed(&di->fg_psy);
-
+		if (di->flags.fully_charged) {
+			dev_dbg(di->dev, "Full, notifying..: %d\n",
+				di->flags.fully_charged);
+			sysfs_notify(&di->fg_kobject, NULL, "charge_full");
+		}
+	}
 }
 
 static void ab8500_fg_charge_state_to(struct ab8500_fg *di,
@@ -1793,8 +1798,6 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
 					di->flags.fully_charged = true;
 					/* Save current capacity as maximum */
 					di->bat_cap.max_mah = di->bat_cap.mah;
-					sysfs_notify(&di->fg_kobject,
-						NULL, "charge_full");
 					queue_work(di->fg_wq, &di->fg_work);
 					break;
 				case POWER_SUPPLY_STATUS_CHARGING:
