@@ -22,6 +22,7 @@
 #include <mach/setup.h>
 #include <mach/devices.h>
 #include <mach/reboot_reasons.h>
+#include <mach/pm.h>
 
 #include "clock.h"
 
@@ -54,6 +55,12 @@ void __init ux500_init_irq(void)
 		ux500_unknown_soc();
 
 	gic_init(0, 29, dist_base, cpu_base);
+
+	/*
+	 * On WD reboot gic is in some cases decoupled.
+	 * This will make sure that the GIC is correctly configured.
+	 */
+	ux500_pm_gic_recouple();
 
 	/*
 	 * Init clocks here so that they are available for system timer
