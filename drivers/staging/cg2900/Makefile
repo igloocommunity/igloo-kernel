@@ -8,7 +8,8 @@ ccflags-y :=					\
 
 obj-$(CONFIG_CG2900)	+= devices-cg2900.o \
 				devices-cg2900-ux500.o \
-				board-ux500-cg2900.o
+				board-ux500-cg2900.o \
+				clock-cg2900.o
 
 obj-y				+= mfd/
 obj-y				+= bluetooth/
