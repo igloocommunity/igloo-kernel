@@ -6,5 +6,6 @@
  * room for a couple of GPIO expanders.
  */
 #define ARCH_NR_GPIOS	355
+#define NOMADIK_NR_GPIO	288
 
 #endif /* __ASM_ARCH_GPIO_H */
