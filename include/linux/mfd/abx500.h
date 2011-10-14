@@ -333,6 +333,15 @@ struct ab5500 {
 #endif
 };
 
+#ifndef CONFIG_AB5500_CORE
+static inline int ab5500_clock_rtc_enable(int num, bool enable)
+{
+	return -ENOSYS;
+}
+#else
+extern int ab5500_clock_rtc_enable(int num, bool enable);
+#endif
+
 struct ab5500_regulator_platform_data;
 struct ab5500_platform_data {
 	struct {unsigned int base; unsigned int count; } irq;
