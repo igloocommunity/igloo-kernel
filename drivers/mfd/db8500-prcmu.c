@@ -627,6 +627,68 @@ void prcmu_disable_spi2(void)
 	spin_unlock_irqrestore(&gpiocr_lock, flags);
 }
 
+/**
+ * prcmu_enable_stm_mod_uart - Enables pin muxing for STMMOD
+ * and UARTMOD on OtherAlternateC3.
+ */
+void prcmu_enable_stm_mod_uart(void)
+{
+	u32 reg;
+	unsigned long flags;
+
+	spin_lock_irqsave(&gpiocr_lock, flags);
+	reg = readl(PRCM_GPIOCR);
+	reg |= (PRCM_GPIOCR_DBG_STM_MOD_SELECT
+			| PRCM_GPIOCR_DBG_UARTMOD_SELECT);
+	writel(reg, PRCM_GPIOCR);
+	spin_unlock_irqrestore(&gpiocr_lock, flags);
+}
+
+/**
+ * prcmu_enable_stm_mod_uart - Disables pin muxing for STMMOD
+ * and UARTMOD on OtherAlternateC3.
+ */
+void prcmu_disable_stm_mod_uart(void)
+{
+	u32 reg;
+	unsigned long flags;
+
+	spin_lock_irqsave(&gpiocr_lock, flags);
+	reg = readl(PRCM_GPIOCR);
+	reg &= ~(PRCM_GPIOCR_DBG_STM_MOD_SELECT
+			| PRCM_GPIOCR_DBG_UARTMOD_SELECT);
+	writel(reg, PRCM_GPIOCR);
+	spin_unlock_irqrestore(&gpiocr_lock, flags);
+}
+
+/**
+ * prcmu_enable_stm_ape - Enables pin muxing for STM APE on OtherAlternateC1.
+ */
+void prcmu_enable_stm_ape(void)
+{
+	u32 reg;
+	unsigned long flags;
+
+	spin_lock_irqsave(&gpiocr_lock, flags);
+	reg = readl(PRCM_GPIOCR);
+	writel(reg | PRCM_GPIOCR_DBG_STM_APE_SELECT, PRCM_GPIOCR);
+	spin_unlock_irqrestore(&gpiocr_lock, flags);
+}
+
+/**
+ * prcmu_disable_stm_ape - Disables pin muxing for STM APE on OtherAlternateC1.
+ */
+void prcmu_disable_stm_ape(void)
+{
+	u32 reg;
+	unsigned long flags;
+
+	spin_lock_irqsave(&gpiocr_lock, flags);
+	reg = readl(PRCM_GPIOCR);
+	writel(reg & ~PRCM_GPIOCR_DBG_STM_APE_SELECT, PRCM_GPIOCR);
+	spin_unlock_irqrestore(&gpiocr_lock, flags);
+}
+
 bool prcmu_has_arm_maxopp(void)
 {
 	return (readb(tcdm_base + PRCM_AVS_VARM_MAX_OPP) &
