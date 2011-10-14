@@ -8,7 +8,7 @@
 #ifndef __ASM_ARCH_SYSTEM_H
 #define __ASM_ARCH_SYSTEM_H
 
-#include <mach/prcmu-fw-api.h>
+#include <mach/prcmu.h>
 #include <mach/reboot_reasons.h>
 
 static inline void arch_idle(void)
