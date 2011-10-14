@@ -8,8 +8,6 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/clk.h>
-#include <linux/mfd/db8500-prcmu.h>
-#include <linux/mfd/db5500-prcmu.h>
 #include <linux/delay.h>
 
 #include <asm/cacheflush.h>
