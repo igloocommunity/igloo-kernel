@@ -26,36 +26,11 @@
 
 void __iomem *_PRCMU_BASE;
 
-/*
- * The reboot reason string can be 255 characters long and the memory
- * in which we save the sw reset reason is 2 bytes. Therefore we need to
- * convert the string into a 16 bit pattern.
- *
- * See file reboot_reasons.h for conversion.
- */
-static unsigned short map_cmd_to_code(const char *cmd)
-{
-	int i;
-
-	if (cmd == NULL)
-		/* normal reboot w/o argument */
-		return SW_RESET_NO_ARGUMENT;
-
-	/* Search through reboot reason list */
-	for (i = 0; i < reboot_reasons_size; i++) {
-		if (!strcmp(reboot_reasons[i].reason, cmd))
-			return reboot_reasons[i].code;
-	}
-
-	/* No valid Reboot Reason found */
-	return SW_RESET_CRASH;
-}
-
 void ux500_restart(char mode, const char *cmd)
 {
 	unsigned short reset_code;
 
-	reset_code = map_cmd_to_code(cmd);
+	reset_code = reboot_reason_code(cmd);
 	prcmu_system_reset(reset_code);
 
 	mdelay(1000);
