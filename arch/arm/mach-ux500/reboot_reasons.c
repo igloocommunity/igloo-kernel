@@ -10,6 +10,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/string.h>
 #include <mach/reboot_reasons.h>
 
 struct reboot_reason reboot_reasons[] = {
@@ -18,3 +19,49 @@ struct reboot_reason reboot_reasons[] = {
 };
 
 unsigned int reboot_reasons_size = ARRAY_SIZE(reboot_reasons);
+
+/*
+ * The reboot reason string can be 255 characters long and the memory
+ * in which we save the sw reset reason is 2 bytes. Therefore we need to
+ * convert the string into a 16 bit pattern.
+ *
+ * See file reboot_reasons.h for conversion.
+ */
+u16 reboot_reason_code(const char *cmd)
+{
+	int i;
+
+	if (cmd == NULL)
+		/* normal reboot w/o argument */
+		return SW_RESET_NO_ARGUMENT;
+
+	/* Search through reboot reason list */
+	for (i = 0; i < reboot_reasons_size; i++) {
+		if (!strcmp(reboot_reasons[i].reason, cmd))
+			return reboot_reasons[i].code;
+	}
+
+	/* No valid reboot reason found */
+	return SW_RESET_CRASH;
+}
+
+/*
+ * The saved sw reset reason is a 2 byte code that is translated into
+ * a reboot reason string which is up to 255 characters long by this
+ * function.
+ *
+ * See file reboot_reasons.h for conversion.
+ */
+const char *reboot_reason_string(u16 code)
+{
+	int i;
+
+	/* Search through reboot reason list */
+	for (i = 0; i < reboot_reasons_size; i++) {
+		if (reboot_reasons[i].code == code)
+			return reboot_reasons[i].reason;
+	}
+
+	/* No valid reboot reason code found */
+	return "";
+}
