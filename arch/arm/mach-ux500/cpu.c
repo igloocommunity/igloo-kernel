@@ -64,13 +64,8 @@ void __init ux500_init_irq(void)
 	 * Init clocks here so that they are available for system timer
 	 * initialization.
 	 */
-	if (cpu_is_u5500())
-		db5500_prcmu_early_init();
-	if (cpu_is_u8500()) {
-		prcmu_early_init();
-		arm_pm_restart = ux500_restart;
-	}
-
+	prcmu_early_init();
+	arm_pm_restart = ux500_restart;
 	clk_init();
 }
 
