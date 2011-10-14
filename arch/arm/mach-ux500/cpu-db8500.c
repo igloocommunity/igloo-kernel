@@ -241,14 +241,13 @@ static ssize_t ux500_get_process(char *buf, struct sysfs_soc_info *si)
 
 static ssize_t ux500_get_reset_code(char *buf, struct sysfs_soc_info *si)
 {
-	return 0;
-	// return sprintf(buf, "0x%04x\n", prcmu_get_reset_code());
+	return sprintf(buf, "0x%04x\n", prcmu_get_reset_code());
 }
 
 static ssize_t ux500_get_reset_reason(char *buf, struct sysfs_soc_info *si)
 {
-	return 0;
-	// return sprintf(buf, "%s\n", reboot_reason_string(prcmu_get_reset_code()));
+	return sprintf(buf, "%s\n",
+		reboot_reason_string(prcmu_get_reset_code()));
 }
 
 static struct sysfs_soc_info soc_info[] = {
@@ -257,7 +256,7 @@ static struct sysfs_soc_info soc_info[] = {
 	SYSFS_SOC_ATTR_CALLBACK("soc_id", ux500_get_soc_id),
 	SYSFS_SOC_ATTR_CALLBACK("revision", ux500_get_revision),
 	SYSFS_SOC_ATTR_CALLBACK("process", ux500_get_process),
-//	SYSFS_SOC_ATTR_CALLBACK("reset_code", ux500_get_reset_code),
+	SYSFS_SOC_ATTR_CALLBACK("reset_code", ux500_get_reset_code),
 	SYSFS_SOC_ATTR_CALLBACK("reset_reason", ux500_get_reset_reason),
 };
 

@@ -647,7 +647,8 @@ static struct pl022_ssp_controller ssp0_platform_data = {
 static void __init mop500_spi_init(void)
 {
 	db8500_add_ssp0(&ssp0_platform_data);
-	db8500_add_msp2_spi(&mop500_msp2_spi_data);
+	if (!machine_is_snowball())
+		db8500_add_msp2_spi(&mop500_msp2_spi_data);
 }
 
 #ifdef CONFIG_STE_DMA40_REMOVE
@@ -818,6 +819,7 @@ static void __init mop500_init_machine(void)
 	int i2c0_devs;
 
 	mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
+	mop500_gpio_keys[1].gpio = GPIO_HAL_SENSOR;
 
 	u8500_init_devices();
 
@@ -878,6 +880,7 @@ static void __init hrefv60_init_machine(void)
 	 * instead.
 	 */
 	mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
+	mop500_gpio_keys[1].gpio = HREFV60_HAL_SW_GPIO;
 
 	accessory_detect_config();
 
