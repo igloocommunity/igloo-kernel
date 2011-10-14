@@ -521,6 +521,10 @@ void prcmu_ac_sleep_req(void);
 void prcmu_modem_reset(void);
 void prcmu_enable_spi2(void);
 void prcmu_disable_spi2(void);
+void prcmu_enable_stm_mod_uart(void);
+void prcmu_disable_stm_mod_uart(void);
+void prcmu_enable_stm_ape(void);
+void prcmu_disable_stm_ape(void);
 
 int prcmu_config_a9wdog(u8 num, bool sleep_auto_off);
 int prcmu_enable_a9wdog(u8 id);
@@ -658,6 +662,26 @@ static inline int prcmu_enable_spi2(void)
 }
 
 static inline int prcmu_disable_spi2(void)
+{
+	return 0;
+}
+
+static inline int prcmu_enable_stm_mod_uart(void)
+{
+	return 0;
+}
+
+static inline int prcmu_disable_stm_mod_uart(void)
+{
+	return 0;
+}
+
+static inline int prcmu_enable_stm_ape(void)
+{
+	return 0;
+}
+
+static inline int prcmu_disable_stm_ape(void)
 {
 	return 0;
 }
