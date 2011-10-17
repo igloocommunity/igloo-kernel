@@ -76,4 +76,9 @@
 #define db5500_add_uart3(plat) \
 	dbx500_add_uart("uart3", U5500_UART3_BASE, IRQ_DB5500_UART3, plat)
 
+#define db5500_add_cryp1(pdata) \
+	dbx500_add_cryp1(-1, U5500_CRYP1_BASE, IRQ_DB5500_CRYP1, pdata)
+#define db5500_add_hash1(pdata) \
+	dbx500_add_hash1(-1, U5500_HASH1_BASE, pdata)
+
 #endif
