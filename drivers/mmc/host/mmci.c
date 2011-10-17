@@ -182,6 +182,9 @@ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 	host->cmd = NULL;
 
 	mmc_request_done(host->mmc, mrq);
+
+	pm_runtime_mark_last_busy(host->mmc->parent);
+	pm_runtime_put_autosuspend(host->mmc->parent);
 }
 
 static void mmci_set_mask1(struct mmci_host *host, unsigned int mask)
@@ -1019,6 +1022,8 @@ static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		return;
 	}
 
+	pm_runtime_get_sync(mmc->parent);
+
 	spin_lock_irqsave(&host->lock, flags);
 
 	host->mrq = mrq;
@@ -1041,6 +1046,8 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	u32 pwr = 0;
 	unsigned long flags;
 	int ret;
+
+	pm_runtime_get_sync(mmc->parent);
 
 	if (host->plat->ios_handler &&
 		host->plat->ios_handler(mmc_dev(mmc), ios))
@@ -1110,12 +1117,15 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	mmci_set_clkreg(host, ios->clock);
 
-	if (host->pwr != pwr) {
-		host->pwr = pwr;
+	if (host->pwr_reg != pwr) {
+		host->pwr_reg = pwr;
 		writel(pwr, host->base + MMCIPOWER);
 	}
 
 	spin_unlock_irqrestore(&host->lock, flags);
+
+	pm_runtime_mark_last_busy(mmc->parent);
+	pm_runtime_put_autosuspend(mmc->parent);
 }
 
 static int mmci_get_ro(struct mmc_host *mmc)
@@ -1199,6 +1209,9 @@ static int __devinit mmci_probe(struct amba_device *dev,
 	host->gpio_wp = -ENOSYS;
 	host->gpio_cd = -ENOSYS;
 	host->gpio_cd_irq = -1;
+	host->irqmask0_reg = 0;
+	host->pwr_reg = 0;
+	host->clk_reg = 0;
 
 	host->hw_designer = amba_manf(dev);
 	host->hw_revision = amba_rev(dev);
@@ -1372,13 +1385,10 @@ static int __devinit mmci_probe(struct amba_device *dev,
 			goto irq0_free;
 	}
 
+	host->irqmask0_reg = MCI_IRQENABLE;
 	writel(MCI_IRQENABLE, host->base + MMCIMASK0);
 
 	amba_set_drvdata(dev, mmc);
-
-	pm_runtime_enable(mmc->parent);
-	if (pm_runtime_get_sync(mmc->parent) < 0)
-		dev_err(mmc_dev(mmc), "failed pm_runtime_get_sync\n");
 
 	dev_info(&dev->dev, "%s: PL%03x manf %x rev%u at 0x%08llx irq %d,%d (pio)\n",
 		 mmc_hostname(mmc), amba_part(dev), amba_manf(dev),
@@ -1386,6 +1396,10 @@ static int __devinit mmci_probe(struct amba_device *dev,
 		 dev->irq[0], dev->irq[1]);
 
 	mmci_dma_setup(host);
+
+	pm_runtime_set_autosuspend_delay(mmc->parent, 50);
+	pm_runtime_use_autosuspend(mmc->parent);
+	pm_runtime_put(mmc->parent);
 
 	mmc_add_host(mmc);
 
@@ -1424,6 +1438,13 @@ static int __devexit mmci_remove(struct amba_device *dev)
 	if (mmc) {
 		struct mmci_host *host = mmc_priv(mmc);
 
+		/*
+		 * Make sure the host is resumed and undo the
+		 * pm_runtime_put in probe.
+		 */
+		pm_runtime_resume(mmc->parent);
+		pm_runtime_get_noresume(mmc->parent);
+
 		mmc_remove_host(mmc);
 
 		writel(0, host->base + MMCIMASK0);
@@ -1445,6 +1466,7 @@ static int __devexit mmci_remove(struct amba_device *dev)
 			gpio_free(host->gpio_cd);
 
 		iounmap(host->base);
+
 		clk_disable(host->clk);
 		clk_put(host->clk);
 
@@ -1460,48 +1482,133 @@ static int __devexit mmci_remove(struct amba_device *dev)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int mmci_suspend(struct amba_device *dev, pm_message_t state)
+#ifdef CONFIG_SUSPEND
+
+#ifdef CONFIG_PM_RUNTIME
+static void mmci_disable_irq(struct mmci_host *host) {}
+static void mmci_enable_irq(struct mmci_host *host) {}
+#else
+static void mmci_disable_irq(struct mmci_host *host)
 {
-	struct mmc_host *mmc = amba_get_drvdata(dev);
+	writel(0, host->base + MMCIMASK0);
+}
+static void mmci_enable_irq(struct mmci_host *host)
+{
+	writel(host->irqmask0_reg, host->base + MMCIMASK0);
+}
+#endif
+
+static int mmci_suspend(struct device *dev)
+{
+	struct amba_device *adev = to_amba_device(dev);
+	struct mmc_host *mmc = amba_get_drvdata(adev);
 	int ret = 0;
 
 	if (mmc) {
 		struct mmci_host *host = mmc_priv(mmc);
 
-		ret = mmc_suspend_host(mmc);
-		if (ret == 0)
-			writel(0, host->base + MMCIMASK0);
+		pm_runtime_get_sync(mmc->parent);
 
-		if (pm_runtime_put_sync(mmc->parent) < 0)
-			dev_err(mmc_dev(mmc), "failed pm_runtime_put_sync\n");
+		ret = mmc_suspend_host(mmc);
+		if (!ret)
+			mmci_disable_irq(host);
+
+		pm_runtime_put_sync_suspend(mmc->parent);
 	}
 
 	return ret;
 }
 
-static int mmci_resume(struct amba_device *dev)
+static int mmci_resume(struct device *dev)
 {
-	struct mmc_host *mmc = amba_get_drvdata(dev);
+	struct amba_device *adev = to_amba_device(dev);
+	struct mmc_host *mmc = amba_get_drvdata(adev);
 	int ret = 0;
 
 	if (mmc) {
 		struct mmci_host *host = mmc_priv(mmc);
 
-		if (pm_runtime_get_sync(mmc->parent) < 0)
-			dev_err(mmc_dev(mmc), "failed pm_runtime_get_sync\n");
-
-		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
-
+		mmci_enable_irq(host);
 		ret = mmc_resume_host(mmc);
 	}
 
 	return ret;
 }
-#else
-#define mmci_suspend	NULL
-#define mmci_resume	NULL
 #endif
+
+#ifdef CONFIG_PM_RUNTIME
+static int mmci_runtime_suspend(struct device *dev)
+{
+	struct amba_device *adev = to_amba_device(dev);
+	struct mmc_host *mmc = amba_get_drvdata(adev);
+	unsigned long flags;
+
+	if (mmc) {
+		struct mmci_host *host = mmc_priv(mmc);
+
+		spin_lock_irqsave(&host->lock, flags);
+
+		/* Save registers for POWER, CLOCK and IRQMASK0 */
+		host->irqmask0_reg = readl(host->base + MMCIMASK0);
+		host->pwr_reg = readl(host->base + MMCIPOWER);
+		host->clk_reg = readl(host->base + MMCICLOCK);
+
+		/*
+		 * Make sure we do not get any interrupts when we disabled the
+		 * clock and the regulator and as well make sure to clear the
+		 * registers for clock and power.
+		 */
+		writel(0, host->base + MMCIMASK0);
+		writel(0, host->base + MMCIPOWER);
+		writel(0, host->base + MMCICLOCK);
+
+		spin_unlock_irqrestore(&host->lock, flags);
+
+		clk_disable(host->clk);
+		amba_vcore_disable(adev);
+	}
+
+	return 0;
+}
+
+static int mmci_runtime_resume(struct device *dev)
+{
+	struct amba_device *adev = to_amba_device(dev);
+	struct mmc_host *mmc = amba_get_drvdata(adev);
+	unsigned long flags;
+
+	if (mmc) {
+		struct mmci_host *host = mmc_priv(mmc);
+
+		amba_vcore_enable(adev);
+		clk_enable(host->clk);
+
+		spin_lock_irqsave(&host->lock, flags);
+
+		/* Restore registers for POWER, CLOCK and IRQMASK0 */
+		writel(host->clk_reg, host->base + MMCICLOCK);
+		writel(host->pwr_reg, host->base + MMCIPOWER);
+		writel(host->irqmask0_reg, host->base + MMCIMASK0);
+
+		spin_unlock_irqrestore(&host->lock, flags);
+	}
+
+	return 0;
+}
+
+static int mmci_runtime_idle(struct device *dev)
+{
+	pm_runtime_suspend(dev);
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops mmci_dev_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(mmci_suspend, mmci_resume)
+	SET_RUNTIME_PM_OPS(mmci_runtime_suspend,
+			   mmci_runtime_resume,
+			   mmci_runtime_idle)
+};
 
 static struct amba_id mmci_ids[] = {
 	{
@@ -1546,11 +1653,10 @@ static struct amba_id mmci_ids[] = {
 static struct amba_driver mmci_driver = {
 	.drv		= {
 		.name	= DRIVER_NAME,
+		.pm	= &mmci_dev_pm_ops,
 	},
 	.probe		= mmci_probe,
 	.remove		= __devexit_p(mmci_remove),
-	.suspend	= mmci_suspend,
-	.resume		= mmci_resume,
 	.id_table	= mmci_ids,
 };
 
