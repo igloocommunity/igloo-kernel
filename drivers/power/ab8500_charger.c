@@ -122,7 +122,7 @@ enum ab8500_usb_state {
 #define USB_CH_IP_CUR_LVL_1P4		1400
 #define USB_CH_IP_CUR_LVL_1P5		1500
 
-#define VBAT_3700			3700
+#define VBAT_TRESH_IP_CUR_RED		3800
 
 #define to_ab8500_charger_usb_device_info(x) container_of((x), \
 	struct ab8500_charger, usb_chg)
@@ -890,11 +890,11 @@ static int ab8500_charger_set_vbus_in_curr(struct ab8500_charger *di,
 
 	switch (min_value) {
 	case 100:
-		if (di->vbat < VBAT_3700)
+		if (di->vbat < VBAT_TRESH_IP_CUR_RED)
 			min_value = USB_CH_IP_CUR_LVL_0P05;
 		break;
 	case 500:
-		if (di->vbat < VBAT_3700)
+		if (di->vbat < VBAT_TRESH_IP_CUR_RED)
 			min_value = USB_CH_IP_CUR_LVL_0P45;
 		break;
 	default:
@@ -1374,8 +1374,11 @@ static void ab8500_charger_check_vbat_work(struct work_struct *work)
 	if (di->old_vbat == 0)
 		di->old_vbat = di->vbat;
 
-	if (!((di->old_vbat <= VBAT_3700 && di->vbat <= VBAT_3700) ||
-		(di->old_vbat > VBAT_3700 && di->vbat > VBAT_3700))) {
+	if (!((di->old_vbat <= VBAT_TRESH_IP_CUR_RED &&
+		di->vbat <= VBAT_TRESH_IP_CUR_RED) ||
+		(di->old_vbat > VBAT_TRESH_IP_CUR_RED &&
+		di->vbat > VBAT_TRESH_IP_CUR_RED))) {
+
 		dev_dbg(di->dev, "Vbat did cross threshold, curr: %d, new: %d,"
 			" old: %d\n", di->max_usb_in_curr, di->vbat,
 			di->old_vbat);
@@ -1389,8 +1392,8 @@ static void ab8500_charger_check_vbat_work(struct work_struct *work)
 	 * No need to check the battery voltage every second when not close to
 	 * the threshold.
 	 */
-	if (di->vbat < (VBAT_3700 + 100) &&
-		(di->vbat > (VBAT_3700 - 100)))
+	if (di->vbat < (VBAT_TRESH_IP_CUR_RED + 100) &&
+		(di->vbat > (VBAT_TRESH_IP_CUR_RED - 100)))
 			t = 1;
 
 	queue_delayed_work(di->charger_wq, &di->check_vbat_work, t * HZ);
