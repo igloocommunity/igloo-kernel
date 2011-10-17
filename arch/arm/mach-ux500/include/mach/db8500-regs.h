@@ -23,6 +23,9 @@
 
 #define U8500_DMA_LCPA_BASE    (U8500_ESRAM_BANK0 + U8500_ESRAM_DMA_LCPA_OFFSET)
 
+/* This address fulfills the 256k alignment requirement of the lcla base */
+#define U8500_DMA_LCLA_BASE	U8500_ESRAM_BANK4
+
 #define U8500_PER3_BASE		0x80000000
 #define U8500_STM_BASE		0x80100000
 #define U8500_STM_REG_BASE	(U8500_STM_BASE + 0xF000)
