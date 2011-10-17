@@ -33,6 +33,7 @@
 #include <mach/devices.h>
 #include <mach/setup.h>
 #include <mach/crypto-ux500.h>
+#include <mach/usb.h>
 
 #include "pins-db5500.h"
 #include "pins.h"
@@ -40,6 +41,7 @@
 #include "board-u5500.h"
 #include "board-u5500-bm.h"
 #include "board-mop500-wlan.h"
+#include "board-ux500-usb.h"
 
 /*
  * LSM303DLH
@@ -416,6 +418,7 @@ static struct resource ab5500_resources[] = {
 	}
 };
 
+
 static struct ab5500_platform_data ab5500_plf_data = {
 	.irq = {
 		.base = IRQ_AB5500_BASE,
@@ -450,6 +453,8 @@ static struct ab5500_platform_data ab5500_plf_data = {
 #endif
 	.dev_data[AB5500_DEVID_ONSWA] = &ab5500_ponkey_data,
 	.dev_data_sz[AB5500_DEVID_ONSWA] = sizeof(ab5500_ponkey_data),
+	.dev_data[AB5500_DEVID_USB] = &abx500_usbgpio_plat_data,
+	.dev_data_sz[AB5500_DEVID_USB] = sizeof(abx500_usbgpio_plat_data),
 };
 
 static struct platform_device u5500_ab5500_device = {
