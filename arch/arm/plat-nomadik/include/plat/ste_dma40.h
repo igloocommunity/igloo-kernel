@@ -142,6 +142,7 @@ struct stedma40_chan_cfg {
  * @memcpy_conf_phy: default configuration of physical channel memcpy
  * @memcpy_conf_log: default configuration of logical channel memcpy
  * @disabled_channels: A vector, ending with -1, that marks physical channels
+ * @use_esram_lcla: flag for mapping the lcla into esram region
  * that are for different reasons not available for the driver.
  */
 struct stedma40_platform_data {
@@ -153,6 +154,7 @@ struct stedma40_platform_data {
 	struct stedma40_chan_cfg	*memcpy_conf_phy;
 	struct stedma40_chan_cfg	*memcpy_conf_log;
 	int				 disabled_channels[STEDMA40_MAX_PHYS];
+	bool				 use_esram_lcla;
 };
 
 #ifdef CONFIG_STE_DMA40
