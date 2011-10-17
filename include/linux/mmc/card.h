@@ -168,14 +168,6 @@ struct sdio_func_tuple;
 #define MMC_NUM_PHY_PARTITION	6
 
 /*
- * Partition area type, boot or gp
- */
-enum mmc_part_area_type {
-	MMC_BLK_DATA_AREA_BOOT,
-	MMC_BLK_DATA_AREA_GP,
-};
-
-/*
  * MMC Physical partitions
  */
 struct mmc_part {
@@ -184,6 +176,9 @@ struct mmc_part {
 	char	name[DISK_NAME_LEN];
 	bool	force_ro;	/* to make boot parts RO by default */
 	int	area_type;
+#define MMC_BLK_DATA_AREA_MAIN	0
+#define MMC_BLK_DATA_AREA_BOOT	1
+#define MMC_BLK_DATA_AREA_GP	2
 };
 
 /*
