@@ -39,6 +39,7 @@
 #include "devices-db5500.h"
 #include "board-u5500.h"
 #include "board-u5500-bm.h"
+#include "board-mop500-wlan.h"
 
 /*
  * LSM303DLH
@@ -565,6 +566,8 @@ static void __init u5500_init_machine(void)
 
 	u5500_sdi_init();
 	u5500_uart_init();
+
+	mop500_wlan_init();
 
 	u5500_cryp1_hash1_init();
 
