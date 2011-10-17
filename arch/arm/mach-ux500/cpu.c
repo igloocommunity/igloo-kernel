@@ -12,6 +12,7 @@
 #include <linux/mfd/db5500-prcmu.h>
 #include <linux/clksrc-dbx500-prcmu.h>
 #include <linux/delay.h>
+#include <linux/mfd/dbx500-prcmu.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/mach/map.h>
@@ -20,7 +21,6 @@
 #include <mach/hardware.h>
 #include <mach/setup.h>
 #include <mach/devices.h>
-#include <mach/prcmu.h>
 #include <mach/reboot_reasons.h>
 
 #include "clock.h"
