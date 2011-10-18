@@ -990,6 +990,7 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 	} else if (!enabled && dev->enabled) {
 		usb_gadget_disconnect(cdev->gadget);
 		usb_remove_config(cdev, &android_config_driver);
+		usb_ep_autoconfig_reset(cdev->gadget);
 		dev->enabled = false;
 	} else {
 		pr_err("android_usb: already %s\n",
