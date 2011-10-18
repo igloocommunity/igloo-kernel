@@ -38,7 +38,9 @@
 #include <linux/workqueue.h>
 #include <linux/byteorder/generic.h>
 #include <linux/bitops.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
+#endif
 #include <linux/cyttsp.h>
 #include <linux/ctype.h>
 #include <linux/regulator/consumer.h>
@@ -269,7 +271,9 @@ struct cyttsp {
 	struct work_struct work;
 	struct timer_list timer;
 	struct mutex mutex;
+#ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
+#endif
 	char phys[32];
 	struct cyttsp_platform_data *platform_data;
 	struct cyttsp_bootloader_data bl_data;
