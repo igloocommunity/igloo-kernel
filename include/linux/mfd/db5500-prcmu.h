@@ -31,6 +31,20 @@ bool db5500_prcmu_is_ac_wake_requested(void);
 int db5500_prcmu_set_arm_opp(u8 opp);
 int db5500_prcmu_get_arm_opp(void);
 
+static inline unsigned long prcmu_clock_rate(u8 clock)
+{
+	return 0;
+}
+
+static inline long prcmu_round_clock_rate(u8 clock, unsigned long rate)
+{
+	return 0;
+}
+
+static inline int prcmu_set_clock_rate(u8 clock, unsigned long rate)
+{
+	return 0;
+}
 #else /* !CONFIG_UX500_SOC_DB5500 */
 
 static inline void db5500_prcmu_early_init(void) {}
@@ -46,6 +60,11 @@ static inline int db5500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
 }
 
 static inline int db5500_prcmu_request_clock(u8 clock, bool enable)
+{
+	return 0;
+}
+
+static inline unsigned long db5500_prcmu_clock_rate(u8 clock)
 {
 	return 0;
 }
@@ -71,6 +90,16 @@ static inline int db5500_prcmu_config_esram0_deep_sleep(u8 state)
 }
 
 static inline void db5500_prcmu_enable_wakeups(u32 wakeups) {}
+
+static inline long db5500_prcmu_round_clock_rate(u8 clock, unsigned long rate)
+{
+	return 0;
+}
+
+static inline int db5500_prcmu_set_clock_rate(u8 clock, unsigned long rate)
+{
+	return 0;
+}
 
 static inline int prcmu_resetout(u8 resoutn, u8 state)
 {
