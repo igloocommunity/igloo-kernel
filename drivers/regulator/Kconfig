@@ -292,6 +292,13 @@ config REGULATOR_AD5398
 	  This driver supports AD5398 and AD5821 current regulator chips.
 	  If building into module, its name is ad5398.ko.
 
+config REGULATOR_AB5500
+	bool "ST-Ericsson AB5500 Power Regulators"
+	depends on AB5500_CORE
+	help
+	 This driver supports the regulators found on the ST-Ericsson mixed
+	 signal AB5500 PMIC
+
 config REGULATOR_AB8500
 	bool "ST-Ericsson AB8500 Power Regulators"
 	depends on AB8500_CORE
@@ -317,6 +324,14 @@ config REGULATOR_DB8500_PRCMU
 	help
 	  This driver supports the voltage domain regulators controlled by the
 	  DB8500 PRCMU
+
+config REGULATOR_AB8500_DEBUG
+	bool "AB8500 regulator debug"
+	depends on REGULATOR_AB8500
+	help
+	  Say Y here to add debug functionality for ST-Ericsson
+	  ab8500 regulators. This is a module that exposes a
+	  number of settings and debug output in debugfs.
 
 config REGULATOR_TPS6586X
 	tristate "TI TPS6586X Power regulators"
