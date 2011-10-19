@@ -2177,6 +2177,12 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 		dev_err(&adev->dev, "could not retrieve SSP/SPI bus clock\n");
 		goto err_no_clk;
 	}
+	status = clk_enable(pl022->clk);
+	if (status) {
+		dev_err(&adev->dev, "could not enable SSP/SPI bus clock\n");
+		goto err_no_clk_en;
+	}
+
 	/* Disable SSP */
 	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
 	       SSP_CR1(pl022->virtbase));
@@ -2230,6 +2236,8 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 
 	free_irq(adev->irq[0], pl022);
  err_no_irq:
+	clk_disable(pl022->clk);
+ err_no_clk_en:
 	clk_put(pl022->clk);
  err_no_clk:
 	iounmap(pl022->virtbase);
@@ -2332,11 +2340,19 @@ static int pl022_runtime_resume(struct device *dev)
 
 	return 0;
 }
+
+static int pl022_runtime_idle(struct device *dev)
+{
+	pm_runtime_suspend(dev);
+	return 0;
+}
 #endif
 
 static const struct dev_pm_ops pl022_dev_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
-	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
+	SET_RUNTIME_PM_OPS(pl022_runtime_suspend,
+			   pl022_runtime_resume,
+			   pl022_runtime_idle)
 };
 
 static struct vendor_data vendor_arm = {
