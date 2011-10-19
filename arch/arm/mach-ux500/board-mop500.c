@@ -19,6 +19,7 @@
 #include <linux/amba/pl022.h>
 #include <linux/amba/serial.h>
 #include <linux/spi/spi.h>
+#include <linux/hsi/hsi.h>
 #include <linux/mfd/abx500/ab8500.h>
 #include <linux/regulator/ab8500.h>
 #include <linux/mfd/tc3589x.h>
@@ -776,6 +777,62 @@ static struct platform_device ste_ff_vibra_device = {
 	.name = "ste_ff_vibra"
 };
 
+#ifdef CONFIG_HSI
+static struct hsi_board_info __initdata u8500_hsi_devices[] = {
+	{
+		.name = "hsi_char",
+		.hsi_id = 0,
+		.port = 0,
+		.tx_cfg = {
+			.mode = HSI_MODE_STREAM,
+			.channels = 2,
+			.speed = 100000,
+			{.arb_mode = HSI_ARB_RR},
+		},
+		.rx_cfg = {
+			.mode = HSI_MODE_STREAM,
+			.channels = 2,
+			.speed = 200000,
+			{.flow = HSI_FLOW_SYNC},
+		},
+	},
+	{
+		.name = "hsi_test",
+		.hsi_id = 0,
+		.port = 0,
+		.tx_cfg = {
+			.mode = HSI_MODE_FRAME,
+			.channels = 2,
+			.speed = 100000,
+			{.arb_mode = HSI_ARB_RR},
+		},
+		.rx_cfg = {
+			.mode = HSI_MODE_FRAME,
+			.channels = 2,
+			.speed = 200000,
+			{.flow = HSI_FLOW_SYNC},
+		},
+	},
+	{
+		.name = "cfhsi_v3_driver",
+		.hsi_id = 0,
+		.port = 0,
+		.tx_cfg = {
+			.mode = HSI_MODE_STREAM,
+			.channels = 2,
+			.speed = 20000,
+			{.arb_mode = HSI_ARB_RR},
+		},
+		.rx_cfg = {
+			.mode = HSI_MODE_STREAM,
+			.channels = 2,
+			.speed = 200000,
+			{.flow = HSI_FLOW_SYNC},
+		},
+	},
+};
+#endif
+
 #ifdef CONFIG_U8500_SIM_DETECT
 static struct sim_detect_platform_data sim_detect_pdata = {
 	.irq_num		= MOP500_AB8500_VIR_GPIO_IRQ(6),
@@ -879,6 +936,9 @@ static struct platform_device *mop500_platform_devs[] __initdata = {
 #endif
 #ifdef CONFIG_DB8500_MLOADER
 	&mloader_fw_device,
+#endif
+#ifdef CONFIG_HSI
+	&u8500_hsi_device,
 #endif
 #ifdef CONFIG_MODEM_U8500
 	&u8500_modem_dev,
@@ -1138,6 +1198,11 @@ static void __init mop500_init_machine(void)
 
 	u8500_cryp1_hash1_init();
 
+#ifdef CONFIG_HSI
+	hsi_register_board_info(u8500_hsi_devices,
+				ARRAY_SIZE(u8500_hsi_devices));
+#endif
+
 	platform_add_devices(mop500_platform_devs,
 			ARRAY_SIZE(mop500_platform_devs));
 
@@ -1171,6 +1236,11 @@ static void __init snowball_init_machine(void)
 	snowball_pins_init();
 
 	u8500_cryp1_hash1_init();
+
+#ifdef CONFIG_HSI
+	hsi_register_board_info(u8500_hsi_devices,
+				ARRAY_SIZE(u8500_hsi_devices));
+#endif
 
 	platform_add_devices(snowball_platform_devs,
 			ARRAY_SIZE(snowball_platform_devs));
@@ -1208,6 +1278,11 @@ static void __init hrefv60_init_machine(void)
 	hrefv60_pins_init();
 
 	u8500_cryp1_hash1_init();
+
+#ifdef CONFIG_HSI
+	hsi_register_board_info(u8500_hsi_devices,
+				ARRAY_SIZE(u8500_hsi_devices));
+#endif
 
 	platform_add_devices(mop500_platform_devs,
 			ARRAY_SIZE(mop500_platform_devs));
