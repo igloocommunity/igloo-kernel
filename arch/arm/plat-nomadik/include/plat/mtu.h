@@ -50,5 +50,7 @@ extern void __iomem *mtu_base;
 #define MTU_PCELL2	0xff8
 #define MTU_PCELL3	0xffC
 
+struct clock_event_device *nmdk_clkevt_get(void);
+
 #endif /* __PLAT_MTU_H */
 
