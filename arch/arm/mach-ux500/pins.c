@@ -184,6 +184,8 @@ static int pins_dbg_show(struct seq_file *s, void *iter)
 
 	seq_printf(s, "\n");
 
+	kfree(pins);
+
 	return 0;
 }
 
