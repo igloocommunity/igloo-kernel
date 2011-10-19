@@ -266,6 +266,11 @@ static int usb_db5500_tx_dma_cfg[] = {
 void __init u5500_init_devices(void)
 {
 	ux500_init_devices();
+
+#ifdef CONFIG_STM_TRACE
+	/* Early init for STM tracing */
+	/* platform_device_register(&u5500_stm_device); */
+#endif
 	db5500_add_gpios();
 	db5500_pmu_init();
 	db5500_dma_init();
