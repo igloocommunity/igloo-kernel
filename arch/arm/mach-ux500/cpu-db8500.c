@@ -14,7 +14,7 @@
 #include <linux/amba/bus.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
-#include <linux/gpio.h>
+#include <linux/gpio/nomadik.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/sys_soc.h>
