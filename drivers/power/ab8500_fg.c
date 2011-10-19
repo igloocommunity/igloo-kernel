@@ -494,6 +494,11 @@ static int ab8500_fg_coulomb_counter(struct ab8500_fg *di, bool enable)
 		if (ret)
 			goto cc_err;
 
+		ret = abx500_set_register_interruptible(di->dev,
+			AB8500_GAS_GAUGE, AB8500_GASG_CC_NCOV_ACCU_CTRL, 0);
+		if (ret)
+			goto cc_err;
+
 		/* Stop the CC */
 		ret = abx500_set_register_interruptible(di->dev, AB8500_RTC,
 			AB8500_RTC_CC_CONF_REG, 0);
