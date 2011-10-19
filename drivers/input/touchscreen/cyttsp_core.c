@@ -149,7 +149,7 @@
 #define CY_MAXZ                     255
 #define CY_OK                       0
 #define CY_INIT                     1
-#define CY_DELAY_DFLT               20 /* ms */
+#define CY_DELAY_DFLT               10 /* ms */
 #define CY_DELAY_MAX                (500/CY_DELAY_DFLT) /* half second */
 #define CY_DELAY_SYSINFO            20 /* ms */
 #define CY_MODE_CHANGE_DELAY        30 /* ms */
@@ -1334,9 +1334,9 @@ static int cyttsp_exit_bl_mode(struct cyttsp *ts)
 		goto fail;
 	}
 	do {
-		msleep(20);
+		msleep(10);
 		cyttsp_load_bl_regs(ts);
-	} while (GET_BOOTLOADERMODE(ts->bl_data.bl_status) && tries++ < 10);
+	} while (GET_BOOTLOADERMODE(ts->bl_data.bl_status) && tries++ < 1);
 
 	DBG2(printk(KERN_INFO "%s: read tries=%d\n", __func__, tries);)
 
@@ -1473,7 +1473,7 @@ static int cyttsp_set_operational_mode(struct cyttsp *ts)
 	}
 
 	/* wait for TTSP Device to complete switch to Operational mode */
-	msleep(20);
+	msleep(10);
 
 	tries = 0;
 	gest_default =
@@ -1610,15 +1610,15 @@ static int cyttsp_power_on(struct cyttsp *ts)
 	if (retval < 0)
 		goto bypass;
 
+	/* init gesture setup; required for active distance */
+	cyttsp_gesture_setup(ts);
+
 	/* switch back to Operational mode */
 	DBG2(printk(KERN_INFO"%s: switch back to operational mode\n",
 		__func__);)
 	retval = cyttsp_set_operational_mode(ts);
 	if (retval < 0)
 		goto bypass;
-
-	/* init gesture setup; required for active distance */
-	cyttsp_gesture_setup(ts);
 
 bypass:
 	if (retval)
