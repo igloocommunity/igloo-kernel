@@ -53,6 +53,7 @@ obj-$(CONFIG_STE_TRACE_MODEM) 	+= db8500-modem-trace.o
 obj-$(CONFIG_DBX500_MLOADER) 	+= dbx500-mloader.o
 obj-$(CONFIG_STM_I2S)		+= i2s/
 obj-$(CONFIG_STE_AUDIO_IO_DEV)	+= audio_io_dev/
+obj-$(CONFIG_HWMEM)             += hwmem/
 obj-$(CONFIG_U5500_MBOX)	+= mbox.o mbox_channels-db5500.o
 obj-$(CONFIG_U8500_SIM_DETECT)	+= sim_detect.o
 obj-y				+= modem_audio/
