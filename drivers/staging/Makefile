@@ -67,4 +67,5 @@ obj-$(CONFIG_DRM_PSB)		+= gma500/
 obj-$(CONFIG_INTEL_MEI)		+= mei/
 obj-$(CONFIG_MFD_NVEC)		+= nvec/
 obj-$(CONFIG_U8500_MMIO)	+= mmio/
+obj-$(CONFIG_U8500_FLASH)	+= camera_flash/
 obj-$(CONFIG_U8500_CM)		+= nmf-cm/
