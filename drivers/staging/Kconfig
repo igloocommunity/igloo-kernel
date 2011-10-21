@@ -154,4 +154,6 @@ source "drivers/staging/nvec/Kconfig"
 
 source "drivers/staging/cw1200/Kconfig"
 
+source "drivers/staging/mmio/Kconfig"
+
 endif # STAGING
