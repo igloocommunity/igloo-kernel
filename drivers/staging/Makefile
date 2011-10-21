@@ -56,3 +56,4 @@ obj-$(CONFIG_MFD_NVEC)		+= nvec/
 obj-$(CONFIG_DRM_OMAP)		+= omapdrm/
 obj-$(CONFIG_ANDROID)		+= android/
 obj-$(CONFIG_U8500_MMIO)	+= mmio/
+obj-$(CONFIG_U8500_CM)		+= nmf-cm/
