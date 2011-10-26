@@ -1548,13 +1548,9 @@ static int mmci_suspend(struct device *dev)
 	if (mmc) {
 		struct mmci_host *host = mmc_priv(mmc);
 
-		pm_runtime_get_sync(mmc->parent);
-
 		ret = mmc_suspend_host(mmc);
 		if (!ret)
 			mmci_disable_irq(host);
-
-		pm_runtime_put_sync_suspend(mmc->parent);
 	}
 
 	return ret;
