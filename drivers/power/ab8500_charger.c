@@ -2311,6 +2311,11 @@ static int ab8500_charger_usb_notifier_call(struct notifier_block *nb,
 	enum ab8500_usb_state bm_usb_state;
 	unsigned mA = *((unsigned *)power);
 
+	if (event != USB_EVENT_VBUS) {
+		dev_dbg(di->dev, "not a standard host, returning\n");
+		return NOTIFY_DONE;
+	}
+
 	/* TODO: State is fabricate  here. See if charger really needs USB
 	 * state or if mA is enough
 	 */
