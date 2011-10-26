@@ -8,6 +8,7 @@
 
 #include <linux/kernel.h>
 #include <linux/dmaengine.h>
+#include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
