@@ -108,7 +108,6 @@ static struct mmci_platform_data mop500_sdi0_data = {
 /*
  * SDI1 (SDIO WLAN)
  */
-#ifdef SDIO_DMA_ON
 #ifdef CONFIG_STE_DMA40
 static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
@@ -128,7 +127,6 @@ static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
 };
 #endif
-#endif
 
 static struct mmci_platform_data mop500_sdi1_data = {
 	.ocr_mask	= MMC_VDD_29_30,
@@ -136,12 +134,10 @@ static struct mmci_platform_data mop500_sdi1_data = {
 	.capabilities	= MMC_CAP_4_BIT_DATA,
 	.gpio_cd	= -1,
 	.gpio_wp	= -1,
-#ifdef SDIO_DMA_ON
 #ifdef CONFIG_STE_DMA40
 	.dma_filter	= stedma40_filter,
 	.dma_rx_param	= &sdi1_dma_cfg_rx,
 	.dma_tx_param	= &sdi1_dma_cfg_tx,
-#endif
 #endif
 };
 
