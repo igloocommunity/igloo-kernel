@@ -44,7 +44,7 @@ dbx500_add_amba_device(const char *name, resource_size_t base,
 
 	dev->dma_mask = DMA_BIT_MASK(32);
 	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-	dev->dev.pwr_domain = &ux500_amba_dev_power_domain;
+	dev->dev.pm_domain = &ux500_amba_dev_power_domain;
 
 	dev->irq[0] = irq;
 	dev->irq[1] = NO_IRQ;
@@ -75,7 +75,7 @@ dbx500_add_platform_device(const char *name, int id, void *pdata,
 
 	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
 	dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
-	dev->dev.pwr_domain = &ux500_dev_power_domain;
+	dev->dev.pm_domain = &ux500_dev_power_domain;
 
 	ret = platform_device_add_resources(dev, res, resnum);
 	if (ret)
