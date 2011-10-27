@@ -135,6 +135,73 @@ void amba_pm_complete(struct device *dev)
 
 #endif /* !CONFIG_PM_SLEEP */
 
+#ifdef CONFIG_PM_RUNTIME
+/*
+ * Hooks to provide runtime PM of the pclk (bus clock).  It is safe to
+ * enable/disable the bus clock at runtime PM suspend/resume as this
+ * does not result in loss of context.  However, disabling vcore power
+ * would do, so we leave that to the driver.
+ */
+static int amba_pm_runtime_suspend(struct device *dev)
+{
+	struct amba_device *pcdev = to_amba_device(dev);
+	int ret = pm_generic_runtime_suspend(dev);
+
+	if (ret == 0 && dev->driver)
+		clk_disable(pcdev->pclk);
+
+	return ret;
+}
+
+static int amba_pm_runtime_suspend_noirq(struct device *dev)
+{
+	int ret = 0;
+
+	/*
+	 * If the amba device is not already runtime suspended
+	 * force it into this state to save power.
+	 */
+	if (!pm_runtime_status_suspended(dev))
+		ret = amba_pm_runtime_suspend(dev);
+
+	return ret;
+}
+
+static int amba_pm_runtime_resume(struct device *dev)
+{
+	struct amba_device *pcdev = to_amba_device(dev);
+	int ret;
+
+	if (dev->driver) {
+		ret = clk_enable(pcdev->pclk);
+		/* Failure is probably fatal to the system, but... */
+		if (ret)
+			return ret;
+	}
+
+	return pm_generic_runtime_resume(dev);
+}
+
+static int amba_pm_runtime_resume_noirq(struct device *dev)
+{
+	int ret = 0;
+
+	/*
+	 * If the amba device has been forced into runtime suspend state,
+	 * we must make sure to restore it back into runtime resumed state.
+	 */
+	if (!pm_runtime_status_suspended(dev))
+		ret = amba_pm_runtime_resume(dev);
+
+	return ret;
+}
+#else /* !CONFIG_PM_RUNTIME */
+
+#define amba_pm_runtime_suspend_noirq	NULL
+#define amba_pm_runtime_resume_noirq	NULL
+
+#endif /* !CONFIG_PM_RUNTIME */
+
 #ifdef CONFIG_SUSPEND
 
 int amba_pm_suspend(struct device *dev)
@@ -163,7 +230,10 @@ int amba_pm_suspend_noirq(struct device *dev)
 	if (!drv)
 		return 0;
 
-	if (drv->pm) {
+	if (amba_pm_runtime_suspend_noirq)
+		ret = amba_pm_runtime_suspend_noirq(dev);
+
+	if (!ret && drv->pm) {
 		if (drv->pm->suspend_noirq)
 			ret = drv->pm->suspend_noirq(dev);
 	}
@@ -201,6 +271,9 @@ int amba_pm_resume_noirq(struct device *dev)
 		if (drv->pm->resume_noirq)
 			ret = drv->pm->resume_noirq(dev);
 	}
+
+	if (!ret && amba_pm_runtime_resume_noirq)
+		ret = amba_pm_runtime_resume_noirq(dev);
 
 	return ret;
 }
@@ -365,39 +438,6 @@ int amba_pm_restore_noirq(struct device *dev)
 
 #endif /* !CONFIG_HIBERNATE_CALLBACKS */
 
-#ifdef CONFIG_PM_RUNTIME
-/*
- * Hooks to provide runtime PM of the pclk (bus clock).  It is safe to
- * enable/disable the bus clock at runtime PM suspend/resume as this
- * does not result in loss of context.  However, disabling vcore power
- * would do, so we leave that to the driver.
- */
-static int amba_pm_runtime_suspend(struct device *dev)
-{
-	struct amba_device *pcdev = to_amba_device(dev);
-	int ret = pm_generic_runtime_suspend(dev);
-
-	if (ret == 0 && dev->driver)
-		clk_disable(pcdev->pclk);
-
-	return ret;
-}
-
-static int amba_pm_runtime_resume(struct device *dev)
-{
-	struct amba_device *pcdev = to_amba_device(dev);
-	int ret;
-
-	if (dev->driver) {
-		ret = clk_enable(pcdev->pclk);
-		/* Failure is probably fatal to the system, but... */
-		if (ret)
-			return ret;
-	}
-
-	return pm_generic_runtime_resume(dev);
-}
-#endif
 
 #ifdef CONFIG_PM
 
