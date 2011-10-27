@@ -2974,7 +2974,6 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 		},
 	},
 	[DB8500_REGULATOR_SWITCH_ESRAM34] = {
-		.supply_regulator = "db8500-vape",
 		.constraints = {
 			.name = "db8500-esram34",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
