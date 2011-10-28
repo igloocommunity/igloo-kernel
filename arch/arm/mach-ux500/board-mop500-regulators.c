@@ -80,6 +80,10 @@ struct regulator_init_data tps61052_regulator = {
 };
 
 static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
+	/* lps001wp baromenter i2c dev name is 2-005c
+	 * maybe change that in the driver, like for lsm303dlh drivers
+	 */
+	REGULATOR_SUPPLY("vdd", "2-005c"),
 	/* Main display, u8500 R3 uib */
 	REGULATOR_SUPPLY("vddi", "mcde_disp_sony_acx424akp.0"),
 	/* Main display, u8500 uib and ST uib */
