@@ -16,7 +16,7 @@
  */
 #define AB8500_MAIN_WDOG_CTRL_REG	0x01
 #define AB8500_LOW_BAT_REG		0x03
-
+#define AB8500_BATT_OK_REG		0x04
 /*
  * USB/ULPI register offsets
  * Bank : 0x5
@@ -278,6 +278,10 @@ struct ab8500_fg;
  * @accu_high_curr:		FG accumulation time in high current mode
  * @high_curr_threshold:	High current threshold, in mA
  * @lowbat_threshold:		Low battery threshold, in mV
+ * @battok_falling_th_sel0	Threshold in mV for battOk signal sel0
+ *				Resolution in 50 mV step.
+ * @battok_raising_th_sel1	Threshold in mV for battOk signal sel1
+ *				Resolution in 50 mV step.
  */
 struct ab8500_fg_parameters {
 	int recovery_sleep_timer;
@@ -290,6 +294,8 @@ struct ab8500_fg_parameters {
 	int accu_high_curr;
 	int high_curr_threshold;
 	int lowbat_threshold;
+	int battok_falling_th_sel0;
+	int battok_raising_th_sel1;
 };
 
 /**

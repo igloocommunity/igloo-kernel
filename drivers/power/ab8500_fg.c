@@ -39,6 +39,9 @@
 #define LOW_BAT_CHECK_INTERVAL		(2 * HZ)
 
 #define VALID_CAPACITY_SEC		(45 * 60) /* 45 minutes */
+#define BATT_OK_MIN			2360 /* mV */
+#define BATT_OK_INCREMENT		50 /* mV */
+#define BATT_OK_MAX_NR_INCREMENTS	0xE
 
 #define interpolate(x, x1, y1, x2, y2) \
 	((y1) + ((((y2) - (y1)) * ((x) - (x1))) / ((x2) - (x1))));
@@ -1494,6 +1497,68 @@ static void ab8500_fg_low_bat_work(struct work_struct *work)
 }
 
 /**
+ * ab8500_fg_battok_calc - calculate the bit pattern corresponding
+ * to the target voltage.
+ * @di:       pointer to the ab8500_fg structure
+ * @target    target voltage
+ *
+ * Returns bit pattern closest to the target voltage
+ * valid return values are 0-14. (0-BATT_OK_MAX_NR_INCREMENTS)
+ */
+
+static int ab8500_fg_battok_calc(struct ab8500_fg *di, int target)
+{
+	if (target > BATT_OK_MIN +
+		(BATT_OK_INCREMENT * BATT_OK_MAX_NR_INCREMENTS))
+		return BATT_OK_MAX_NR_INCREMENTS;
+	if (target < BATT_OK_MIN)
+		return 0;
+	return (target - BATT_OK_MIN) / BATT_OK_INCREMENT;
+}
+
+/**
+ * ab8500_fg_battok_init_hw_register - init battok levels
+ * @di:       pointer to the ab8500_fg structure
+ *
+ */
+
+static int ab8500_fg_battok_init_hw_register(struct ab8500_fg *di)
+{
+	int selected;
+	int sel0;
+	int sel1;
+	int cbp_sel0;
+	int cbp_sel1;
+	int ret;
+	int new_val;
+
+	sel0 = di->bat->fg_params->battok_falling_th_sel0;
+	sel1 = di->bat->fg_params->battok_raising_th_sel1;
+
+	cbp_sel0 = ab8500_fg_battok_calc(di, sel0);
+	cbp_sel1 = ab8500_fg_battok_calc(di, sel1);
+
+	selected = BATT_OK_MIN + cbp_sel0 * BATT_OK_INCREMENT;
+
+	if (selected != sel0)
+		dev_warn(di->dev, "Invalid voltage step:%d, using %d %d\n",
+			sel0, selected, cbp_sel0);
+
+	selected = BATT_OK_MIN + cbp_sel1 * BATT_OK_INCREMENT;
+
+	if (selected != sel1)
+		dev_warn(di->dev, "Invalid voltage step:%d, using %d %d\n",
+			sel1, selected, cbp_sel1);
+
+	new_val = cbp_sel0 | (cbp_sel1 << 4);
+
+	dev_dbg(di->dev, "using: %x %d %d\n", new_val, cbp_sel0, cbp_sel1);
+	ret = abx500_set_register_interruptible(di->dev, AB8500_SYS_CTRL2_BLOCK,
+		AB8500_BATT_OK_REG, new_val);
+	return ret;
+}
+
+/**
  * ab8500_fg_instant_work() - Run the FG state machine instantly
  * @work:	pointer to the work_struct structure
  *
@@ -1790,6 +1855,12 @@ static int ab8500_fg_init_hw_registers(struct ab8500_fg *di)
 		goto out;
 	}
 
+	/* Battery OK threshold */
+	ret = ab8500_fg_battok_init_hw_register(di);
+	if (ret) {
+		dev_err(di->dev, "BattOk init write failed.\n");
+		goto out;
+	}
 out:
 	return ret;
 }
