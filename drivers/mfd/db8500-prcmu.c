@@ -1594,7 +1594,8 @@ static int request_plldsi(bool enable)
 	int r = 0;
 	u32 val;
 
-	writel(PRCM_MMIP_LS_CLAMP_DSIPLL_CLAMP, (enable ?
+	writel((PRCM_MMIP_LS_CLAMP_DSIPLL_CLAMP |
+		PRCM_MMIP_LS_CLAMP_DSIPLL_CLAMPI), (enable ?
 		PRCM_MMIP_LS_CLAMP_CLR : PRCM_MMIP_LS_CLAMP_SET));
 
 	val = readl(PRCM_PLLDSI_ENABLE);
@@ -1616,7 +1617,8 @@ static int request_plldsi(bool enable)
 			writel(PRCM_APE_RESETN_DSIPLL_RESETN,
 				PRCM_APE_RESETN_SET);
 		} else {
-			writel(PRCM_MMIP_LS_CLAMP_DSIPLL_CLAMP,
+			writel((PRCM_MMIP_LS_CLAMP_DSIPLL_CLAMP |
+				PRCM_MMIP_LS_CLAMP_DSIPLL_CLAMPI),
 				PRCM_MMIP_LS_CLAMP_SET);
 			val &= ~PRCM_PLLDSI_ENABLE_PRCM_PLLDSI_ENABLE;
 			writel(val, PRCM_PLLDSI_ENABLE);
