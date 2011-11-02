@@ -412,8 +412,8 @@ static struct {
 static atomic_t ac_wake_req_state = ATOMIC_INIT(0);
 
 /* Spinlocks */
+static DEFINE_SPINLOCK(prcmu_lock);
 static DEFINE_SPINLOCK(clkout_lock);
-static DEFINE_SPINLOCK(gpiocr_lock);
 
 /* Global var to runtime determine TCDM base for v2 or v1 */
 static __iomem void *tcdm_base;
@@ -642,94 +642,30 @@ int db8500_prcmu_set_display_clocks(void)
 	return 0;
 }
 
-/**
- * prcmu_enable_spi2 - Enables pin muxing for SPI2 on OtherAlternateC1.
- */
-void prcmu_enable_spi2(void)
+u32 db8500_prcmu_read(unsigned int reg)
 {
-	u32 reg;
-	unsigned long flags;
-
-	spin_lock_irqsave(&gpiocr_lock, flags);
-	reg = readl(PRCM_GPIOCR);
-	writel(reg | PRCM_GPIOCR_SPI2_SELECT, PRCM_GPIOCR);
-	spin_unlock_irqrestore(&gpiocr_lock, flags);
+	return readl(_PRCMU_BASE + reg);
 }
 
-/**
- * prcmu_disable_spi2 - Disables pin muxing for SPI2 on OtherAlternateC1.
- */
-void prcmu_disable_spi2(void)
+void db8500_prcmu_write(unsigned int reg, u32 value)
 {
-	u32 reg;
 	unsigned long flags;
 
-	spin_lock_irqsave(&gpiocr_lock, flags);
-	reg = readl(PRCM_GPIOCR);
-	writel(reg & ~PRCM_GPIOCR_SPI2_SELECT, PRCM_GPIOCR);
-	spin_unlock_irqrestore(&gpiocr_lock, flags);
+	spin_lock_irqsave(&prcmu_lock, flags);
+	writel(value, (_PRCMU_BASE + reg));
+	spin_unlock_irqrestore(&prcmu_lock, flags);
 }
 
-/**
- * prcmu_enable_stm_mod_uart - Enables pin muxing for STMMOD
- * and UARTMOD on OtherAlternateC3.
- */
-void prcmu_enable_stm_mod_uart(void)
+void db8500_prcmu_write_masked(unsigned int reg, u32 mask, u32 value)
 {
-	u32 reg;
+	u32 val;
 	unsigned long flags;
 
-	spin_lock_irqsave(&gpiocr_lock, flags);
-	reg = readl(PRCM_GPIOCR);
-	reg |= (PRCM_GPIOCR_DBG_STM_MOD_SELECT
-			| PRCM_GPIOCR_DBG_UARTMOD_SELECT);
-	writel(reg, PRCM_GPIOCR);
-	spin_unlock_irqrestore(&gpiocr_lock, flags);
-}
-
-/**
- * prcmu_enable_stm_mod_uart - Disables pin muxing for STMMOD
- * and UARTMOD on OtherAlternateC3.
- */
-void prcmu_disable_stm_mod_uart(void)
-{
-	u32 reg;
-	unsigned long flags;
-
-	spin_lock_irqsave(&gpiocr_lock, flags);
-	reg = readl(PRCM_GPIOCR);
-	reg &= ~(PRCM_GPIOCR_DBG_STM_MOD_SELECT
-			| PRCM_GPIOCR_DBG_UARTMOD_SELECT);
-	writel(reg, PRCM_GPIOCR);
-	spin_unlock_irqrestore(&gpiocr_lock, flags);
-}
-
-/**
- * prcmu_enable_stm_ape - Enables pin muxing for STM APE on OtherAlternateC1.
- */
-void prcmu_enable_stm_ape(void)
-{
-	u32 reg;
-	unsigned long flags;
-
-	spin_lock_irqsave(&gpiocr_lock, flags);
-	reg = readl(PRCM_GPIOCR);
-	writel(reg | PRCM_GPIOCR_DBG_STM_APE_SELECT, PRCM_GPIOCR);
-	spin_unlock_irqrestore(&gpiocr_lock, flags);
-}
-
-/**
- * prcmu_disable_stm_ape - Disables pin muxing for STM APE on OtherAlternateC1.
- */
-void prcmu_disable_stm_ape(void)
-{
-	u32 reg;
-	unsigned long flags;
-
-	spin_lock_irqsave(&gpiocr_lock, flags);
-	reg = readl(PRCM_GPIOCR);
-	writel(reg & ~PRCM_GPIOCR_DBG_STM_APE_SELECT, PRCM_GPIOCR);
-	spin_unlock_irqrestore(&gpiocr_lock, flags);
+	spin_lock_irqsave(&prcmu_lock, flags);
+	val = readl(_PRCMU_BASE + reg);
+	val = ((val & ~mask) | (value & mask));
+	writel(val, (_PRCMU_BASE + reg));
+	spin_unlock_irqrestore(&prcmu_lock, flags);
 }
 
 bool prcmu_has_arm_maxopp(void)
