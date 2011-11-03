@@ -143,23 +143,7 @@ struct inst_curr_result_list {
  * @recovery_needed:	Indicate if recovery is needed
  * @high_curr_mode:	Indicate if we're in high current mode
  * @init_capacity:	Indicate if initial capacity measuring should be done
- * @inst_curr_mip:	Indicate if 'instant' current measurement is in progress
- *				AB8500 does not support real instant current
- *				readings. The best we can do is sample over
- *				250ms.
- * @inst_curr_lock:	Control access to inst curr wait queues and result lists
- * @inst_curr_wq:	Work queue for running 'instant' current measurements
- * @fg_inst_curr_work:	Work to measure 'instant' current
- * @result_wq:		Wait queue for blocking 'instant' current clients
- * @cpw_a_wq:		Physical wait queue A for concurrent inst curr clients
- * @cpw_b_wq:		Physical wait queue B for concurrent inst curr clients
- * @cpw_next_wq:	Logical next wait queue for concurrent inst curr clients
- * @cpw_this_wq:	Logical this wait queue for concurrent inst curr clients
- * @inst_curr_result:	Result register for blocking instant current clients
- * @result_a_list:	Physical result list A for concurrent inst curr clients
- * @result_b_list:	Physical result list B for concurrent inst curr clients
- * @next_result_list:	Logical next results for concurrent inst curr clients
- * @this_result_list:	Logical this results for concurrent inst curr clients
+ * @fg_off:		True if fg was off before current measurement
  * @calib_state		State during offset calibration
  * @discharge_state:	Current discharge state
  * @charge_state:	Current charge state
@@ -195,20 +179,7 @@ struct ab8500_fg {
 	bool recovery_needed;
 	bool high_curr_mode;
 	bool init_capacity;
-	bool inst_curr_mip;
-	spinlock_t inst_curr_lock;
-	struct workqueue_struct *inst_curr_wq;
-	struct delayed_work fg_inst_curr_work;
-	wait_queue_head_t result_wq;
-	wait_queue_head_t cpw_a_wq;
-	wait_queue_head_t cpw_b_wq;
-	wait_queue_head_t *cpw_next_wq;
-	wait_queue_head_t *cpw_this_wq;
-	int inst_curr_result;
-	struct list_head result_a_list;
-	struct list_head result_b_list;
-	struct list_head *next_result_list;
-	struct list_head *this_result_list;
+	bool fg_off;
 	enum ab8500_fg_calibration_state calib_state;
 	enum ab8500_fg_discharge_state discharge_state;
 	enum ab8500_fg_charge_state charge_state;
@@ -521,145 +492,82 @@ cc_err:
 }
 
 /**
- * ab8500_fg_inst_curr_nonblocking() - battery instantaneous current
- * @di:           pointer to the ab8500_fg structure
- * @local_result: pointer to result location, updated after measurement is
- *                completed ~250ms after this function returns
- *
- * Returns error code
- */
-int ab8500_fg_inst_curr_nonblocking(struct ab8500_fg *di, int *local_result)
-{
-	DEFINE_WAIT(wait);
-
-	/*
-	 * caller needs to do some other work at
-	 * the same time as current measurement
-	 */
-	wait_queue_head_t *cpw_my_wq;
-	struct inst_curr_result_list *new =
-		kmalloc(sizeof(struct inst_curr_result_list), GFP_KERNEL);
-	if (!new)
-		return -ENOMEM;
-	new->result = local_result;
-	*local_result = INVALID_CURRENT;
-	INIT_LIST_HEAD(&new->list);
-	spin_lock(&di->inst_curr_lock);
-	list_add(&new->list, di->next_result_list);
-	cpw_my_wq = di->cpw_next_wq;
-	add_wait_queue(cpw_my_wq, &wait);
-	/* queue_work may schedule */
-	queue_delayed_work(di->inst_curr_wq, &di->fg_inst_curr_work, 1);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	spin_unlock(&di->inst_curr_lock);
-	schedule();
-	finish_wait(cpw_my_wq, &wait);
-	return 0;
-}
-
-/**
- * ab8500_fg_inst_curr_blocking() - battery instantaneous current
+ * ab8500_fg_inst_curr_start() - start battery instantaneous current
  * @di:         pointer to the ab8500_fg structure
  *
- * Returns battery instantenous current(on success) else error code
+ * Returns 0 or error code
+ * Note: This is part "one" and has to be called before
+ * ab8500_fg_inst_curr_finalize()
  */
-int ab8500_fg_inst_curr_blocking(struct ab8500_fg *di)
+int ab8500_fg_inst_curr_start(struct ab8500_fg *di)
 {
-	DEFINE_WAIT(wait);
-
-	/* caller will wait for the next available result */
-	spin_lock(&di->inst_curr_lock);
-	add_wait_queue(&di->result_wq, &wait);
-	if (!di->inst_curr_mip)
-		/* queue_work may schedule */
-		queue_delayed_work(di->inst_curr_wq, &di->fg_inst_curr_work, 1);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	spin_unlock(&di->inst_curr_lock);
-	schedule();
-	finish_wait(&di->result_wq, &wait);
-	return di->inst_curr_result;
-}
-
-/**
- * ab8500_fg_inst_curr_work() - take an 'instant' battery current reading
- * @work:	pointer to the work_struct structure
- *
- * AB8500 does not provide instant current readings, the best we can do is
- * average over 250ms.
- */
-static void ab8500_fg_inst_curr_work(struct work_struct *work)
-{
-	struct list_head *temp_result_list;
-	wait_queue_head_t *cpw_temp_wq;
-	u8 low, high, reg_val;
-	static int val;
-	int ret = 0;
-	bool fg_off = false;
-
-	struct ab8500_fg *di = container_of(work,
-		struct ab8500_fg, fg_inst_curr_work.work);
-
-	spin_lock(&di->inst_curr_lock);
-	temp_result_list = di->next_result_list;
-	cpw_temp_wq = di->cpw_next_wq;
-	di->next_result_list = di->this_result_list;
-	di->cpw_next_wq = di->cpw_this_wq;
-	di->this_result_list = temp_result_list;
-	di->cpw_this_wq = cpw_temp_wq;
-
-	di->inst_curr_mip = true;
-	spin_unlock(&di->inst_curr_lock);
+	u8 reg_val;
+	int ret;
 
 	mutex_lock(&di->cc_lock);
 
 	ret = abx500_get_register_interruptible(di->dev, AB8500_RTC,
 		AB8500_RTC_CC_CONF_REG, &reg_val);
 	if (ret < 0)
-		goto inst_curr_err1;
+		goto fail;
 
 	if (!(reg_val & CC_PWR_UP_ENA)) {
 		dev_dbg(di->dev, "%s Enable FG\n", __func__);
-		fg_off = true;
+		di->fg_off = true;
 
 		/* Program the samples */
 		ret = abx500_set_register_interruptible(di->dev,
 			AB8500_GAS_GAUGE, AB8500_GASG_CC_NCOV_ACCU,
 			SEC_TO_SAMPLE(10));
 		if (ret)
-			goto inst_curr_err1;
+			goto fail;
 
 		/* Start the CC */
 		ret = abx500_set_register_interruptible(di->dev, AB8500_RTC,
 			AB8500_RTC_CC_CONF_REG,
 			(CC_DEEP_SLEEP_ENA | CC_PWR_UP_ENA));
 		if (ret)
-			goto inst_curr_err1;
+			goto fail;
 	}
 
 	/* Reset counter and Read request */
 	ret = abx500_set_register_interruptible(di->dev, AB8500_GAS_GAUGE,
 		AB8500_GASG_CC_CTRL_REG, (RESET_ACCU | READ_REQ));
 	if (ret)
-		goto inst_curr_err1;
+		goto fail;
 
-	wake_up(di->cpw_this_wq);
+	/* Note: cc_lock is still locked */
+	return 0;
+fail:
+	mutex_unlock(&di->cc_lock);
+	return ret;
+}
 
-	/*
-	 * Since there is no interrupt for this, just wait for 250ms
-	 * 250ms is one sample conversion time with 32.768 Khz RTC clock
-	 */
-	msleep(250);
+/**
+ * ab8500_fg_inst_curr_finalize() - battery instantaneous current
+ * @di:         pointer to the ab8500_fg structure
+ * @res:	battery instantenous current(on success)
+ *
+ * Returns 0 or an error code
+ * Note: This is part "two" and has to be called at earliest 250 ms
+ * after ab8500_fg_inst_curr_start()
+ */
+int ab8500_fg_inst_curr_finalize(struct ab8500_fg *di, int *res)
+{
+	u8 low, high;
+	int val;
+	int ret;
 
 	/* Read CC Sample conversion value Low and high */
 	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
 		AB8500_GASG_CC_SMPL_CNVL_REG,  &low);
 	if (ret < 0)
-		goto inst_curr_err2;
+		goto fail;
 
 	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
 		AB8500_GASG_CC_SMPL_CNVH_REG,  &high);
 	if (ret < 0)
-		goto inst_curr_err2;
+		goto fail;
 
 	/*
 	 * negative value for Discharging
@@ -678,49 +586,63 @@ static void ab8500_fg_inst_curr_work(struct work_struct *work)
 	 */
 	val = ((val * 66660)  / (4096 * di->bat->fg_res));
 
-	if (fg_off) {
+	if (di->fg_off) {
 		dev_dbg(di->dev, "%s Disable FG\n", __func__);
 
 		/* Clear any pending read requests */
 		ret = abx500_set_register_interruptible(di->dev,
 			AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG, 0);
 		if (ret)
-			goto inst_curr_err3;
+			goto fail;
 
 		/* Stop the CC */
 		ret = abx500_set_register_interruptible(di->dev, AB8500_RTC,
 			AB8500_RTC_CC_CONF_REG, 0);
 		if (ret)
-			goto inst_curr_err3;
+			goto fail;
 	}
-
-finished:
 	mutex_unlock(&di->cc_lock);
+	(*res) = val;
 
-	spin_lock(&di->inst_curr_lock);
-	di->inst_curr_result = val;
+	return 0;
+fail:
+	mutex_unlock(&di->cc_lock);
+	return ret;
+}
 
-	while (!list_empty(di->this_result_list)) {
-		struct inst_curr_result_list *this = list_first_entry(
-			di->this_result_list,
-			struct inst_curr_result_list,
-			list);
-		*(this->result) = val;
-		list_del(&this->list);
-		kfree(this);
+/**
+ * ab8500_fg_inst_curr_blocking() - battery instantaneous current
+ * @di:         pointer to the ab8500_fg structure
+ * @res:	battery instantenous current(on success)
+ *
+ * Returns 0 else error code
+ */
+int ab8500_fg_inst_curr_blocking(struct ab8500_fg *di)
+{
+	int ret;
+	int res = 0;
+
+	ret = ab8500_fg_inst_curr_start(di);
+	if (ret) {
+		dev_err(di->dev, "Failed to initialize fg_inst\n");
+		return 0;
 	}
-	di->inst_curr_mip = false;
-	wake_up(&di->result_wq);
-	spin_unlock(&di->inst_curr_lock);
-	return;
 
-inst_curr_err1:
-	wake_up(di->cpw_this_wq);
-inst_curr_err2:
-	val = 0;
-inst_curr_err3:
-	dev_err(di->dev, "%s Get instanst current failed\n", __func__);
-	goto finished;
+	/*
+	 * Since there is no interrupt for this wait for 253ms to be
+	 * on the safe side.
+	 *
+	 * one sample conversion takes 250 ms at 32.768 Khz RTC clock
+	 */
+	msleep(253);
+
+	ret = ab8500_fg_inst_curr_finalize(di, &res);
+	if (ret) {
+		dev_err(di->dev, "Failed to finalize fg_inst\n");
+		return 0;
+	}
+
+	return res;
 }
 
 /**
@@ -2092,8 +2014,6 @@ static int __devexit ab8500_fg_remove(struct platform_device *pdev)
 	if (ret)
 		dev_err(di->dev, "failed to disable coulomb counter\n");
 
-	flush_workqueue(di->inst_curr_wq);
-	destroy_workqueue(di->inst_curr_wq);
 	destroy_workqueue(di->fg_wq);
 	ab8500_fg_sysfs_exit(di);
 
@@ -2166,19 +2086,6 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 
 	di->init_capacity = true;
 
-	di->inst_curr_mip = false;
-	spin_lock_init(&di->inst_curr_lock);
-	init_waitqueue_head(&di->result_wq);
-	init_waitqueue_head(&di->cpw_a_wq);
-	init_waitqueue_head(&di->cpw_b_wq);
-	di->cpw_next_wq = &di->cpw_a_wq;
-	di->cpw_this_wq = &di->cpw_b_wq;
-	di->inst_curr_result = 0;
-	INIT_LIST_HEAD(&di->result_a_list);
-	INIT_LIST_HEAD(&di->result_b_list);
-	di->next_result_list = &di->result_a_list;
-	di->this_result_list = &di->result_b_list;
-
 	ab8500_fg_charge_state_to(di, AB8500_FG_CHARGE_INIT);
 	ab8500_fg_discharge_state_to(di, AB8500_FG_DISCHARGE_INIT);
 
@@ -2188,16 +2095,6 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 		dev_err(di->dev, "failed to create work queue\n");
 		goto free_device_info;
 	}
-
-	di->inst_curr_wq = create_singlethread_workqueue("ab8500_inst_curr_wq");
-	if (di->inst_curr_wq == NULL) {
-		dev_err(di->dev, "failed to create work queue\n");
-		goto free_fg_wq;
-	}
-
-	/* Init work for running the instant current measurment */
-	INIT_DELAYED_WORK_DEFERRABLE(&di->fg_inst_curr_work,
-		ab8500_fg_inst_curr_work);
 
 	/* Init work for running the fg algorithm instantly */
 	INIT_WORK(&di->fg_work, ab8500_fg_instant_work);
@@ -2281,8 +2178,6 @@ free_irq:
 		free_irq(irq, di);
 	}
 free_inst_curr_wq:
-	destroy_workqueue(di->inst_curr_wq);
-free_fg_wq:
 	destroy_workqueue(di->fg_wq);
 free_device_info:
 	kfree(di);

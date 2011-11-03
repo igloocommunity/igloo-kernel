@@ -228,9 +228,6 @@
 /* Battery type */
 #define BATTERY_UNKNOWN			00
 
-/* Concurrent instant current i/f */
-#define INVALID_CURRENT			INT_MAX
-
 /*
  * ADC for the battery thermistor.
  * When using the ADC_THERM_BATCTRL the battery ID resistor is combined with
@@ -480,7 +477,9 @@ struct ab8500_btemp *ab8500_btemp_get(void);
 int ab8500_btemp_get_batctrl_temp(struct ab8500_btemp *btemp);
 struct ab8500_fg *ab8500_fg_get(void);
 int ab8500_fg_inst_curr_blocking(struct ab8500_fg *dev);
-int ab8500_fg_inst_curr_nonblocking(struct ab8500_fg *dev, int *local_result);
+int ab8500_fg_inst_curr_start(struct ab8500_fg *di);
+int ab8500_fg_inst_curr_finalize(struct ab8500_fg *di, int *res);
+
 #else
 static void ab8500_fg_reinit(void)
 {
@@ -504,11 +503,16 @@ static int ab8500_fg_inst_curr_blocking(struct ab8500_fg *dev)
 {
 	return -ENODEV;
 }
-static int ab8500_fg_inst_curr_nonblocking(
-	struct ab8500_fg *dev,
-	int *local_result)
+
+static inline int ab8500_fg_inst_curr_start(struct ab8500_fg *di)
 {
 	return -ENODEV;
 }
+
+static inline int ab8500_fg_inst_curr_finalize(struct ab8500_fg *di, int *res)
+{
+	return -ENODEV;
+}
+
 #endif
 #endif /* _AB8500_BM_H */

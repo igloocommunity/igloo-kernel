@@ -349,7 +349,7 @@ static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
 	int batctrl = 0;
 	int res;
 	int inst_curr;
-	int i = 0;
+	int i;
 
 	/*
 	 * BATCTRL current sources are included on AB8500 cut2.0
@@ -363,15 +363,37 @@ static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
 
 	if (!di->fg)
 		di->fg = ab8500_fg_get();
-	if (!di->fg || ab8500_fg_inst_curr_nonblocking(di->fg, &inst_curr))
-			inst_curr = 0;
-	do {
+	if (!di->fg) {
+		dev_err(di->dev, "No fg found\n");
+		return -EINVAL;
+	}
+
+	ret = ab8500_fg_inst_curr_start(di->fg);
+
+	if (ret) {
+		dev_err(di->dev, "Failed to start current measurement\n");
+		return ret;
+	}
+
+	/*
+	 * Since there is no interrupt when current measurement id one,
+	 * loop for over 250ms, since 250ms is one sample conversion time
+	 * with 32.768 Khz RTC clock.
+	 */
+
+	for (i = 0; i < 11; i++) {
 		batctrl += ab8500_btemp_read_batctrl_voltage(di);
-		i++;
-		msleep(1);
-		barrier();
-	} while (inst_curr == INVALID_CURRENT);
+		msleep(25);
+	}
+
 	batctrl /= i;
+
+	ret = ab8500_fg_inst_curr_finalize(di->fg, &inst_curr);
+	if (ret) {
+		dev_err(di->dev, "Failed to finalize current measurement\n");
+		return ret;
+	}
+
 	res = ab8500_btemp_batctrl_volt_to_res(di, batctrl, inst_curr);
 
 	ret = ab8500_btemp_curr_source_enable(di, false);
