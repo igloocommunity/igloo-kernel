@@ -862,7 +862,18 @@ static int mmci_pio_read(struct mmci_host *host, char *buffer, unsigned int rema
 		if (count <= 0)
 			break;
 
-		readsl(base + MMCIFIFO, ptr, count >> 2);
+		/*
+		 * SDIO especially may want to receive something that is
+		 * not divisible by 4 (as opposed to card sectors
+		 * etc). Therefore make sure to to always read the last bytes
+		 * while only doing full 32-bit reads towards the FIFO.
+		 */
+		if (count < 4) {
+			unsigned char buf[4];
+			readsl(base + MMCIFIFO, buf, 1);
+			memcpy(ptr, buf, count);
+		} else
+			readsl(base + MMCIFIFO, ptr, count >> 2);
 
 		ptr += count;
 		remain -= count;
