@@ -164,4 +164,3 @@ void dbx500_add_gpios(resource_size_t *base, int num, int irq,
 		dbx500_add_gpio(i, base[i], irq, pdata);
 	}
 }
-
