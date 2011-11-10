@@ -64,6 +64,7 @@ enum ab8500_fg_discharge_state {
 	AB8500_FG_DISCHARGE_INITMEASURING,
 	AB8500_FG_DISCHARGE_INIT_RECOVERY,
 	AB8500_FG_DISCHARGE_RECOVERY,
+	AB8500_FG_DISCHARGE_READOUT_INIT,
 	AB8500_FG_DISCHARGE_READOUT,
 	AB8500_FG_DISCHARGE_WAKEUP,
 };
@@ -73,6 +74,7 @@ static char *discharge_state[] = {
 	"DISCHARGE_INITMEASURING",
 	"DISCHARGE_INIT_RECOVERY",
 	"DISCHARGE_RECOVERY",
+	"DISCHARGE_READOUT_INIT",
 	"DISCHARGE_READOUT",
 	"DISCHARGE_WAKEUP",
 };
@@ -111,6 +113,7 @@ struct ab8500_fg_battery_capacity {
 	int prev_mah;
 	int prev_percent;
 	int prev_level;
+	int user_mah;
 };
 
 struct ab8500_fg_flags {
@@ -123,6 +126,7 @@ struct ab8500_fg_flags {
 	bool bat_ovv;
 	bool batt_unknown;
 	bool calibrate;
+	bool user_cap;
 };
 
 struct inst_curr_result_list {
@@ -1116,6 +1120,7 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 				di->flags.fully_charged);
 			sysfs_notify(&di->fg_kobject, NULL, "charge_full");
 		}
+		sysfs_notify(&di->fg_kobject, NULL, "charge_now");
 	}
 }
 
@@ -1197,6 +1202,56 @@ static void ab8500_fg_algorithm_charging(struct ab8500_fg *di)
 	ab8500_fg_check_capacity_limits(di, false);
 }
 
+static void force_capacity(struct ab8500_fg *di)
+{
+	int cap;
+
+	ab8500_fg_clear_cap_samples(di);
+	cap = di->bat_cap.user_mah;
+	if (cap > di->bat_cap.max_mah_design) {
+		dev_dbg(di->dev, "Remaining cap %d can't be bigger than total"
+			" %d\n", cap, di->bat_cap.max_mah_design);
+		cap = di->bat_cap.max_mah_design;
+	}
+	ab8500_fg_fill_cap_sample(di, di->bat_cap.user_mah);
+	di->bat_cap.permille = ab8500_fg_convert_mah_to_permille(di, cap);
+	di->bat_cap.mah = cap;
+	ab8500_fg_check_capacity_limits(di, true);
+}
+
+static bool check_sysfs_capacity(struct ab8500_fg *di)
+{
+	int cap, lower, upper;
+	int cap_permille;
+
+	cap = di->bat_cap.user_mah;
+
+	cap_permille = ab8500_fg_convert_mah_to_permille(di,
+		di->bat_cap.user_mah);
+
+	lower = di->bat_cap.permille - di->bat->fg_params->user_cap_limit * 10;
+	upper = di->bat_cap.permille + di->bat->fg_params->user_cap_limit * 10;
+
+	if (lower < 0)
+		lower = 0;
+	/* 1000 is permille, -> 100 percent */
+	if (upper > 1000)
+		upper = 1000;
+
+	dev_dbg(di->dev, "Capacity limits:"
+		" (Lower: %d User: %d Upper: %d) [user: %d, was: %d]\n",
+		lower, cap_permille, upper, cap, di->bat_cap.mah);
+
+	/* If within limits, use the saved capacity and exit estimation...*/
+	if (cap_permille > lower && cap_permille < upper) {
+		dev_dbg(di->dev, "OK! Using users cap %d uAh now\n", cap);
+		force_capacity(di);
+		return true;
+	}
+	dev_dbg(di->dev, "Capacity from user out of limits, ignoring");
+	return false;
+}
+
 /**
  * ab8500_fg_algorithm_discharging() - FG algorithm for when discharging
  * @di:		pointer to the ab8500_fg structure
@@ -1233,7 +1288,6 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
 		/* Discard the first [x] seconds */
 		if (di->init_cnt >
 			di->bat->fg_params->init_discard_time) {
-
 			ab8500_fg_calc_cap_discharge_voltage(di, true);
 
 			ab8500_fg_check_capacity_limits(di, true);
@@ -1241,14 +1295,10 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
 
 		di->init_cnt += sleep_time;
 		if (di->init_cnt >
-			di->bat->fg_params->init_total_time) {
+			di->bat->fg_params->init_total_time)
 			di->fg_samples = SEC_TO_SAMPLE(
-				di->bat->fg_params->accu_high_curr);
-
+			di->bat->fg_params->accu_high_curr);
 			ab8500_fg_coulomb_counter(di, true);
-			ab8500_fg_discharge_state_to(di,
-				AB8500_FG_DISCHARGE_READOUT);
-		}
 
 		break;
 
@@ -1287,13 +1337,17 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
 			}
 			di->recovery_cnt += sleep_time;
 		} else {
-			di->fg_samples = SEC_TO_SAMPLE(
-				di->bat->fg_params->accu_high_curr);
-			ab8500_fg_coulomb_counter(di, true);
 			ab8500_fg_discharge_state_to(di,
-				AB8500_FG_DISCHARGE_READOUT);
+				AB8500_FG_DISCHARGE_READOUT_INIT);
 		}
+		break;
 
+	case AB8500_FG_DISCHARGE_READOUT_INIT:
+		di->fg_samples = SEC_TO_SAMPLE(
+			di->bat->fg_params->accu_high_curr);
+		ab8500_fg_coulomb_counter(di, true);
+		ab8500_fg_discharge_state_to(di,
+				AB8500_FG_DISCHARGE_READOUT);
 		break;
 
 	case AB8500_FG_DISCHARGE_READOUT:
@@ -1357,9 +1411,9 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
 
 		di->fg_samples = SEC_TO_SAMPLE(
 			di->bat->fg_params->accu_high_curr);
-		/* Re-program number of samples set above */
 		ab8500_fg_coulomb_counter(di, true);
-		ab8500_fg_discharge_state_to(di, AB8500_FG_DISCHARGE_READOUT);
+		ab8500_fg_discharge_state_to(di,
+				AB8500_FG_DISCHARGE_READOUT);
 
 		ab8500_fg_check_capacity_limits(di, false);
 
@@ -1475,6 +1529,19 @@ static void ab8500_fg_periodic_work(struct work_struct *work)
 		ab8500_fg_calc_cap_discharge_voltage(di, true);
 		ab8500_fg_check_capacity_limits(di, true);
 		di->init_capacity = false;
+
+		queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
+	} else if (di->flags.user_cap) {
+		if (check_sysfs_capacity(di)) {
+			ab8500_fg_check_capacity_limits(di, true);
+			if (di->flags.charging)
+				ab8500_fg_charge_state_to(di,
+					AB8500_FG_CHARGE_INIT);
+			else
+				ab8500_fg_discharge_state_to(di,
+					AB8500_FG_DISCHARGE_READOUT_INIT);
+		}
+		di->flags.user_cap = false;
 		queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
 	} else
 		ab8500_fg_algorithm(di);
@@ -1977,8 +2044,37 @@ static ssize_t charge_full_store(struct ab8500_fg *di, const char *buf,
 	}
 	return ret;
 }
+
+static ssize_t charge_now_show(struct ab8500_fg *di, char *buf)
+{
+	return sprintf(buf, "%d\n", di->bat_cap.prev_mah);
+}
+
+static ssize_t charge_now_store(struct ab8500_fg *di, const char *buf,
+				 size_t count)
+{
+	unsigned long charge_now;
+	ssize_t ret;
+
+	ret = strict_strtoul(buf, 10, &charge_now);
+
+	dev_dbg(di->dev, "Ret %d charge_now %lu was %d",
+		ret, charge_now, di->bat_cap.prev_mah);
+
+	if (!ret) {
+		di->bat_cap.user_mah = (int) charge_now;
+		di->flags.user_cap = true;
+		ret = count;
+		queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
+	}
+	return ret;
+}
+
 static struct ab8500_fg_sysfs_entry charge_full_attr =
 	__ATTR(charge_full, 0644, charge_full_show, charge_full_store);
+
+static struct ab8500_fg_sysfs_entry charge_now_attr =
+	__ATTR(charge_now, 0644, charge_now_show, charge_now_store);
 
 static ssize_t
 ab8500_fg_show(struct kobject *kobj, struct attribute *attr, char *buf)
@@ -2017,6 +2113,7 @@ const struct sysfs_ops ab8500_fg_sysfs_ops = {
 
 static struct attribute *ab8500_fg_attrs[] = {
 	&charge_full_attr.attr,
+	&charge_now_attr.attr,
 	NULL,
 };
 

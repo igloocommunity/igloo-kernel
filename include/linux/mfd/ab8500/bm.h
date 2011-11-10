@@ -282,6 +282,9 @@ struct ab8500_fg;
  *				Resolution in 50 mV step.
  * @battok_raising_th_sel1	Threshold in mV for battOk signal sel1
  *				Resolution in 50 mV step.
+ * @user_cap_limit		Capacity reported from user must be within this
+ *				limit to be considered as sane, in percentage
+ *				points.
  */
 struct ab8500_fg_parameters {
 	int recovery_sleep_timer;
@@ -296,6 +299,7 @@ struct ab8500_fg_parameters {
 	int lowbat_threshold;
 	int battok_falling_th_sel0;
 	int battok_raising_th_sel1;
+	int user_cap_limit;
 };
 
 /**
