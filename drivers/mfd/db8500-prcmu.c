@@ -2829,7 +2829,7 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 		},
 	},
 	[DB8500_REGULATOR_SWITCH_SVAMMDSP] = {
-		.supply_regulator = "db8500-vape",
+		/* dependency to u8500-vape is handled outside regulator framework */
 		.constraints = {
 			.name = "db8500-sva-mmdsp",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
@@ -2845,7 +2845,7 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 		},
 	},
 	[DB8500_REGULATOR_SWITCH_SVAPIPE] = {
-		.supply_regulator = "db8500-vape",
+		/* dependency to u8500-vape is handled outside regulator framework */
 		.constraints = {
 			.name = "db8500-sva-pipe",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
@@ -2854,7 +2854,7 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 		.num_consumer_supplies = ARRAY_SIZE(db8500_svapipe_consumers),
 	},
 	[DB8500_REGULATOR_SWITCH_SIAMMDSP] = {
-		.supply_regulator = "db8500-vape",
+		/* dependency to u8500-vape is handled outside regulator framework */
 		.constraints = {
 			.name = "db8500-sia-mmdsp",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
@@ -2869,7 +2869,7 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 		},
 	},
 	[DB8500_REGULATOR_SWITCH_SIAPIPE] = {
-		.supply_regulator = "db8500-vape",
+		/* dependency to u8500-vape is handled outside regulator framework */
 		.constraints = {
 			.name = "db8500-sia-pipe",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
@@ -2897,7 +2897,10 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 		.num_consumer_supplies = ARRAY_SIZE(db8500_b2r2_mcde_consumers),
 	},
 	[DB8500_REGULATOR_SWITCH_ESRAM12] = {
-		.supply_regulator = "db8500-vape",
+		/*
+		 * esram12 is set in retention and supplied by Vsafe when Vape is off,
+		 * no need to hold Vape
+		 */
 		.constraints = {
 			.name = "db8500-esram12",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
@@ -2912,6 +2915,10 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
 		},
 	},
 	[DB8500_REGULATOR_SWITCH_ESRAM34] = {
+		/*
+		 * esram34 is set in retention and supplied by Vsafe when Vape is off,
+		 * no need to hold Vape
+		 */
 		.constraints = {
 			.name = "db8500-esram34",
 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
