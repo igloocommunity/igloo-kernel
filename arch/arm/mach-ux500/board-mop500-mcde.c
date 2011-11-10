@@ -434,6 +434,9 @@ struct mcde_display_device av8100_hdmi = {
 
 static void delayed_work_dispreg_hdmi(struct work_struct *ptr)
 {
+	if (machine_is_snowball())
+		av8100_hdmi.default_pixel_format = MCDE_OVLYPIXFMT_RGB565;
+
 	if (mcde_display_device_register(&av8100_hdmi))
 		pr_warning("Failed to register av8100_hdmi\n");
 }
