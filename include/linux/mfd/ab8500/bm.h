@@ -412,7 +412,7 @@ struct ab8500_bm_charger_parameters {
  * @adc_therm		placement of thermistor, batctrl or battemp adc
  * @chg_unknown_bat	flag to enable charging of unknown batteries
  * @enable_overshoot	flag to enable VBAT overshoot control
- * @fg_res		resistance of FG resistor in mOhm
+ * @fg_res		resistance of FG resistor in 0.1mOhm
  * @n_btypes		number of elements in array bat_type
  * @batt_id		index of the identified battery in array bat_type
  * @interval_charging	charge alg cycle period time when charging (sec)

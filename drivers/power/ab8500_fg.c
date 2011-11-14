@@ -585,9 +585,13 @@ int ab8500_fg_inst_curr_finalize(struct ab8500_fg *di, int *res)
 	 * Convert to unit value in mA
 	 * Full scale input voltage is
 	 * 66.660mV => LSB = 66.660mV/(4096*res) = 1.627mA
-	 * resistance is in mOhm
+	 * Given a 250ms conversion cycle time the LSB corresponds
+	 * to 112.9 nAh. Convert to current by dividing by the conversion
+	 * time in hours (250ms = 1 / (3600 * 4)h)
+	 * 112.9nAh assumes 10mOhm, but fg_res is in 0.1mOhm
 	 */
-	val = ((val * 66660)  / (4096 * di->bat->fg_res));
+	val = (val * QLSB_NANO_AMP_HOURS_X10 * 36 * 4) /
+		(1000 * di->bat->fg_res);
 
 	if (di->fg_off) {
 		dev_dbg(di->dev, "%s Disable FG\n", __func__);
@@ -691,9 +695,27 @@ static void ab8500_fg_acc_cur_work(struct work_struct *work)
 	else
 		val = (low | (med << 8) | (high << 16));
 
-	di->accu_charge = (val * QLSB_NANO_AMP_HOURS_X10)/10000;
+	/*
+	 * Convert to uAh
+	 * Given a 250ms conversion cycle time the LSB corresponds
+	 * to 112.9 nAh.
+	 * 112.9nAh assumes 10mOhm, but fg_res is in 0.1mOhm
+	 */
+	di->accu_charge = (val * QLSB_NANO_AMP_HOURS_X10) /
+		(100 * di->bat->fg_res);
 
-	di->avg_curr = (val * FG_LSB_IN_MA) / (di->fg_samples * 1000);
+	/*
+	 * Convert to unit value in mA
+	 * Full scale input voltage is
+	 * 66.660mV => LSB = 66.660mV/(4096*res) = 1.627mA
+	 * Given a 250ms conversion cycle time the LSB corresponds
+	 * to 112.9 nAh. Convert to current by dividing by the conversion
+	 * time in hours (= samples / (3600 * 4)h)
+	 * 112.9nAh assumes 10mOhm, but fg_res is in 0.1mOhm
+	 */
+	di->avg_curr = (val * QLSB_NANO_AMP_HOURS_X10 * 36) /
+		(1000 * di->bat->fg_res * (di->fg_samples / 4));
+
 	di->flags.conv_done = true;
 
 	mutex_unlock(&di->cc_lock);
