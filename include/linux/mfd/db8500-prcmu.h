@@ -536,7 +536,7 @@ int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
 
 void prcmu_ac_wake_req(void);
 void prcmu_ac_sleep_req(void);
-void prcmu_modem_reset(void);
+void db8500_prcmu_modem_reset(void);
 
 int prcmu_config_a9wdog(u8 num, bool sleep_auto_off);
 int prcmu_enable_a9wdog(u8 id);
@@ -670,7 +670,7 @@ static inline void prcmu_ac_wake_req(void) {}
 
 static inline void prcmu_ac_sleep_req(void) {}
 
-static inline void prcmu_modem_reset(void) {}
+static inline void db8500_prcmu_modem_reset(void) {}
 
 static inline void db8500_prcmu_system_reset(u16 reset_code) {}
 

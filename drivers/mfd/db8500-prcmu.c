@@ -2389,9 +2389,9 @@ u16 db8500_prcmu_get_reset_code(void)
 }
 
 /**
- * prcmu_reset_modem - ask the PRCMU to reset modem
+ * db8500_prcmu_reset_modem - ask the PRCMU to reset modem
  */
-void prcmu_modem_reset(void)
+void db8500_prcmu_modem_reset(void)
 {
 	mutex_lock(&mb1_transfer.lock);
 

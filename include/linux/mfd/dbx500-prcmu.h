@@ -391,7 +391,14 @@ static inline u16 prcmu_get_reset_code(void)
 
 void prcmu_ac_wake_req(void);
 void prcmu_ac_sleep_req(void);
-void prcmu_modem_reset(void);
+static inline void prcmu_modem_reset(void)
+{
+	if (cpu_is_u5500())
+		return db5500_prcmu_modem_reset();
+	else
+		return db8500_prcmu_modem_reset();
+}
+
 static inline bool prcmu_is_ac_wake_requested(void)
 {
 	if (cpu_is_u5500())
