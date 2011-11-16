@@ -65,6 +65,7 @@
 #ifdef CONFIG_CRYPTO_DEV_UX500
 #include <mach/crypto-ux500.h>
 #endif
+#include <mach/pm.h>
 #ifdef CONFIG_AV8100
 #include <video/av8100.h>
 #endif
@@ -227,6 +228,7 @@ static struct platform_device snowball_key_dev = {
 	.id		= -1,
 	.dev		= {
 		.platform_data  = &snowball_key_data,
+		.pm_domain	= &ux500_dev_power_domain,
 	}
 };
 
@@ -697,6 +699,7 @@ static struct platform_device mop500_gpio_keys_device = {
 	.id	= 0,
 	.dev	= {
 		.platform_data	= &mop500_gpio_keys_data,
+		.pwr_domain	= &ux500_dev_power_domain,
 	},
 };
 
