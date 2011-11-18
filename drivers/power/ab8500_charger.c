@@ -173,7 +173,10 @@ struct ab8500_charger_usb_state {
  * @vbus_detected_start:
  *			VBUS detected during startup
  * @ac_conn:		This will be true when the AC charger has been plugged
- * @vddadc_en:		Indicate if VDD ADC supply is enabled from this driver
+ * @vddadc_en_ac:	Indicate if VDD ADC supply is enabled because AC
+ *			charger is enabled
+ * @vddadc_en_usb:	Indicate if VDD ADC supply is enabled because USB
+ *			charger is enabled
  * @vbat		Battery voltage
  * @old_vbat		Previously measured battery voltage
  * @parent:		Pointer to the struct ab8500
@@ -209,7 +212,8 @@ struct ab8500_charger {
 	bool vbus_detected;
 	bool vbus_detected_start;
 	bool ac_conn;
-	bool vddadc_en;
+	bool vddadc_en_ac;
+	bool vddadc_en_usb;
 	int vbat;
 	int old_vbat;
 	struct ab8500 *parent;
@@ -443,7 +447,7 @@ static int ab8500_charger_detect_chargers(struct ab8500_charger *di)
 		AB8500_CH_STATUS1_REG, &val);
 	if (ret < 0) {
 		dev_err(di->dev, "%s ab8500 read failed\n", __func__);
-		goto out;
+		return ret;
 	}
 
 	if (val & MAIN_CH_DET)
@@ -454,39 +458,13 @@ static int ab8500_charger_detect_chargers(struct ab8500_charger *di)
 		AB8500_CH_USBCH_STAT1_REG, &val);
 	if (ret < 0) {
 		dev_err(di->dev, "%s ab8500 read failed\n", __func__);
-		goto out;
+		return ret;
 	}
 
 	if ((val & VBUS_DET_DBNC1) && (val & VBUS_DET_DBNC100))
 		result |= USB_PW_CONN;
 
-	/*
-	 * Due to a bug in AB8500, BTEMP_HIGH/LOW interrupts
-	 * will be triggered everytime we enable the VDD ADC supply.
-	 * This will turn off charging for a short while.
-	 * It can be avoided by having the supply on when
-	 * there is a charger connected. Normally the VDD ADC supply
-	 * is enabled everytime a GPADC conversion is triggered. We will
-	 * force it to be enabled from this driver to have
-	 * the GPADC module independant of the AB8500 chargers
-	 */
-	if (result == NO_PW_CONN && di->vddadc_en) {
-		regulator_disable(di->regu);
-		di->vddadc_en = false;
-	} else if ((result & AC_PW_CONN || result & USB_PW_CONN) &&
-		!di->vddadc_en) {
-		regulator_enable(di->regu);
-		di->vddadc_en = true;
-	}
-
 	return result;
-
-out:
-	if (di->vddadc_en) {
-		regulator_disable(di->regu);
-		di->vddadc_en = false;
-	}
-	return ret;
 }
 
 /**
@@ -1000,6 +978,21 @@ static int ab8500_charger_ac_en(struct ux500_charger *charger,
 		/* Enable AC charging */
 		dev_dbg(di->dev, "Enable AC: %dmV %dmA\n", vset, iset);
 
+		/*
+		 * Due to a bug in AB8500, BTEMP_HIGH/LOW interrupts
+		 * will be triggered everytime we enable the VDD ADC supply.
+		 * This will turn off charging for a short while.
+		 * It can be avoided by having the supply on when
+		 * there is a charger enabled. Normally the VDD ADC supply
+		 * is enabled everytime a GPADC conversion is triggered. We will
+		 * force it to be enabled from this driver to have
+		 * the GPADC module independant of the AB8500 chargers
+		 */
+		if (!di->vddadc_en_ac) {
+			regulator_enable(di->regu);
+			di->vddadc_en_ac = true;
+		}
+
 		/* Check if the requested voltage or current is valid */
 		volt_index = ab8500_voltage_to_regval(vset);
 		curr_index = ab8500_current_to_regval(iset);
@@ -1120,6 +1113,13 @@ static int ab8500_charger_ac_en(struct ux500_charger *charger,
 
 		di->ac.charger_online = 0;
 		di->ac.wd_expired = false;
+
+		/* Disable regulator if enabled */
+		if (di->vddadc_en_ac) {
+			regulator_disable(di->regu);
+			di->vddadc_en_ac = false;
+		}
+
 		dev_dbg(di->dev, "%s Disabled AC charging\n", __func__);
 	}
 	power_supply_changed(&di->ac_chg.psy);
@@ -1152,6 +1152,21 @@ static int ab8500_charger_usb_en(struct ux500_charger *charger,
 		if (!di->usb.charger_connected) {
 			dev_err(di->dev, "USB charger not connected\n");
 			return -ENXIO;
+		}
+
+		/*
+		 * Due to a bug in AB8500, BTEMP_HIGH/LOW interrupts
+		 * will be triggered everytime we enable the VDD ADC supply.
+		 * This will turn off charging for a short while.
+		 * It can be avoided by having the supply on when
+		 * there is a charger enabled. Normally the VDD ADC supply
+		 * is enabled everytime a GPADC conversion is triggered. We will
+		 * force it to be enabled from this driver to have
+		 * the GPADC module independant of the AB8500 chargers
+		 */
+		if (!di->vddadc_en_usb) {
+			regulator_enable(di->regu);
+			di->vddadc_en_usb = true;
 		}
 
 		/* Enable USB charging */
@@ -1224,6 +1239,13 @@ static int ab8500_charger_usb_en(struct ux500_charger *charger,
 
 		di->usb.charger_online = 0;
 		di->usb.wd_expired = false;
+
+		/* Disable regulator if enabled */
+		if (di->vddadc_en_usb) {
+			regulator_disable(di->regu);
+			di->vddadc_en_usb = false;
+		}
+
 		dev_dbg(di->dev, "%s Disabled USB charging\n", __func__);
 
 		/* Cancel any pending Vbat check work */
