@@ -16,9 +16,11 @@
 #include <linux/gpio.h>
 #include <linux/gpio/nomadik.h>
 
+#ifdef CONFIG_FB_MCDE
 #include <video/mcde_display.h>
 #include <video/mcde_display-av8100.h>
 #include <video/mcde_fb.h>
+#endif
 
 #include <mach/hardware.h>
 #include <mach/pm.h>
@@ -168,6 +170,7 @@ void dbx500_add_gpios(resource_size_t *base, int num, int irq,
 	}
 }
 
+#ifdef CONFIG_FB_MCDE
 void hdmi_fb_onoff(struct mcde_display_device *ddev,
 		bool enable, u8 cea, u8 vesa_cea_nr)
 {
@@ -228,4 +231,5 @@ hdmi_fb_onoff_end:
 	return;
 }
 EXPORT_SYMBOL(hdmi_fb_onoff);
+#endif
 
