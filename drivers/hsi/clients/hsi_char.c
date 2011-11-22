@@ -123,7 +123,7 @@ static unsigned int max_data_size = 0x1000;
 module_param(max_data_size, uint, 1);
 MODULE_PARM_DESC(max_data_size, "max read/write data size [4,8..65536] (^2)");
 
-static int channels_map[HSI_CHAR_DEVS] = {0, -1, -1 , -1, -1, -1, -1, -1};
+static int channels_map[HSI_CHAR_DEVS] = {0, -1, -1, -1, -1, -1, -1, -1};
 module_param_array(channels_map, int, NULL, 0);
 MODULE_PARM_DESC(channels_map, "Array of HSI channels ([0...7]) to be probed");
 
@@ -624,10 +624,14 @@ static inline void hsi_char_rx2icfg(struct hsi_config *cfg,
 static inline void hsi_char_tx2icfg(struct hsi_config *cfg,
 						struct hsc_tx_config *tx_cfg)
 {
+	int ch;
+
 	cfg->mode = tx_cfg->mode;
 	cfg->channels = tx_cfg->channels;
 	cfg->speed = tx_cfg->speed;
 	cfg->arb_mode = tx_cfg->arb_mode;
+	for (ch = 0; ch < HSI_MAX_CHANNELS; ch++)
+		cfg->ch_prio[ch] = (tx_cfg->priority >> ch) & 1;
 }
 
 static inline void hsi_char_rx2ecfg(struct hsc_rx_config *rx_cfg,
@@ -641,10 +645,16 @@ static inline void hsi_char_rx2ecfg(struct hsc_rx_config *rx_cfg,
 static inline void hsi_char_tx2ecfg(struct hsc_tx_config *tx_cfg,
 							struct hsi_config *cfg)
 {
+	int ch;
+
 	tx_cfg->mode = cfg->mode;
 	tx_cfg->channels = cfg->channels;
 	tx_cfg->speed = cfg->speed;
 	tx_cfg->arb_mode = cfg->arb_mode;
+	tx_cfg->priority = 0;
+	for (ch = 0; ch < HSI_MAX_CHANNELS; ch++)
+		if (cfg->ch_prio[ch])
+			tx_cfg->priority |= (1 << ch);
 }
 
 static ssize_t hsi_char_read(struct file *file, char __user *buf,
