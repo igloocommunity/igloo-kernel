@@ -81,6 +81,8 @@ struct hsi_config {
 	unsigned int	mode;
 	unsigned int	channels;
 	unsigned int	speed;
+	/* ch_prio for TX only, Valid if arb_mode == HSI_ARB_PRIO */
+	unsigned char	ch_prio[HSI_MAX_CHANNELS];
 	union {
 		unsigned int	flow;		/* RX only */
 		unsigned int	arb_mode;	/* TX only */
