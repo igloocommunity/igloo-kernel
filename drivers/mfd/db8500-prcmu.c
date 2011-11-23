@@ -134,6 +134,8 @@
 #define PRCM_REQ_MB1_ARM_OPP			(PRCM_REQ_MB1 + 0x0)
 #define PRCM_REQ_MB1_APE_OPP			(PRCM_REQ_MB1 + 0x1)
 #define PRCM_REQ_MB1_PLL_ON_OFF			(PRCM_REQ_MB1 + 0x4)
+#define PLL_SOC0_OFF	0x1
+#define PLL_SOC0_ON	0x2
 #define PLL_SOC1_OFF	0x4
 #define PLL_SOC1_ON	0x8
 
@@ -1149,7 +1151,9 @@ static int request_pll(u8 clock, bool enable)
 {
 	int r = 0;
 
-	if (clock == PRCMU_PLLSOC1)
+	if (clock == PRCMU_PLLSOC0)
+		clock = (enable ? PLL_SOC0_ON : PLL_SOC0_OFF);
+	else if (clock == PRCMU_PLLSOC1)
 		clock = (enable ? PLL_SOC1_ON : PLL_SOC1_OFF);
 	else
 		return -EINVAL;
@@ -1607,6 +1611,7 @@ int db8500_prcmu_request_clock(u8 clock, bool enable)
 		return request_sysclk(enable);
 	case PRCMU_PLLDSI:
 		return request_plldsi(enable);
+	case PRCMU_PLLSOC0:
 	case PRCMU_PLLSOC1:
 		return request_pll(clock, enable);
 	default:
