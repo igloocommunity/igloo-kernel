@@ -511,6 +511,18 @@ struct prcmu_auto_pm_config {
 	u8 sva_policy;
 };
 
+#define PRCMU_FW_PROJECT_U8500		2
+#define PRCMU_FW_PROJECT_U9500		4
+#define PRCMU_FW_PROJECT_U8500_C2	7
+#define PRCMU_FW_PROJECT_U9500_C2	11
+
+struct prcmu_fw_version {
+	u8 project;
+	u8 api_version;
+	u8 func_version;
+	u8 errata;
+};
+
 #ifdef CONFIG_MFD_DB8500_PRCMU
 
 void db8500_prcmu_early_init(void);
@@ -518,6 +530,7 @@ int prcmu_set_rc_a2p(enum romcode_write);
 enum romcode_read prcmu_get_rc_p2a(void);
 enum ap_pwrst prcmu_get_xp70_current_state(void);
 bool prcmu_has_arm_maxopp(void);
+struct prcmu_fw_version *prcmu_get_fw_version(void);
 int prcmu_request_ape_opp_100_voltage(bool enable);
 int prcmu_release_usb_wakeup_state(void);
 /* NOTE! Use regulator framework instead */
@@ -590,6 +603,11 @@ static inline enum ap_pwrst prcmu_get_xp70_current_state(void)
 static inline bool prcmu_has_arm_maxopp(void)
 {
 	return false;
+}
+
+static inline struct prcmu_fw_version *prcmu_get_fw_version(void)
+{
+	return NULL;
 }
 
 static inline int db8500_prcmu_set_ape_opp(u8 opp)
