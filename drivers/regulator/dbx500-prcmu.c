@@ -267,6 +267,13 @@ static const struct file_operations ux500_regulator_status_fops = {
 	.owner = THIS_MODULE,
 };
 
+int __attribute__((weak)) dbx500_regulator_testcase(
+	struct dbx500_regulator_info *regulator_info,
+	int num_regulators)
+{
+	return 0;
+}
+
 int __devinit
 ux500_regulator_debug_init(struct platform_device *pdev,
 	struct dbx500_regulator_info *regulator_info,
@@ -307,6 +314,8 @@ ux500_regulator_debug_init(struct platform_device *pdev,
 			"could not allocate memory for saving state\n");
 		goto exit_free;
 	}
+
+	dbx500_regulator_testcase(regulator_info, num_regulators);
 	return 0;
 
 exit_free:
