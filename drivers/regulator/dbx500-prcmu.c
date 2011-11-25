@@ -24,6 +24,18 @@
 static int power_state_active_cnt; /* will initialize to zero */
 static DEFINE_SPINLOCK(power_state_active_lock);
 
+int power_state_active_get(void)
+{
+	unsigned long flags;
+	int cnt;
+
+	spin_lock_irqsave(&power_state_active_lock, flags);
+	cnt = power_state_active_cnt;
+	spin_unlock_irqrestore(&power_state_active_lock, flags);
+
+	return cnt;
+}
+
 void power_state_active_enable(void)
 {
 	unsigned long flags;
@@ -156,6 +168,7 @@ EXPORT_SYMBOL_GPL(ux500_regulator_put);
 static struct ux500_regulator_debug {
 	struct dentry *dir;
 	struct dentry *status_file;
+	struct dentry *power_state_cnt_file;
 	struct dbx500_regulator_info *regulator_array;
 	int num_regulators;
 	u8 *state_before_suspend;
@@ -177,6 +190,35 @@ void ux500_regulator_resume_debug(void)
 		rdebug.state_after_suspend[i] =
 			rdebug.regulator_array[i].is_enabled;
 }
+
+static int ux500_regulator_power_state_cnt_print(struct seq_file *s, void *p)
+{
+	struct device *dev = s->private;
+	int err;
+
+	/* print power state count */
+	err = seq_printf(s, "ux500-regulator power state count: %i\n",
+		power_state_active_get());
+	if (err < 0)
+		dev_err(dev, "seq_printf overflow\n");
+
+	return 0;
+}
+
+static int ux500_regulator_power_state_cnt_open(struct inode *inode,
+	struct file *file)
+{
+	return single_open(file, ux500_regulator_power_state_cnt_print,
+		inode->i_private);
+}
+
+static const struct file_operations ux500_regulator_power_state_cnt_fops = {
+	.open = ux500_regulator_power_state_cnt_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.owner = THIS_MODULE,
+};
 
 static int ux500_regulator_status_print(struct seq_file *s, void *p)
 {
@@ -242,6 +284,13 @@ ux500_regulator_debug_init(struct platform_device *pdev,
 	if (!rdebug.status_file)
 		goto exit_destroy_dir;
 
+	/* create "power-state-count" file */
+	rdebug.power_state_cnt_file = debugfs_create_file("power-state-count",
+		S_IRUGO, rdebug.dir, &pdev->dev,
+		&ux500_regulator_power_state_cnt_fops);
+	if (!rdebug.power_state_cnt_file)
+		goto exit_destroy_status;
+
 	rdebug.regulator_array = regulator_info;
 	rdebug.num_regulators = num_regulators;
 
@@ -249,7 +298,7 @@ ux500_regulator_debug_init(struct platform_device *pdev,
 	if (!rdebug.state_before_suspend) {
 		dev_err(&pdev->dev,
 			"could not allocate memory for saving state\n");
-		goto exit_destory_status;
+		goto exit_destroy_power_state;
 	}
 
 	rdebug.state_after_suspend = kzalloc(num_regulators, GFP_KERNEL);
@@ -262,7 +311,9 @@ ux500_regulator_debug_init(struct platform_device *pdev,
 
 exit_free:
 	kfree(rdebug.state_before_suspend);
-exit_destory_status:
+exit_destroy_power_state:
+	debugfs_remove(rdebug.power_state_cnt_file);
+exit_destroy_status:
 	debugfs_remove(rdebug.status_file);
 exit_destroy_dir:
 	debugfs_remove(rdebug.dir);
