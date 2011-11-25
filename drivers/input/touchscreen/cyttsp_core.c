@@ -795,6 +795,7 @@ no_track_id:
 					t->cur_mt_pos[t->snd_trk[id]][CY_XPOS]);
 			input_report_abs(ts->input, ABS_MT_POSITION_Y,
 					t->cur_mt_pos[t->snd_trk[id]][CY_YPOS]);
+			input_report_key(ts->input, BTN_TOUCH, 1);
 			if (mt_sync_func)
 				mt_sync_func(ts->input);
 
@@ -815,6 +816,7 @@ no_track_id:
 				ts->prv_mt_pos[ts->prv_mt_tch[id]][CY_XPOS]);
 			input_report_abs(ts->input, ABS_MT_POSITION_Y,
 				ts->prv_mt_pos[ts->prv_mt_tch[id]][CY_YPOS]);
+			input_report_key(ts->input, BTN_TOUCH, 0);
 
 			if (mt_sync_func)
 				mt_sync_func(ts->input);
