@@ -285,6 +285,8 @@ struct ab8500_fg;
  * @user_cap_limit		Capacity reported from user must be within this
  *				limit to be considered as sane, in percentage
  *				points.
+ * @maint_thres			This is the threshold where we stop reporting
+ *				battery full while in maintenance, in per cent
  */
 struct ab8500_fg_parameters {
 	int recovery_sleep_timer;
@@ -300,6 +302,7 @@ struct ab8500_fg_parameters {
 	int battok_falling_th_sel0;
 	int battok_raising_th_sel1;
 	int user_cap_limit;
+	int maint_thres;
 };
 
 /**

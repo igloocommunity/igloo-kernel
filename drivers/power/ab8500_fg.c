@@ -121,6 +121,7 @@ struct ab8500_fg_flags {
 	bool conv_done;
 	bool charging;
 	bool fully_charged;
+	bool force_full;
 	bool low_bat_delay;
 	bool low_bat;
 	bool bat_ovv;
@@ -903,14 +904,14 @@ static int ab8500_fg_calc_cap_charging(struct ab8500_fg *di)
 		di->bat_cap.mah += di->accu_charge;
 	else
 		di->bat_cap.mah = 0;
-
 	/*
-	 * We force capacity to 100% as long as the algorithm
+	 * We force capacity to 100% once when the algorithm
 	 * reports that it's full.
-	*/
+	 */
 	if (di->bat_cap.mah >= di->bat_cap.max_mah_design ||
-		di->flags.fully_charged)
+		di->flags.force_full) {
 		di->bat_cap.mah = di->bat_cap.max_mah_design;
+	}
 
 	ab8500_fg_fill_cap_sample(di, di->bat_cap.mah);
 	di->bat_cap.permille =
@@ -1075,6 +1076,28 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 		di->bat_cap.prev_mah = 0;
 		di->bat_cap.mah = 0;
 		changed = true;
+	} else if (di->flags.fully_charged) {
+		/*
+		 * We report 100% if algorithm reported fully charged
+		 * unless capacity drops too much
+		 */
+		if (di->flags.force_full) {
+			di->bat_cap.prev_percent = di->bat_cap.permille / 10;
+			di->bat_cap.prev_mah = di->bat_cap.mah;
+		} else if (!di->flags.force_full &&
+			di->bat_cap.prev_percent !=
+			(di->bat_cap.permille) / 10 &&
+			(di->bat_cap.permille / 10) <
+			di->bat->fg_params->maint_thres) {
+			dev_dbg(di->dev,
+				"battery reported full "
+				"but capacity dropping: %d\n",
+				di->bat_cap.permille / 10);
+			di->bat_cap.prev_percent = di->bat_cap.permille / 10;
+			di->bat_cap.prev_mah = di->bat_cap.mah;
+
+			changed = true;
+		}
 	} else if (di->bat_cap.prev_percent != di->bat_cap.permille / 10) {
 		if (di->bat_cap.permille / 10 == 0) {
 			/*
@@ -1115,9 +1138,9 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 
 	if (changed) {
 		power_supply_changed(&di->fg_psy);
-		if (di->flags.fully_charged) {
-			dev_dbg(di->dev, "Full, notifying..: %d\n",
-				di->flags.fully_charged);
+		if (di->flags.fully_charged && di->flags.force_full) {
+			dev_dbg(di->dev, "Battery full, notifying.\n");
+			di->flags.force_full = false;
 			sysfs_notify(&di->fg_kobject, NULL, "charge_full");
 		}
 		sysfs_notify(&di->fg_kobject, NULL, "charge_now");
@@ -1880,6 +1903,7 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
 					if (di->flags.fully_charged)
 						break;
 					di->flags.fully_charged = true;
+					di->flags.force_full = true;
 					/* Save current capacity as maximum */
 					di->bat_cap.max_mah = di->bat_cap.mah;
 					queue_work(di->fg_wq, &di->fg_work);
