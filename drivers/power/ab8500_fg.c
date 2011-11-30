@@ -1337,8 +1337,11 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
 			}
 			di->recovery_cnt += sleep_time;
 		} else {
+			di->fg_samples = SEC_TO_SAMPLE(
+				di->bat->fg_params->accu_high_curr);
+			ab8500_fg_coulomb_counter(di, true);
 			ab8500_fg_discharge_state_to(di,
-				AB8500_FG_DISCHARGE_READOUT_INIT);
+				AB8500_FG_DISCHARGE_READOUT);
 		}
 		break;
 
