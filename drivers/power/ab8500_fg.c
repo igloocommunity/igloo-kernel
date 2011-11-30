@@ -128,6 +128,7 @@ struct ab8500_fg_flags {
 	bool batt_unknown;
 	bool calibrate;
 	bool user_cap;
+	bool batt_id_received;
 };
 
 struct inst_curr_result_list {
@@ -1815,7 +1816,8 @@ static int ab8500_fg_get_property(struct power_supply *psy,
 				di->bat_cap.max_mah);
 		break;
 	case POWER_SUPPLY_PROP_ENERGY_NOW:
-		if (di->flags.batt_unknown && !di->bat->chg_unknown_bat)
+		if (di->flags.batt_unknown && !di->bat->chg_unknown_bat &&
+				di->flags.batt_id_received)
 			val->intval = ab8500_fg_convert_mah_to_uwh(di,
 					di->bat_cap.max_mah);
 		else
@@ -1829,19 +1831,22 @@ static int ab8500_fg_get_property(struct power_supply *psy,
 		val->intval = di->bat_cap.max_mah;
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_NOW:
-		if (di->flags.batt_unknown && !di->bat->chg_unknown_bat)
+		if (di->flags.batt_unknown && !di->bat->chg_unknown_bat &&
+				di->flags.batt_id_received)
 			val->intval = di->bat_cap.max_mah;
 		else
 			val->intval = di->bat_cap.prev_mah;
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
-		if (di->flags.batt_unknown && !di->bat->chg_unknown_bat)
+		if (di->flags.batt_unknown && !di->bat->chg_unknown_bat &&
+				di->flags.batt_id_received)
 			val->intval = 100;
 		else
 			val->intval = di->bat_cap.prev_percent;
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
-		if (di->flags.batt_unknown && !di->bat->chg_unknown_bat)
+		if (di->flags.batt_unknown && !di->bat->chg_unknown_bat &&
+				di->flags.batt_id_received)
 			val->intval = POWER_SUPPLY_CAPACITY_LEVEL_UNKNOWN;
 		else
 			val->intval = di->bat_cap.prev_level;
@@ -1923,6 +1928,8 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
 		case POWER_SUPPLY_PROP_TECHNOLOGY:
 			switch (ext->type) {
 			case POWER_SUPPLY_TYPE_BATTERY:
+				if (!di->flags.batt_id_received)
+					di->flags.batt_id_received = true;
 				if (ret.intval)
 					di->flags.batt_unknown = false;
 				else
@@ -2340,6 +2347,7 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 
 	/* Consider battery unknown until we're informed otherwise */
 	di->flags.batt_unknown = true;
+	di->flags.batt_id_received = false;
 
 	/* Register FG power supply class */
 	ret = power_supply_register(di->dev, &di->fg_psy);
