@@ -14,6 +14,7 @@
 #include <linux/amba/bus.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/gpio/nomadik.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/dma-mapping.h>
@@ -21,7 +22,6 @@
 
 #include <asm/mach/map.h>
 #include <asm/pmu.h>
-#include <plat/gpio-nomadik.h>
 #include <mach/hardware.h>
 #include <mach/setup.h>
 #include <mach/devices.h>
