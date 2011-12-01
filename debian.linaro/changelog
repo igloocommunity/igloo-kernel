@@ -1,9 +1,15 @@
+linux-ux500 (3.0.0-4.0) oneiric; urgency=low
+
+  * Moved to igloo kernel git.
+
+ -- John Fredriksson <john.xj.fredriksson@stericsson.com>  Thu, 24 Nov 2011 10:57:34 +0100
+
 linux-ux500 (3.0.0-3.0) natty; urgency=low
 
   * Configuration change to diable auto created HDMI framebuffer. It is now
     created by hdmiservice.
 
- -- John Fredriksson <qjohnfr@linux-64-02>  Fri, 28 Oct 2011 15:21:41 +0200
+ -- John Fredriksson <john.xj.fredriksson@stericsson.com>  Fri, 28 Oct 2011 15:21:41 +0200
 
 linux-ux500 (3.0.0-2.0) UNRELEASED; urgency=low
 
