@@ -1,0 +1,5 @@
+linux-ux500 (3.0.0-2.0) UNRELEASED; urgency=low
+
+  * Snowball bsp B-release candidate.
+
+ -- John Fredriksson <john.xj.fredriksson@stericsson.com>  Thu, 13 Oct 2011 13:37:00 +0200
