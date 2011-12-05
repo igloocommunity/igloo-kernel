@@ -818,6 +818,11 @@ int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll)
 	return 0;
 }
 
+u8 db8500_prcmu_get_power_state_result(void)
+{
+	return readb(tcdm_base + PRCM_ACK_MB0_AP_PWRSTTR_STATUS);
+}
+
 /* This function should only be called while mb0_transfer.lock is held. */
 static void config_wakeups(void)
 {

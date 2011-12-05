@@ -181,84 +181,6 @@ enum hw_acc_state {
 };
 
 /**
- * enum  mbox_2_arm_stat - Status messages definition for mbox_arm
- * @BOOT_TO_EXECUTEOK: The apBoot to apExecute state transition has been
- *                    completed
- * @DEEPSLEEPOK: The apExecute to apDeepSleep state transition has been
- *              completed
- * @SLEEPOK: The apExecute to apSleep state transition has been completed
- * @IDLEOK: The apExecute to apIdle state transition has been completed
- * @SOFTRESETOK: The A9 watchdog/ SoftReset state has been completed
- * @SOFTRESETGO : The A9 watchdog/SoftReset state is on going
- * @BOOT_TO_EXECUTE: The apBoot to apExecute state transition is on going
- * @EXECUTE_TO_DEEPSLEEP: The apExecute to apDeepSleep state transition is on
- *                       going
- * @DEEPSLEEP_TO_EXECUTE: The apDeepSleep to apExecute state transition is on
- *                       going
- * @DEEPSLEEP_TO_EXECUTEOK: The apDeepSleep to apExecute state transition has
- *                         been completed
- * @EXECUTE_TO_SLEEP: The apExecute to apSleep state transition is on going
- * @SLEEP_TO_EXECUTE: The apSleep to apExecute state transition is on going
- * @SLEEP_TO_EXECUTEOK: The apSleep to apExecute state transition has been
- *                     completed
- * @EXECUTE_TO_IDLE: The apExecute to apIdle state transition is on going
- * @IDLE_TO_EXECUTE: The apIdle to apExecute state transition is on going
- * @IDLE_TO_EXECUTEOK: The apIdle to apExecute state transition has been
- *                    completed
- * @INIT_STATUS: Status init
- */
-enum ap_pwrsttr_status {
-	BOOT_TO_EXECUTEOK = 0xFF,
-	DEEPSLEEPOK = 0xFE,
-	SLEEPOK = 0xFD,
-	IDLEOK = 0xFC,
-	SOFTRESETOK = 0xFB,
-	SOFTRESETGO = 0xFA,
-	BOOT_TO_EXECUTE = 0xF9,
-	EXECUTE_TO_DEEPSLEEP = 0xF8,
-	DEEPSLEEP_TO_EXECUTE = 0xF7,
-	DEEPSLEEP_TO_EXECUTEOK = 0xF6,
-	EXECUTE_TO_SLEEP = 0xF5,
-	SLEEP_TO_EXECUTE = 0xF4,
-	SLEEP_TO_EXECUTEOK = 0xF3,
-	EXECUTE_TO_IDLE = 0xF2,
-	IDLE_TO_EXECUTE = 0xF1,
-	IDLE_TO_EXECUTEOK = 0xF0,
-	RDYTODS_RETURNTOEXE    = 0xEF,
-	NORDYTODS_RETURNTOEXE  = 0xEE,
-	EXETOSLEEP_RETURNTOEXE = 0xED,
-	EXETOIDLE_RETURNTOEXE  = 0xEC,
-	INIT_STATUS = 0xEB,
-
-	/*error messages */
-	INITERROR                     = 0x00,
-	PLLARMLOCKP_ER                = 0x01,
-	PLLDDRLOCKP_ER                = 0x02,
-	PLLSOCLOCKP_ER                = 0x03,
-	PLLSOCK1LOCKP_ER              = 0x04,
-	ARMWFI_ER                     = 0x05,
-	SYSCLKOK_ER                   = 0x06,
-	I2C_NACK_DATA_ER              = 0x07,
-	BOOT_ER                       = 0x08,
-	I2C_STATUS_ALWAYS_1           = 0x0A,
-	I2C_NACK_REG_ADDR_ER          = 0x0B,
-	I2C_NACK_DATA0123_ER          = 0x1B,
-	I2C_NACK_ADDR_ER              = 0x1F,
-	CURAPPWRSTISNOT_BOOT          = 0x20,
-	CURAPPWRSTISNOT_EXECUTE       = 0x21,
-	CURAPPWRSTISNOT_SLEEPMODE     = 0x22,
-	CURAPPWRSTISNOT_CORRECTFORIT10 = 0x23,
-	FIFO4500WUISNOT_WUPEVENT      = 0x24,
-	PLL32KLOCKP_ER                = 0x29,
-	DDRDEEPSLEEPOK_ER             = 0x2A,
-	ROMCODEREADY_ER               = 0x50,
-	WUPBEFOREDS                   = 0x51,
-	DDRCONFIG_ER                  = 0x52,
-	WUPBEFORESLEEP                = 0x53,
-	WUPBEFOREIDLE                 = 0x54
-};  /* earlier called as  mbox_2_arm_stat */
-
-/**
  * enum dvfs_stat - DVFS status messages definition
  * @DVFS_GO: A state transition DVFS is on going
  * @DVFS_ARM100OPPOK: The state transition DVFS has been completed for 100OPP
@@ -475,6 +397,25 @@ enum hw_acc_dev {
 	NUM_HW_ACC
 };
 
+/**
+ * enum prcmu_power_status - results from set_power_state
+ * @PRCMU_SLEEP_OK: Sleep went ok
+ * @PRCMU_DEEP_SLEEP_OK: DeepSleep went ok
+ * @PRCMU_IDLE_OK: Idle went ok
+ * @PRCMU_DEEPIDLE_OK: DeepIdle went ok
+ * @PRCMU_PRCMU2ARMPENDINGIT_ER: Pending interrupt detected
+ * @PRCMU_ARMPENDINGIT_ER: Pending interrupt detected
+ *
+ */
+enum prcmu_power_status {
+	PRCMU_SLEEP_OK			= 0xf3,
+	PRCMU_DEEP_SLEEP_OK		= 0xf6,
+	PRCMU_IDLE_OK			= 0xf0,
+	PRCMU_DEEPIDLE_OK		= 0xe3,
+	PRCMU_PRCMU2ARMPENDINGIT_ER	= 0x91,
+	PRCMU_ARMPENDINGIT_ER		= 0x93,
+};
+
 /*
  * Definitions for autonomous power management configuration.
  */
@@ -559,6 +500,7 @@ int prcmu_load_a9wdog(u8 id, u32 val);
 
 void db8500_prcmu_system_reset(u16 reset_code);
 int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll);
+u8 db8500_prcmu_get_power_state_result(void);
 void db8500_prcmu_enable_wakeups(u32 wakeups);
 int db8500_prcmu_set_epod(u16 epod_id, u8 epod_state);
 int db8500_prcmu_request_clock(u8 clock, bool enable);
@@ -694,6 +636,11 @@ static inline void db8500_prcmu_system_reset(u16 reset_code) {}
 
 static inline int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 	bool keep_ap_pll)
+{
+	return 0;
+}
+
+static inline u8 db8500_prcmu_get_power_state_result(void)
 {
 	return 0;
 }
