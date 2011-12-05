@@ -154,6 +154,28 @@ static int mmci_validate_data(struct mmci_host *host,
 /*
  * This must be called with host->lock held
  */
+static void mmci_write_clkreg(struct mmci_host *host, u32 clk)
+{
+	if (host->clk_reg != clk) {
+		host->clk_reg = clk;
+		writel(clk, host->base + MMCICLOCK);
+	}
+}
+
+/*
+ * This must be called with host->lock held
+ */
+static void mmci_write_pwrreg(struct mmci_host *host, u32 pwr)
+{
+	if (host->pwr_reg != pwr) {
+		host->pwr_reg = pwr;
+		writel(pwr, host->base + MMCIPOWER);
+	}
+}
+
+/*
+ * This must be called with host->lock held
+ */
 static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
 {
 	struct variant_data *variant = host->variant;
@@ -198,7 +220,7 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
 	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_8)
 		clk |= MCI_ST_8BIT_BUS;
 
-	writel(clk, host->base + MMCICLOCK);
+	mmci_write_clkreg(host, clk);
 }
 
 static void
@@ -661,26 +683,25 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 	/* The ST Micro variants has a special bit to enable SDIO */
 	if (variant->sdio && host->mmc->card)
 		if (mmc_card_sdio(host->mmc->card)) {
-			/*
-			 * The ST Micro variants has a special bit
-			 * to enable SDIO.
-			 */
-			datactrl |= MCI_ST_DPSM_SDIOEN;
 
 			/*
 			 * The ST Micro variant for SDIO write transfer sizes
 			 * less then 8 bytes needs to have clock H/W flow
 			 * control disabled.
 			 */
-			if ((host->size < 8) &&
-			    (data->flags & MMC_DATA_WRITE))
-				writel(readl(host->base + MMCICLOCK) &
-				       ~variant->clkreg_enable,
-				       host->base + MMCICLOCK);
+			u32 clk;
+			if ((host->size < 8) && (data->flags & MMC_DATA_WRITE))
+				clk = host->clk_reg & ~variant->clkreg_enable;
 			else
-				writel(readl(host->base + MMCICLOCK) |
-				       variant->clkreg_enable,
-				       host->base + MMCICLOCK);
+				clk = host->clk_reg | variant->clkreg_enable;
+
+			mmci_write_clkreg(host, clk);
+
+			/*
+			 * The ST Micro variants has a special bit
+			 * to enable SDIO.
+			 */
+			datactrl |= MCI_ST_DPSM_SDIOEN;
 		}
 
 	/*
@@ -1156,11 +1177,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	spin_lock_irqsave(&host->lock, flags);
 
 	mmci_set_clkreg(host, ios->clock);
-
-	if (host->pwr != pwr) {
-		host->pwr = pwr;
-		writel(pwr, host->base + MMCIPOWER);
-	}
+	mmci_write_pwrreg(host, pwr);
 
 	spin_unlock_irqrestore(&host->lock, flags);
 }
