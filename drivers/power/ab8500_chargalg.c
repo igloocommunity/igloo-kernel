@@ -187,6 +187,11 @@ enum maxim_ret {
 	MAXIM_RET_IBAT_TOO_HIGH,
 };
 
+enum maintenance_state {
+	MAINT_A,
+	MAINT_B,
+};
+
 /**
  * struct ab8500_chargalg - ab8500 Charging algorithm device information
  * @dev:		pointer to the structure device
@@ -194,9 +199,10 @@ enum maxim_ret {
  * @eoc_cnt:		counter used to determine end-of_charge
  * @rch_cnt:		counter used to determine start of recharge
  * @maintenance_chg:	indicate if maintenance charge is active
- * @t_hyst_norm		temperature hysteresis when the temperature has	been
+ * @maint_state:	indicate what maintenance state we should go to next
+ * @t_hyst_norm		temperature hysteresis when the temperature has been
  *			over or under normal limits
- * @t_hyst_lowhigh	temperature hysteresis when the temperature has	been
+ * @t_hyst_lowhigh	temperature hysteresis when the temperature has been
  *			over or under the high or low limits
  * @charge_state:	current state of the charging algorithm
  * @ccm			charging current maximization parameters
@@ -223,6 +229,7 @@ struct ab8500_chargalg {
 	int eoc_cnt;
 	int rch_cnt;
 	bool maintenance_chg;
+	enum maintenance_state maint_state;
 	int t_hyst_norm;
 	int t_hyst_lowhigh;
 	enum ab8500_chargalg_states charge_state;
@@ -591,10 +598,8 @@ static void ab8500_chargalg_hold_charging(struct ab8500_chargalg *di)
 	ab8500_chargalg_usb_en(di, false, 0, 0);
 	ab8500_chargalg_stop_safety_timer(di);
 	ab8500_chargalg_stop_maintenance_timer(di);
-	di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
 	di->maintenance_chg = false;
 	cancel_delayed_work(&di->chargalg_wd_work);
-	power_supply_changed(&di->chargalg_psy);
 }
 
 /**
@@ -1427,6 +1432,7 @@ static void ab8500_chargalg_algorithm(struct ab8500_chargalg *di)
 		di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
 		di->eoc_cnt = 0;
 		di->maintenance_chg = false;
+		di->maint_state = MAINT_A;
 		power_supply_changed(&di->chargalg_psy);
 
 		break;
@@ -1434,19 +1440,14 @@ static void ab8500_chargalg_algorithm(struct ab8500_chargalg *di)
 	case STATE_NORMAL:
 		handle_maxim_chg_curr(di);
 		if (di->charge_status == POWER_SUPPLY_STATUS_FULL &&
-			di->maintenance_chg) {
-			if (di->bat->no_maintenance)
-				ab8500_chargalg_state_to(di,
-					STATE_WAIT_FOR_RECHARGE_INIT);
-			else
-				ab8500_chargalg_state_to(di,
-					STATE_MAINTENANCE_A_INIT);
-		}
+				di->maintenance_chg)
+			ab8500_chargalg_state_to(di,
+				STATE_WAIT_FOR_RECHARGE_INIT);
+
 		/* Check whether we should start the safety timer or not */
 		ab8500_chargalg_check_safety_timer(di);
 		break;
 
-	/* This state will be used when the maintenance state is disabled */
 	case STATE_WAIT_FOR_RECHARGE_INIT:
 		ab8500_chargalg_hold_charging(di);
 		ab8500_chargalg_state_to(di, STATE_WAIT_FOR_RECHARGE);
@@ -1454,12 +1455,37 @@ static void ab8500_chargalg_algorithm(struct ab8500_chargalg *di)
 		/* Intentional fallthrough */
 
 	case STATE_WAIT_FOR_RECHARGE:
-		if (di->batt_data.volt <=
-			di->bat->bat_type[di->bat->batt_id].recharge_vol) {
-			if (di->rch_cnt-- == 0)
-				ab8500_chargalg_state_to(di, STATE_NORMAL_INIT);
-		} else
-			di->rch_cnt = RCH_COND_CNT;
+		if (di->bat->no_maintenance) {
+			if (di->batt_data.volt <= di->bat->bat_type[
+					di->bat->batt_id].recharge_vol) {
+				if (di->rch_cnt-- == 0)
+					ab8500_chargalg_state_to(di,
+						STATE_NORMAL_INIT);
+			} else {
+				di->rch_cnt = RCH_COND_CNT;
+			}
+		} else {
+			/* Maintenance A */
+			if (di->maint_state == MAINT_A &&
+					di->batt_data.volt <
+					di->bat->bat_type[di->bat->batt_id].
+					maint_a_vol_lvl) {
+				if (di->rch_cnt-- == 0)
+					ab8500_chargalg_state_to(di,
+						STATE_MAINTENANCE_A_INIT);
+			}
+			/* Maintenance B */
+			else if (di->maint_state == MAINT_B &&
+					di->batt_data.volt <
+					di->bat->bat_type[di->bat->batt_id].
+					maint_b_vol_lvl)  {
+				if (di->rch_cnt-- == 0)
+					ab8500_chargalg_state_to(di,
+						STATE_MAINTENANCE_B_INIT);
+			} else {
+				di->rch_cnt = RCH_COND_CNT;
+			}
+		}
 		break;
 
 	case STATE_MAINTENANCE_A_INIT:
@@ -1473,13 +1499,15 @@ static void ab8500_chargalg_algorithm(struct ab8500_chargalg *di)
 			di->bat->bat_type[
 				di->bat->batt_id].maint_a_cur_lvl);
 		ab8500_chargalg_state_to(di, STATE_MAINTENANCE_A);
+		di->maint_state = MAINT_B;
 		power_supply_changed(&di->chargalg_psy);
 		/* Intentional fallthrough*/
 
 	case STATE_MAINTENANCE_A:
 		if (di->events.maintenance_timer_expired) {
 			ab8500_chargalg_stop_maintenance_timer(di);
-			ab8500_chargalg_state_to(di, STATE_MAINTENANCE_B_INIT);
+			ab8500_chargalg_state_to(di,
+				STATE_WAIT_FOR_RECHARGE_INIT);
 		}
 		break;
 
@@ -1545,7 +1573,8 @@ static void ab8500_chargalg_algorithm(struct ab8500_chargalg *di)
 	/* Start charging directly if the new state is a charge state */
 	if (di->charge_state == STATE_NORMAL_INIT ||
 			di->charge_state == STATE_MAINTENANCE_A_INIT ||
-			di->charge_state == STATE_MAINTENANCE_B_INIT)
+			di->charge_state == STATE_MAINTENANCE_B_INIT ||
+			di->charge_state == STATE_WAIT_FOR_RECHARGE_INIT)
 		queue_work(di->chargalg_wq, &di->chargalg_work);
 }
 
