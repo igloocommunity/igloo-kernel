@@ -19,6 +19,7 @@
 #include <linux/err.h>
 #include <linux/highmem.h>
 #include <linux/log2.h>
+#include <linux/pm_runtime.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/amba/bus.h>
@@ -52,6 +53,9 @@ static unsigned int fmax = 515633;
  * @sdio: variant supports SDIO
  * @st_clkdiv: true if using a ST-specific clock divider algorithm
  * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
+ * @non_power_of_2_blksize: true if block sizes can be other than power of two
+ * @pwrreg_powerup: power up value for MMCIPOWER register
+ * @signal_direction: input/out direction of bus signals can be indicated
  */
 struct variant_data {
 	unsigned int		clkreg;
@@ -62,18 +66,23 @@ struct variant_data {
 	bool			sdio;
 	bool			st_clkdiv;
 	bool			blksz_datactrl16;
+	bool			non_power_of_2_blksize;
+	unsigned int		pwrreg_powerup;
+	bool			signal_direction;
 };
 
 static struct variant_data variant_arm = {
 	.fifosize		= 16 * 4,
 	.fifohalfsize		= 8 * 4,
 	.datalength_bits	= 16,
+	.pwrreg_powerup		= MCI_PWR_UP,
 };
 
 static struct variant_data variant_arm_extended_fifo = {
 	.fifosize		= 128 * 4,
 	.fifohalfsize		= 64 * 4,
 	.datalength_bits	= 16,
+	.pwrreg_powerup		= MCI_PWR_UP,
 };
 
 static struct variant_data variant_u300 = {
@@ -82,6 +91,8 @@ static struct variant_data variant_u300 = {
 	.clkreg_enable		= MCI_ST_U300_HWFCEN,
 	.datalength_bits	= 16,
 	.sdio			= true,
+	.pwrreg_powerup		= MCI_PWR_ON,
+	.signal_direction	= true,
 };
 
 static struct variant_data variant_ux500 = {
@@ -92,6 +103,8 @@ static struct variant_data variant_ux500 = {
 	.datalength_bits	= 24,
 	.sdio			= true,
 	.st_clkdiv		= true,
+	.pwrreg_powerup		= MCI_PWR_ON,
+	.signal_direction	= true,
 };
 
 static struct variant_data variant_ux500v2 = {
@@ -103,6 +116,9 @@ static struct variant_data variant_ux500v2 = {
 	.sdio			= true,
 	.st_clkdiv		= true,
 	.blksz_datactrl16	= true,
+	.non_power_of_2_blksize	= true,
+	.pwrreg_powerup		= MCI_PWR_ON,
+	.signal_direction	= true,
 };
 
 /*
@@ -165,13 +181,7 @@ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 	host->mrq = NULL;
 	host->cmd = NULL;
 
-	/*
-	 * Need to drop the host lock here; mmc_request_done may call
-	 * back into the driver...
-	 */
-	spin_unlock(&host->lock);
 	mmc_request_done(host->mmc, mrq);
-	spin_lock(&host->lock);
 }
 
 static void mmci_set_mask1(struct mmci_host *host, unsigned int mask)
@@ -529,7 +539,7 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
 	if (chan) {
 		if (err)
 			dmaengine_terminate_all(chan);
-		if (err || data->host_cookie)
+		if (data->host_cookie)
 			dma_unmap_sg(mmc_dev(host->mmc), data->sg,
 				     data->sg_len, dir);
 		mrq->data->host_cookie = 0;
@@ -592,7 +602,6 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 	writel(host->size, base + MMCIDATALENGTH);
 
 	blksz_bits = ffs(data->blksz) - 1;
-	BUG_ON(1 << blksz_bits != data->blksz);
 
 	if (variant->blksz_datactrl16)
 		datactrl = MCI_DPSM_ENABLE | (data->blksz << 16);
@@ -601,6 +610,34 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 
 	if (data->flags & MMC_DATA_READ)
 		datactrl |= MCI_DPSM_DIRECTION;
+
+	/* The ST Micro variants has a special bit to enable SDIO */
+	if (variant->sdio && host->mmc->card)
+		if (mmc_card_sdio(host->mmc->card)) {
+			/*
+			 * The ST Micro variants has a special bit
+			 * to enable SDIO.
+			 */
+			datactrl |= MCI_ST_DPSM_SDIOEN;
+
+			/*
+			 * The ST Micro variant for SDIO transfer sizes
+			 * less then or equal to 8 bytes needs to have clock
+			 * H/W flow control disabled. Since flow control is
+			 * not really needed for anything that fits in the
+			 * FIFO, we can disable it for any write smaller
+			 * than the FIFO size.
+			 */
+			if ((host->size <= variant->fifosize) &&
+			    (data->flags & MMC_DATA_WRITE))
+				writel(readl(host->base + MMCICLOCK) &
+				       ~variant->clkreg_enable,
+				       host->base + MMCICLOCK);
+			else
+				writel(readl(host->base + MMCICLOCK) |
+				       variant->clkreg_enable,
+				       host->base + MMCICLOCK);
+		}
 
 	/*
 	 * Attempt to use DMA operation mode, if this
@@ -629,11 +666,6 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 		 */
 		irqmask = MCI_TXFIFOHALFEMPTYMASK;
 	}
-
-	/* The ST Micro variants has a special bit to enable SDIO */
-	if (variant->sdio && host->mmc->card)
-		if (mmc_card_sdio(host->mmc->card))
-			datactrl |= MCI_ST_DPSM_SDIOEN;
 
 	writel(datactrl, base + MMCIDATACTRL);
 	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
@@ -776,7 +808,24 @@ static int mmci_pio_read(struct mmci_host *host, char *buffer, unsigned int rema
 		if (count <= 0)
 			break;
 
-		readsl(base + MMCIFIFO, ptr, count >> 2);
+		/*
+		 * SDIO especially may want to receive something that is
+		 * not divisible by 4 (as opposed to card sectors
+		 * etc). Therefore make sure we always read the last bytes
+		 * out of the FIFO.
+		 */
+		switch (count) {
+		case 1:
+		case 3:
+			readsb(base + MMCIFIFO, ptr, count);
+			break;
+		case 2:
+			readsw(base + MMCIFIFO, ptr, 1);
+			break;
+		default:
+			readsl(base + MMCIFIFO, ptr, count >> 2);
+			break;
+		}
 
 		ptr += count;
 		remain -= count;
@@ -803,23 +852,6 @@ static int mmci_pio_write(struct mmci_host *host, char *buffer, unsigned int rem
 		maxcnt = status & MCI_TXFIFOEMPTY ?
 			 variant->fifosize : variant->fifohalfsize;
 		count = min(remain, maxcnt);
-
-		/*
-		 * The ST Micro variant for SDIO transfer sizes
-		 * less then 8 bytes should have clock H/W flow
-		 * control disabled.
-		 */
-		if (variant->sdio &&
-		    mmc_card_sdio(host->mmc->card)) {
-			if (count < 8)
-				writel(readl(host->base + MMCICLOCK) &
-					~variant->clkreg_enable,
-					host->base + MMCICLOCK);
-			else
-				writel(readl(host->base + MMCICLOCK) |
-					variant->clkreg_enable,
-					host->base + MMCICLOCK);
-		}
 
 		/*
 		 * SDIO especially may want to send something that is
@@ -972,11 +1004,14 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
 static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 {
 	struct mmci_host *host = mmc_priv(mmc);
+	struct variant_data *variant = host->variant;
 	unsigned long flags;
 
 	WARN_ON(host->mrq != NULL);
 
-	if (mrq->data && !is_power_of_2(mrq->data->blksz)) {
+	if (mrq->data &&
+	    !variant->non_power_of_2_blksize &&
+	    !is_power_of_2(mrq->data->blksz)) {
 		dev_err(mmc_dev(mmc), "unsupported block size (%d bytes)\n",
 			mrq->data->blksz);
 		mrq->cmd->error = -EINVAL;
@@ -1002,9 +1037,14 @@ static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct mmci_host *host = mmc_priv(mmc);
+	struct variant_data *variant = host->variant;
 	u32 pwr = 0;
 	unsigned long flags;
 	int ret;
+
+	if (host->plat->ios_handler &&
+		host->plat->ios_handler(mmc_dev(mmc), ios))
+			dev_err(mmc_dev(mmc), "platform ios_handler failed\n");
 
 	switch (ios->power_mode) {
 	case MMC_POWER_OFF:
@@ -1025,17 +1065,33 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 				return;
 			}
 		}
-		if (host->plat->vdd_handler)
-			pwr |= host->plat->vdd_handler(mmc_dev(mmc), ios->vdd,
-						       ios->power_mode);
-		/* The ST version does not have this, fall through to POWER_ON */
-		if (host->hw_designer != AMBA_VENDOR_ST) {
-			pwr |= MCI_PWR_UP;
-			break;
-		}
+		/*
+		 * The ST Micro variant doesn't have the PL180s MCI_PWR_UP
+		 * and instead uses MCI_PWR_ON so apply whatever value is
+		 * configured in the variant data.
+		 */
+		pwr |= variant->pwrreg_powerup;
+
+		break;
 	case MMC_POWER_ON:
 		pwr |= MCI_PWR_ON;
 		break;
+	}
+
+	if (variant->signal_direction && ios->power_mode != MMC_POWER_OFF) {
+		/*
+		 * The ST Micro variant has some additional bits
+		 * indicating signal direction for the signals in
+		 * the SD/MMC bus and feedback-clock usage.
+		 */
+		pwr |= host->plat->sigdir;
+
+		if (ios->bus_width == MMC_BUS_WIDTH_4)
+			pwr &= ~MCI_ST_DATA74DIREN;
+		else if (ios->bus_width == MMC_BUS_WIDTH_1)
+			pwr &= (~MCI_ST_DATA74DIREN &
+				~MCI_ST_DATA31DIREN &
+				~MCI_ST_DATA2DIREN);
 	}
 
 	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN) {
@@ -1320,6 +1376,10 @@ static int __devinit mmci_probe(struct amba_device *dev,
 
 	amba_set_drvdata(dev, mmc);
 
+	pm_runtime_enable(mmc->parent);
+	if (pm_runtime_get_sync(mmc->parent) < 0)
+		dev_err(mmc_dev(mmc), "failed pm_runtime_get_sync\n");
+
 	dev_info(&dev->dev, "%s: PL%03x manf %x rev%u at 0x%08llx irq %d,%d (pio)\n",
 		 mmc_hostname(mmc), amba_part(dev), amba_manf(dev),
 		 amba_rev(dev), (unsigned long long)dev->res.start,
@@ -1412,6 +1472,9 @@ static int mmci_suspend(struct amba_device *dev, pm_message_t state)
 		ret = mmc_suspend_host(mmc);
 		if (ret == 0)
 			writel(0, host->base + MMCIMASK0);
+
+		if (pm_runtime_put_sync(mmc->parent) < 0)
+			dev_err(mmc_dev(mmc), "failed pm_runtime_put_sync\n");
 	}
 
 	return ret;
@@ -1424,6 +1487,9 @@ static int mmci_resume(struct amba_device *dev)
 
 	if (mmc) {
 		struct mmci_host *host = mmc_priv(mmc);
+
+		if (pm_runtime_get_sync(mmc->parent) < 0)
+			dev_err(mmc_dev(mmc), "failed pm_runtime_get_sync\n");
 
 		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
 
