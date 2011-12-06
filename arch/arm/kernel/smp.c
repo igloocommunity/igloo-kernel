@@ -313,8 +313,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 	 */
 	percpu_timer_setup();
 
-	calibrate_delay();
-
 	smp_store_cpu_info(cpu);
 
 	/*
@@ -485,7 +483,7 @@ void show_local_irqs(struct seq_file *p, int prec)
 #endif
 
 #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-static void smp_timer_broadcast(const struct cpumask *mask)
+void smp_timer_broadcast(const struct cpumask *mask)
 {
 	smp_cross_call(mask, IPI_TIMER);
 }

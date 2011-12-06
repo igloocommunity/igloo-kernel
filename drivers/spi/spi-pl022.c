@@ -514,7 +514,12 @@ static void giveback(struct pl022 *pl022)
 	msg->state = NULL;
 	if (msg->complete)
 		msg->complete(msg->context);
-	/* This message is completed, so let's turn off the clocks & power */
+
+	/* disable the SPI/SSP operation */
+	writew((readw(SSP_CR1(pl022->virtbase)) &
+		(~SSP_CR1_MASK_SSE)), SSP_CR1(pl022->virtbase));
+
+	/* This message is completed, so let's turn off the clock! */
 	clk_disable(pl022->clk);
 	amba_pclk_disable(pl022->adev);
 	amba_vcore_disable(pl022->adev);
@@ -923,6 +928,12 @@ static int configure_dma(struct pl022 *pl022)
 	struct dma_chan *txchan = pl022->dma_tx_channel;
 	struct dma_async_tx_descriptor *rxdesc;
 	struct dma_async_tx_descriptor *txdesc;
+
+	/* DMA burstsize should be same as the FIFO trigger level */
+	rx_conf.src_maxburst = pl022->rx_lev_trig ? 1 <<
+		(pl022->rx_lev_trig + 1) : pl022->rx_lev_trig;
+	tx_conf.dst_maxburst = pl022->tx_lev_trig ? 1 <<
+		(pl022->tx_lev_trig + 1) : pl022->tx_lev_trig;
 
 	/* Check that the channels are available */
 	if (!rxchan || !txchan)
@@ -1547,6 +1558,7 @@ static void pump_messages(struct work_struct *work)
 	pm_runtime_get_sync(&pl022->adev->dev);
 	amba_vcore_enable(pl022->adev);
 	amba_pclk_enable(pl022->adev);
+	pm_runtime_get_sync(&pl022->adev->dev);
 	clk_enable(pl022->clk);
 	restore_state(pl022);
 	flush(pl022);
@@ -1896,7 +1908,7 @@ static int pl022_setup(struct spi_device *spi)
 {
 	struct pl022_config_chip const *chip_info;
 	struct chip_data *chip;
-	struct ssp_clock_params clk_freq = {0, };
+	struct ssp_clock_params clk_freq = { .cpsdvsr = 0, .scr = 0};
 	int status = 0;
 	struct pl022 *pl022 = spi_master_get_devdata(spi->master);
 	unsigned int bits = spi->bits_per_word;
@@ -2189,6 +2201,9 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 	pm_runtime_enable(dev);
 	pm_runtime_resume(dev);
 
+	pm_runtime_enable(dev);
+	pm_runtime_resume(dev);
+
 	pl022->clk = clk_get(&adev->dev, NULL);
 	if (IS_ERR(pl022->clk)) {
 		status = PTR_ERR(pl022->clk);
@@ -2279,6 +2294,7 @@ pl022_remove(struct amba_device *adev)
 	free_irq(adev->irq[0], pl022);
 	clk_disable(pl022->clk);
 	clk_put(pl022->clk);
+	pm_runtime_disable(&adev->dev);
 	iounmap(pl022->virtbase);
 	amba_release_regions(adev);
 	tasklet_disable(&pl022->pump_transfers);
@@ -2300,11 +2316,6 @@ static int pl022_suspend(struct amba_device *adev, pm_message_t state)
 		return status;
 	}
 
-	amba_vcore_enable(adev);
-	amba_pclk_enable(adev);
-	load_ssp_default_config(pl022);
-	amba_pclk_disable(adev);
-	amba_vcore_disable(adev);
 	dev_dbg(&adev->dev, "suspended\n");
 	return 0;
 }
