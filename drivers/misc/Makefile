@@ -48,4 +48,5 @@ obj-y				+= lis3lv02d/
 obj-y				+= carma/
 obj-$(CONFIG_STM_TRACE) 	+= stm.o
 obj-$(CONFIG_HWMEM)             += hwmem/
+obj-$(CONFIG_DISPDEV)		+= dispdev/
 obj-$(CONFIG_USB_SWITCH_FSA9480) += fsa9480.o
