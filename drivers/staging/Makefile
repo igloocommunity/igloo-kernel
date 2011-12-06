@@ -16,6 +16,7 @@ obj-$(CONFIG_PRISM2_USB)	+= wlan-ng/
 obj-$(CONFIG_ECHO)		+= echo/
 obj-$(CONFIG_BRCMSMAC)		+= brcm80211/
 obj-$(CONFIG_BRCMFMAC)		+= brcm80211/
+obj-$(CONFIG_CG2900)		+= cg2900/
 obj-$(CONFIG_COMEDI)		+= comedi/
 obj-$(CONFIG_FB_OLPC_DCON)	+= olpc_dcon/
 obj-$(CONFIG_ASUS_OLED)		+= asus_oled/
