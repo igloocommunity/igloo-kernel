@@ -409,6 +409,10 @@ struct ieee80211_key *ieee80211_key_alloc(u32 cipher, int idx, size_t key_len,
 			return ERR_PTR(err);
 		}
 		break;
+	case WLAN_CIPHER_SUITE_SMS4:
+		key->conf.iv_len = WAPI_IV_LEN;
+		key->conf.icv_len = WAPI_ICV_LEN;
+		break;
 	}
 	memcpy(key->conf.key, key_data, key_len);
 	INIT_LIST_HEAD(&key->list);

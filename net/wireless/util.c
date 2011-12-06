@@ -199,6 +199,10 @@ int cfg80211_validate_key_settings(struct cfg80211_registered_device *rdev,
 		if (params->key_len != WLAN_KEY_LEN_AES_CMAC)
 			return -EINVAL;
 		break;
+	case WLAN_CIPHER_SUITE_SMS4:
+		if (params->key_len != WLAN_KEY_LEN_SMS4)
+			return -EINVAL;
+		break;
 	default:
 		/*
 		 * We don't know anything about this algorithm,
@@ -220,6 +224,10 @@ int cfg80211_validate_key_settings(struct cfg80211_registered_device *rdev,
 		case WLAN_CIPHER_SUITE_CCMP:
 		case WLAN_CIPHER_SUITE_AES_CMAC:
 			if (params->seq_len != 6)
+				return -EINVAL;
+			break;
+		case WLAN_CIPHER_SUITE_SMS4:
+			if (params->seq_len != 16)
 				return -EINVAL;
 			break;
 		}

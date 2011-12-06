@@ -42,7 +42,7 @@ struct ieee80211_local;
 #define TOTAL_MAX_TX_BUFFER 512
 
 /* Required encryption head and tailroom */
-#define IEEE80211_ENCRYPT_HEADROOM 8
+#define IEEE80211_ENCRYPT_HEADROOM 20
 #define IEEE80211_ENCRYPT_TAILROOM 18
 
 /* IEEE 802.11 (Ch. 9.5 Defragmentation) requires support for concurrent
@@ -324,6 +324,7 @@ struct ieee80211_work {
 			u8 key_len, key_idx;
 			bool privacy;
 			bool synced;
+			struct cfg80211_bss *bss;
 		} probe_auth;
 		struct {
 			struct cfg80211_bss *bss;
