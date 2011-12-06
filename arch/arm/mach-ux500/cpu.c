@@ -8,8 +8,9 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/clk.h>
-#include <linux/mfd/db8500-prcmu.h>
-#include <linux/mfd/db5500-prcmu.h>
+#include <linux/delay.h>
+#include <linux/clksrc-dbx500-prcmu.h>
+#include <linux/mfd/dbx500-prcmu.h>
 
 #include <asm/cacheflush.h>
 #include <asm/hardware/cache-l2x0.h>
@@ -17,10 +18,10 @@
 #include <asm/mach/map.h>
 #include <asm/localtimer.h>
 
-#include <plat/mtu.h>
 #include <mach/hardware.h>
 #include <mach/setup.h>
 #include <mach/devices.h>
+#include <mach/reboot_reasons.h>
 
 #include "clock.h"
 
@@ -29,6 +30,36 @@ void __iomem *_PRCMU_BASE;
 #ifdef CONFIG_CACHE_L2X0
 static void __iomem *l2x0_base;
 #endif
+
+void __init ux500_init_devices(void)
+{
+#ifdef CONFIG_CACHE_L2X0
+	BUG_ON(!l2x0_base);
+
+	/*
+	 * Unlock Data and Instruction Lock if locked.  This is done here
+	 * instead of in l2x0_init since doing it there appears to cause the
+	 * second core boot to occasionaly fail.
+	 */
+	if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_D_BASE) & 0xFF)
+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D_BASE);
+
+	if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_I_BASE) & 0xFF)
+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I_BASE);
+#endif
+}
+
+static void ux500_restart(char mode, const char *cmd)
+{
+	unsigned short reset_code;
+
+	reset_code = reboot_reason_code(cmd);
+	prcmu_system_reset(reset_code);
+
+	mdelay(1000);
+	printk("Reboot via PRCMU failed -- System halted\n");
+	while (1);
+}
 
 void __init ux500_init_irq(void)
 {
@@ -50,10 +81,8 @@ void __init ux500_init_irq(void)
 	 * Init clocks here so that they are available for system timer
 	 * initialization.
 	 */
-	if (cpu_is_u5500())
-		db5500_prcmu_early_init();
-	if (cpu_is_u8500())
-		prcmu_early_init();
+	prcmu_early_init();
+	arm_pm_restart = ux500_restart;
 	clk_init();
 }
 
@@ -119,30 +148,3 @@ static int ux500_l2x0_init(void)
 }
 early_initcall(ux500_l2x0_init);
 #endif
-
-static void __init ux500_timer_init(void)
-{
-#ifdef CONFIG_LOCAL_TIMERS
-	/* Setup the local timer base */
-	if (cpu_is_u5500())
-		twd_base = __io_address(U5500_TWD_BASE);
-	else if (cpu_is_u8500())
-		twd_base = __io_address(U8500_TWD_BASE);
-	else
-		ux500_unknown_soc();
-#endif
-	if (cpu_is_u5500())
-		mtu_base = __io_address(U5500_MTU0_BASE);
-	else if (cpu_is_u8500ed())
-		mtu_base = __io_address(U8500_MTU0_BASE_ED);
-	else if (cpu_is_u8500())
-		mtu_base = __io_address(U8500_MTU0_BASE);
-	else
-		ux500_unknown_soc();
-
-	nmdk_timer_init();
-}
-
-struct sys_timer ux500_timer = {
-	.init	= ux500_timer_init,
-};

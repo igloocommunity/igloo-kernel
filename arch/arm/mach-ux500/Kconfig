@@ -4,20 +4,25 @@ config UX500_SOC_COMMON
 	bool
 	default y
 	select ARM_GIC
-	select HAS_MTU
+	select NOMADIK_GPIO
 	select ARM_ERRATA_753970
 	select ARM_ERRATA_754322
+	select SYS_SOC
+	select HAS_MTU
+
+config UX500_SOC_DBX500
+	depends on UX500_SOC_DB5500 || UX500_SOC_DB8500
+	bool
 
 menu "Ux500 SoC"
 
 config UX500_SOC_DB5500
 	bool "DB5500"
-	select MFD_DB5500_PRCMU
+	select UX500_SOC_DBX500
 
 config UX500_SOC_DB8500
 	bool "DB8500"
-	select MFD_DB8500_PRCMU
-	select REGULATOR_DB8500_PRCMU
+	select UX500_SOC_DBX500
 
 endmenu
 
@@ -26,13 +31,13 @@ menu "Ux500 target platform (boards)"
 config MACH_U8500
 	bool "U8500 Development platform"
 	depends on UX500_SOC_DB8500
-	select TPS6105X
 	help
 	  Include support for the mop500 development platform.
 
 config MACH_HREFV60
        bool "U85000 Development platform, HREFv60 version"
        depends on UX500_SOC_DB8500
+	select MACH_U8500
        help
          Include support for the HREFv60 new development platform.
 
@@ -50,12 +55,37 @@ config MACH_U5500
 	  Include support for the U5500 development platform.
 endmenu
 
+choice
+	prompt "Ux500 UIB Keylayout"
+	default KEYLAYOUT_LAYOUT1
+
+config KEYLAYOUT_LAYOUT1
+	bool "UIB Keylayout 1; for generic users"
+	help
+	  Supported keylayout for some numerics, power/call buttons,
+	  volume control etc
+
+config KEYLAYOUT_LAYOUT2
+	bool "UIB Keylayout 2; for connectivity users"
+	help
+	  Supports keylayout numerics 0-9, left/right/up/down/back/
+	  enter keys and special character "."(dot)
+
+endchoice
+
 config UX500_DEBUG_UART
 	int "Ux500 UART to use for low-level debug"
 	default 2
 	help
 	  Choose the UART on which kernel low-level debug messages should be
 	  output.
+
+config SENSORS1P_MOP
+	tristate "HAL and Proximity sensors support"
+	depends on REGULATOR && (GPIO_STMPE2401 || GPIO_TC35892)
+	help
+	  Add support for Osram's SFH7741 Proximity Sensor and Samsumg
+	  HED54XXU11 HAL Switch
 
 config U5500_MODEM_IRQ
 	bool "Modem IRQ support"
@@ -64,11 +94,48 @@ config U5500_MODEM_IRQ
 	help
 	  Add support for handling IRQ:s from modem side
 
-config U5500_MBOX
-	bool "Mailbox support"
-	depends on U5500_MODEM_IRQ
+config DBX500_PRCMU_DEBUG
+	bool "DBX500 PRCMU debug"
+	depends on ((MFD_DB5500_PRCMU || MFD_DB8500_PRCMU) && DEBUG_FS)
+	help
+	  Add support for PRCMU debug
+
+config TEE_UX500
+	bool "Trusted Execution Environment (TEE) ux500 hardware support"
+	depends on TEE_SUPPORT
 	default y
 	help
-	  Add support for U5500 mailbox communication with modem side
+	  Adds TEE hardware support for ux500 platforms.
+
+config TEE_SVP
+	bool "Trusted Execution Environment (TEE) ux500 SVP support"
+	depends on TEE_SUPPORT && UX500_SVP
+	default y
+	help
+	  Adds TEE support for SVP in ux500 platforms.
+
+config UX500_DEBUG_HWREG
+	bool "Debug hardware registers from userspace"
+	depends on (DEBUG_FS && UX500_SOC_DB8500)
+	help
+	  Adds various debug files to access registers.
+	  This should never ever be used for anything else than debugging.
+
+config UX500_DEBUG_NO_LAUTERBACH
+       bool "Disable clocks needed for Lauterbach debugging"
+       help
+	  Disable clocks needed for Lauterbach debugging at boot.
+	  If yes, you will reduce the power consumption.
+
+config UX500_L2X0_PREFETCH_CTRL
+	bool "PL310 prefetch control"
+	depends on (UX500_SOC_DB8500 || UX500_SOC_DB5500) && \
+			(TEE_UX500 && CACHE_L2X0)
+	default y
+	help
+	  Adds interface to control instruction and data prefetch.
+	  Communication with Trustzone is done through TEE driver.
+
+source "arch/arm/mach-ux500/pm/Kconfig"
 
 endif

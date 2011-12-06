@@ -9,20 +9,23 @@
 #include <linux/amba/bus.h>
 #include <linux/io.h>
 #include <linux/irq.h>
+#include <linux/gpio/nomadik.h>
 
-#include <asm/mach/map.h>
 #include <asm/pmu.h>
+#include <asm/mach/map.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
-#include <plat/gpio.h>
+#include <linux/gpio.h>
 
 #include <mach/hardware.h>
 #include <mach/devices.h>
 #include <mach/setup.h>
 #include <mach/irqs.h>
 #include <mach/usb.h>
+#include <mach/ste-dma40-db5500.h>
 
 #include "devices-db5500.h"
-#include "ste-dma40-db5500.h"
 
 static struct map_desc u5500_uart_io_desc[] __initdata = {
 	__IO_DEV_DESC(U5500_UART0_BASE, SZ_4K),
@@ -35,8 +38,11 @@ static struct map_desc u5500_io_desc[] __initdata = {
 	__IO_DEV_DESC(U5500_L2CC_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_TWD_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_MTU0_BASE, SZ_4K),
+	__IO_DEV_DESC(U5500_MTU1_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_SCU_BASE, SZ_4K),
+	__IO_DEV_DESC(U5500_RTC_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_BACKUPRAM0_BASE, SZ_8K),
+	__MEM_DEV_DESC(U5500_BOOT_ROM_BASE, SZ_1M),
 
 	__IO_DEV_DESC(U5500_GPIO0_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_GPIO1_BASE, SZ_4K),
@@ -45,26 +51,11 @@ static struct map_desc u5500_io_desc[] __initdata = {
 	__IO_DEV_DESC(U5500_GPIO4_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_PRCMU_BASE, SZ_4K),
 	__IO_DEV_DESC(U5500_PRCMU_TCDM_BASE, SZ_4K),
-};
-
-static struct resource db5500_pmu_resources[] = {
-	[0] = {
-		.start		= IRQ_DB5500_PMU0,
-		.end		= IRQ_DB5500_PMU0,
-		.flags		= IORESOURCE_IRQ,
-	},
-	[1] = {
-		.start		= IRQ_DB5500_PMU1,
-		.end		= IRQ_DB5500_PMU1,
-		.flags		= IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device db5500_pmu_device = {
-	.name			= "arm-pmu",
-	.id			= ARM_PMU_DEVICE_CPU,
-	.num_resources		= ARRAY_SIZE(db5500_pmu_resources),
-	.resource		= db5500_pmu_resources,
+	__IO_DEV_DESC(U5500_CLKRST1_BASE, SZ_4K),
+	__IO_DEV_DESC(U5500_CLKRST2_BASE, SZ_4K),
+	__IO_DEV_DESC(U5500_CLKRST3_BASE, SZ_4K),
+	__IO_DEV_DESC(U5500_CLKRST5_BASE, SZ_4K),
+	__IO_DEV_DESC(U5500_CLKRST6_BASE, SZ_4K),
 };
 
 static struct resource mbox0_resources[] = {
@@ -151,11 +142,15 @@ static struct platform_device mbox2_device = {
 	.num_resources = ARRAY_SIZE(mbox2_resources),
 };
 
+static struct platform_device db5500_prcmu_device = {
+	.name			= "db5500-prcmu",
+};
+
 static struct platform_device *db5500_platform_devs[] __initdata = {
-	&db5500_pmu_device,
 	&mbox0_device,
 	&mbox1_device,
 	&mbox2_device,
+	&db5500_prcmu_device,
 };
 
 static resource_size_t __initdata db5500_gpio_base[] = {
@@ -179,6 +174,38 @@ static void __init db5500_add_gpios(void)
 			 IRQ_DB5500_GPIO0, &pdata);
 }
 
+static u8 db5500_revision;
+
+bool cpu_is_u5500v1()
+{
+	return db5500_revision == 0xA0;
+}
+
+bool cpu_is_u5500v2()
+{
+	return db5500_revision == 0xB0;
+}
+
+static void db5500_rev_init(void)
+{
+	const char *version = "UNKNOWN";
+	unsigned int asicid;
+
+	/* As in devicemaps_init() */
+	local_flush_tlb_all();
+	flush_cache_all();
+
+	asicid = readl_relaxed(__io_address(U5500_ASIC_ID_ADDRESS));
+	db5500_revision = asicid & 0xff;
+
+	if (cpu_is_u5500v1())
+		version = "1.0";
+	else if (cpu_is_u5500v2())
+		version = "2.0";
+
+	pr_info("DB5500 v%s [%#010x]\n", version, asicid);
+}
+
 void __init u5500_map_io(void)
 {
 	/*
@@ -191,6 +218,27 @@ void __init u5500_map_io(void)
 	iotable_init(u5500_io_desc, ARRAY_SIZE(u5500_io_desc));
 
 	_PRCMU_BASE = __io_address(U5500_PRCMU_BASE);
+
+	db5500_rev_init();
+}
+
+static void __init db5500_pmu_init(void)
+{
+	struct resource res[] = {
+		[0] = {
+			.start		= IRQ_DB5500_PMU0,
+			.end		= IRQ_DB5500_PMU0,
+			.flags		= IORESOURCE_IRQ,
+		},
+		[1] = {
+			.start		= IRQ_DB5500_PMU1,
+			.end		= IRQ_DB5500_PMU1,
+			.flags		= IORESOURCE_IRQ,
+		},
+	};
+
+	platform_device_register_simple("arm-pmu", ARM_PMU_DEVICE_CPU,
+					res, ARRAY_SIZE(res));
 }
 
 static int usb_db5500_rx_dma_cfg[] = {
@@ -217,7 +265,14 @@ static int usb_db5500_tx_dma_cfg[] = {
 
 void __init u5500_init_devices(void)
 {
+	ux500_init_devices();
+
+#ifdef CONFIG_STM_TRACE
+	/* Early init for STM tracing */
+	/* platform_device_register(&u5500_stm_device); */
+#endif
 	db5500_add_gpios();
+	db5500_pmu_init();
 	db5500_dma_init();
 	db5500_add_rtc();
 	db5500_add_usb(usb_db5500_rx_dma_cfg, usb_db5500_tx_dma_cfg);

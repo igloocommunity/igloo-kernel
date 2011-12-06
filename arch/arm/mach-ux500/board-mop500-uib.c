@@ -1,4 +1,5 @@
 /*
+
  * Copyright (C) ST-Ericsson SA 2010
  *
  * Author: Rabin Vincent <rabin.vincent@stericsson.com> for ST-Ericsson
@@ -10,13 +11,16 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/i2c.h>
-
 #include <mach/hardware.h>
+#include <asm/mach-types.h>
+
 #include "board-mop500.h"
 
 enum mop500_uib {
 	STUIB,
 	U8500UIB,
+	U8500UIB_R3,
+	NO_UIB,
 };
 
 struct uib {
@@ -24,6 +28,8 @@ struct uib {
 	const char *option;
 	void (*init)(void);
 };
+
+static u8 type_of_uib = NO_UIB;
 
 static struct uib __initdata mop500_uibs[] = {
 	[STUIB] = {
@@ -36,9 +42,16 @@ static struct uib __initdata mop500_uibs[] = {
 		.option	= "u8500uib",
 		.init	= mop500_u8500uib_init,
 	},
+#ifdef CONFIG_TOUCHSCREEN_CYTTSP_SPI
+	[U8500UIB_R3] = {
+		.name   = "U8500-UIBR3",
+		.option = "u8500uibr3",
+		.init   = mop500_u8500uib_r3_init,
+	},
+#endif
 };
 
-static struct uib *mop500_uib;
+static struct uib __initdata *mop500_uib;
 
 static int __init mop500_uib_setup(char *str)
 {
@@ -64,7 +77,7 @@ __setup("uib=", mop500_uib_setup);
  * The UIBs are detected after the I2C host controllers are registered, so
  * i2c_register_board_info() can't be used.
  */
-void mop500_uib_i2c_add(int busnum, struct i2c_board_info *info,
+void mop500_uib_i2c_add(int busnum, struct i2c_board_info const *info,
 		unsigned n)
 {
 	struct i2c_adapter *adap;
@@ -90,7 +103,30 @@ void mop500_uib_i2c_add(int busnum, struct i2c_board_info *info,
 static void __init __mop500_uib_init(struct uib *uib, const char *why)
 {
 	pr_info("%s (%s)\n", uib->name, why);
+
+	if (strcmp("stuib", uib->option) == 0)
+		type_of_uib = STUIB;
+	else if (strcmp("u8500uib", uib->option) == 0)
+		type_of_uib = U8500UIB;
+	else if (strcmp("u8500uibr3", uib->option) == 0)
+		type_of_uib = U8500UIB_R3;
+
 	uib->init();
+}
+
+int uib_is_stuib(void)
+{
+	return (type_of_uib == STUIB);
+}
+
+int uib_is_u8500uib(void)
+{
+	return (type_of_uib == U8500UIB);
+}
+
+int uib_is_u8500uibr3(void)
+{
+	return (type_of_uib == U8500UIB_R3);
 }
 
 /*
@@ -98,17 +134,14 @@ static void __init __mop500_uib_init(struct uib *uib, const char *why)
  */
 static int __init mop500_uib_init(void)
 {
-	struct uib *uib = mop500_uib;
+	struct uib *uib = mop500_uibs;
 	struct i2c_adapter *i2c0;
+	struct i2c_adapter *i2c3;
 	int ret;
 
-	if (!cpu_is_u8500())
+	/* snowball and non u8500 cpus dont have uib */
+	if (!cpu_is_u8500() || machine_is_snowball())
 		return -ENODEV;
-
-	if (uib) {
-		__mop500_uib_init(uib, "from uib= boot argument");
-		return 0;
-	}
 
 	i2c0 = i2c_get_adapter(0);
 	if (!i2c0) {
@@ -121,12 +154,28 @@ static int __init mop500_uib_init(void)
 	ret = i2c_smbus_xfer(i2c0, 0x44, 0, I2C_SMBUS_WRITE, 0,
 			I2C_SMBUS_QUICK, NULL);
 	i2c_put_adapter(i2c0);
-
-	if (ret == 0)
-		uib = &mop500_uibs[U8500UIB];
-	else
-		uib = &mop500_uibs[STUIB];
-
+	i2c3 = i2c_get_adapter(3);
+	if (ret == 0) {
+		if (!i2c3) {
+			__mop500_uib_init(&mop500_uibs[STUIB],
+					"fallback, could not get i2c3");
+			return -ENODEV;
+		}
+		ret = i2c_smbus_xfer(i2c3, 0x4B, 0, I2C_SMBUS_WRITE, 0,
+				I2C_SMBUS_QUICK, NULL);
+		i2c_put_adapter(i2c3);
+		if (ret == 0)
+			uib = &mop500_uibs[U8500UIB];
+		else
+			uib = &mop500_uibs[U8500UIB_R3];
+	}
+	else {
+		ret = i2c_smbus_xfer(i2c3, 0x5C, 0, I2C_SMBUS_WRITE, 0,
+				I2C_SMBUS_QUICK, NULL);
+		i2c_put_adapter(i2c3);
+		if (ret == 0)
+			uib = &mop500_uibs[STUIB];
+	}
 	__mop500_uib_init(uib, "detected");
 
 	return 0;
