@@ -10,6 +10,9 @@
 #include <plat/ste_dma40.h>
 #include <mach/hardware.h>
 #include <mach/usb.h>
+#include <plat/pincfg.h>
+#include "pins.h"
+#include "board-ux500-usb.h"
 
 #define MUSB_DMA40_RX_CH { \
 		.mode = STEDMA40_MODE_LOGICAL, \
@@ -30,6 +33,8 @@
 		.src_info.psize = STEDMA40_PSIZE_LOG_16, \
 		.dst_info.psize = STEDMA40_PSIZE_LOG_16, \
 	}
+
+#define USB_OTG_GPIO_CS      76
 
 static struct stedma40_chan_cfg musb_dma_rx_ch[UX500_MUSB_DMA_NUM_RX_CHANNELS]
 	= {
@@ -85,7 +90,12 @@ static struct ux500_musb_board_data musb_board_data = {
 	.dma_filter = stedma40_filter,
 };
 
+#ifdef CONFIG_USB_UX500_DMA
 static u64 ux500_musb_dmamask = DMA_BIT_MASK(32);
+#else
+static u64 ux500_musb_dmamask = DMA_BIT_MASK(0);
+#endif
+static struct ux500_pins *usb_gpio_pins;
 
 static struct musb_hdrc_config musb_hdrc_config = {
 	.multipoint	= true,
@@ -95,13 +105,7 @@ static struct musb_hdrc_config musb_hdrc_config = {
 };
 
 static struct musb_hdrc_platform_data musb_platform_data = {
-#if defined(CONFIG_USB_MUSB_OTG)
 	.mode = MUSB_OTG,
-#elif defined(CONFIG_USB_MUSB_PERIPHERAL)
-	.mode = MUSB_PERIPHERAL,
-#else /* defined(CONFIG_USB_MUSB_HOST) */
-	.mode = MUSB_HOST,
-#endif
 	.config = &musb_hdrc_config,
 	.board_data = &musb_board_data,
 };
@@ -128,6 +132,38 @@ struct platform_device ux500_musb_device = {
 	},
 	.num_resources = ARRAY_SIZE(usb_resources),
 	.resource = usb_resources,
+};
+
+static void enable_gpio(void)
+{
+	ux500_pins_enable(usb_gpio_pins);
+}
+static void disable_gpio(void)
+{
+	ux500_pins_disable(usb_gpio_pins);
+}
+static int get_gpio(struct device *device)
+{
+	usb_gpio_pins = ux500_pins_get(dev_name(device));
+
+	if (usb_gpio_pins == NULL) {
+		dev_err(device, "Could not get %s:usb_gpio_pins structure\n",
+				dev_name(device));
+
+		return PTR_ERR(usb_gpio_pins);
+	}
+	return 0;
+}
+static void put_gpio(void)
+{
+	ux500_pins_put(usb_gpio_pins);
+}
+struct abx500_usbgpio_platform_data abx500_usbgpio_plat_data = {
+	.get		= &get_gpio,
+	.enable		= &enable_gpio,
+	.disable	= &disable_gpio,
+	.put		= &put_gpio,
+	.usb_cs		= USB_OTG_GPIO_CS,
 };
 
 static inline void ux500_usb_dma_update_rx_ch_config(int *src_dev_type)

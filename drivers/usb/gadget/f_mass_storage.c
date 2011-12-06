@@ -475,20 +475,6 @@ static int exception_in_progress(struct fsg_common *common)
 	return common->state > FSG_STATE_IDLE;
 }
 
-/* Make bulk-out requests be divisible by the maxpacket size */
-static void set_bulk_out_req_length(struct fsg_common *common,
-				    struct fsg_buffhd *bh, unsigned int length)
-{
-	unsigned int	rem;
-
-	bh->bulk_out_intended_length = length;
-	rem = length % common->bulk_out_maxpacket;
-	if (rem > 0)
-		length += common->bulk_out_maxpacket - rem;
-	bh->outreq->length = length;
-}
-
-
 /*-------------------------------------------------------------------------*/
 
 static int fsg_set_halt(struct fsg_dev *fsg, struct usb_ep *ep)
@@ -587,9 +573,9 @@ static void bulk_out_complete(struct usb_ep *ep, struct usb_request *req)
 	struct fsg_buffhd	*bh = req->context;
 
 	dump_msg(common, "bulk-out", req->buf, req->actual);
-	if (req->status || req->actual != bh->bulk_out_intended_length)
+	if (req->status || req->actual != req->length)
 		DBG(common, "%s --> %d, %u/%u\n", __func__,
-		    req->status, req->actual, bh->bulk_out_intended_length);
+		    req->status, req->actual, req->length);
 	if (req->status == -ECONNRESET)		/* Request was cancelled */
 		usb_ep_fifo_flush(ep);
 
@@ -981,7 +967,6 @@ static int do_write(struct fsg_common *common)
 			 * the bulk-out maxpacket size
 			 */
 			bh->outreq->length = amount;
-			bh->bulk_out_intended_length = amount;
 			bh->outreq->short_not_ok = 1;
 			if (!start_out_transfer(common, bh))
 				/* Dunno what to do if common->fsg is NULL */
@@ -1383,32 +1368,7 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 		limit = 65535;		/* Should really be FSG_BUFLEN */
 	}
 
-	/* No block descriptors */
-
-	/*
-	 * The mode pages, in numerical order.  The only page we support
-	 * is the Caching page.
-	 */
-	if (page_code == 0x08 || all_pages) {
-		valid_page = 1;
-		buf[0] = 0x08;		/* Page code */
-		buf[1] = 10;		/* Page length */
-		memset(buf+2, 0, 10);	/* None of the fields are changeable */
-
-		if (!changeable_values) {
-			buf[2] = 0x04;	/* Write cache enable, */
-					/* Read cache not disabled */
-					/* No cache retention priorities */
-			put_unaligned_be16(0xffff, &buf[4]);
-					/* Don't disable prefetch */
-					/* Minimum prefetch = 0 */
-			put_unaligned_be16(0xffff, &buf[8]);
-					/* Maximum prefetch */
-			put_unaligned_be16(0xffff, &buf[10]);
-					/* Maximum prefetch ceiling */
-		}
-		buf += 12;
-	}
+	valid_page = 1;
 
 	/*
 	 * Check that a valid page was requested and the mode data length
@@ -1627,7 +1587,6 @@ static int throw_away_data(struct fsg_common *common)
 			 * the bulk-out maxpacket size.
 			 */
 			bh->outreq->length = amount;
-			bh->bulk_out_intended_length = amount;
 			bh->outreq->short_not_ok = 1;
 			if (!start_out_transfer(common, bh))
 				/* Dunno what to do if common->fsg is NULL */
@@ -2296,8 +2255,8 @@ static int get_next_command(struct fsg_common *common)
 	}
 
 	/* Queue a request to read a Bulk-only CBW */
-	set_bulk_out_req_length(common, bh, USB_BULK_CB_WRAP_LEN);
-	bh->outreq->short_not_ok = 1;
+	bh->outreq->length = USB_BULK_CB_WRAP_LEN;
+	bh->outreq->short_not_ok = 0;
 	if (!start_out_transfer(common, bh))
 		/* Don't know what to do if common->fsg is NULL */
 		return -EIO;

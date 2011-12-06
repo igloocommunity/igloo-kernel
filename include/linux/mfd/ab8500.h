@@ -208,6 +208,7 @@ struct ab8500_platform_data {
 	struct ab8500_fg_platform_data *fg;
 	struct ab8500_chargalg_platform_data *chargalg;
 	struct ab8500_gpio_platform_data *gpio;
+	struct abx500_usbgpio_platform_data *usb;
 };
 
 extern int __devinit ab8500_init(struct ab8500 *ab8500);
