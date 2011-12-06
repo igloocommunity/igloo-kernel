@@ -122,6 +122,8 @@ source "drivers/platform/Kconfig"
 
 source "drivers/clk/Kconfig"
 
+source "drivers/tee/Kconfig"
+
 source "drivers/hwspinlock/Kconfig"
 
 source "drivers/clocksource/Kconfig"
@@ -131,3 +133,4 @@ source "drivers/iommu/Kconfig"
 source "drivers/virt/Kconfig"
 
 endmenu
+
