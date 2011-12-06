@@ -9,20 +9,8 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-#ifndef __ASM_PLAT_GPIO_H
-#define __ASM_PLAT_GPIO_H
-
-#include <asm-generic/gpio.h>
-
-/*
- * These currently cause a function call to happen, they may be optimized
- * if needed by adding cpu-specific defines to identify blocks
- * (see mach-pxa/include/mach/gpio.h as an example using GPLR etc)
- */
-#define gpio_get_value  __gpio_get_value
-#define gpio_set_value  __gpio_set_value
-#define gpio_cansleep   __gpio_cansleep
-#define gpio_to_irq     __gpio_to_irq
+#ifndef __GPIO_NOMADIK_H
+#define __GPIO_NOMADIK_H
 
 /*
  * "nmk_gpio" and "NMK_GPIO" stand for "Nomadik GPIO", leaving
@@ -40,6 +28,7 @@
 #define NMK_GPIO_SLPC	0x1c
 #define NMK_GPIO_AFSLA	0x20
 #define NMK_GPIO_AFSLB	0x24
+#define NMK_GPIO_LOWEMI	0x28
 
 #define NMK_GPIO_RIMSC	0x40
 #define NMK_GPIO_FIMSC	0x44
@@ -78,6 +67,9 @@ extern int nmk_gpio_get_mode(int gpio);
 extern void nmk_gpio_wakeups_suspend(void);
 extern void nmk_gpio_wakeups_resume(void);
 
+extern void nmk_gpio_clocks_enable(void);
+extern void nmk_gpio_clocks_disable(void);
+
 extern void nmk_gpio_read_pull(int gpio_bank, u32 *pull_up);
 
 /*
@@ -93,4 +85,4 @@ struct nmk_gpio_platform_data {
 	bool supports_sleepmode;
 };
 
-#endif /* __ASM_PLAT_GPIO_H */
+#endif
