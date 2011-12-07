@@ -179,6 +179,7 @@ struct ab8500_charger_usb_state {
  *			charger is enabled
  * @vbat		Battery voltage
  * @old_vbat		Previously measured battery voltage
+ * @autopower		Indicate if we should have automatic pwron after pwrloss
  * @parent:		Pointer to the struct ab8500
  * @gpadc:		Pointer to the struct gpadc
  * @pdata:		Pointer to the ab8500_charger platform data
@@ -216,6 +217,7 @@ struct ab8500_charger {
 	bool vddadc_en_usb;
 	int vbat;
 	int old_vbat;
+	bool autopower;
 	struct ab8500 *parent;
 	struct ab8500_gpadc *gpadc;
 	struct ab8500_charger_platform_data *pdata;
@@ -262,6 +264,66 @@ static enum power_supply_property ab8500_charger_usb_props[] = {
 	POWER_SUPPLY_PROP_VOLTAGE_AVG,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 };
+
+/**
+ * ab8500_power_loss_handling - set how we handle powerloss.
+ * @di:		pointer to the ab8500_charger structure
+ *
+ * Magic nummbers are from STE HW department.
+ */
+static void ab8500_power_loss_handling(struct ab8500_charger *di)
+{
+	int loop;
+	u8 banksize = 0xF;
+	u8 regs[banksize];
+
+	for (loop = 0 ; loop < banksize; loop++)
+		(void) abx500_get_register_interruptible(di->dev,
+							0x15, loop,
+							&regs[loop]);
+
+
+	(void) abx500_set_register_interruptible(di->dev, 0x11, 0, 0x2);
+	(void) abx500_set_register_interruptible(di->dev, 0x14, 0xB1, 0x2);
+	regs[0xC] &= ~0x4;
+	dev_dbg(di->dev, "Autopower %s\n", di->autopower ? "on" : "off");
+
+	if (di->autopower)
+		regs[0x0] |= 0x8;
+
+	for (loop = 0 ; loop < banksize; loop++)
+		(void) abx500_set_register_interruptible(di->dev, 0x15,
+							loop,
+							regs[loop]);
+
+	(void) abx500_set_register_interruptible(di->dev, 0x14, 0xB1, 0x03);
+}
+
+/**
+ * ab8500_power_supply_changed - a wrapper with local extentions for
+ * power_supply_changed
+ * @di:	  pointer to the ab8500_charger structure
+ * @psy:  pointer to power_supply_that have changed.
+ *
+ */
+static void ab8500_power_supply_changed(struct ab8500_charger *di,
+					struct power_supply *psy)
+{
+	if (di->pdata->autopower_cfg) {
+		if (!di->usb.charger_connected &&
+		    !di->ac.charger_connected &&
+		    di->autopower) {
+			di->autopower = false;
+			ab8500_power_loss_handling(di);
+		} else if (!di->autopower &&
+			   (di->ac.charger_connected ||
+			    di->usb.charger_connected)) {
+			di->autopower = true;
+			ab8500_power_loss_handling(di);
+		}
+	}
+	power_supply_changed(psy);
+}
 
 static void ab8500_charger_set_usb_connected(struct ab8500_charger *di,
 	bool connected)
@@ -1122,7 +1184,7 @@ static int ab8500_charger_ac_en(struct ux500_charger *charger,
 
 		dev_dbg(di->dev, "%s Disabled AC charging\n", __func__);
 	}
-	power_supply_changed(&di->ac_chg.psy);
+	ab8500_power_supply_changed(di, &di->ac_chg.psy);
 
 	return ret;
 }
@@ -1253,7 +1315,7 @@ static int ab8500_charger_usb_en(struct ux500_charger *charger,
 			cancel_delayed_work(&di->check_vbat_work);
 
 	}
-	power_supply_changed(&di->usb_chg.psy);
+	ab8500_power_supply_changed(di, &di->usb_chg.psy);
 
 	return ret;
 }
@@ -1455,7 +1517,7 @@ static void ab8500_charger_check_hw_failure_work(struct work_struct *work)
 		}
 		if (!(reg_value & MAIN_CH_NOK)) {
 			di->flags.mainextchnotok = false;
-			power_supply_changed(&di->ac_chg.psy);
+			ab8500_power_supply_changed(di, &di->ac_chg.psy);
 		}
 	}
 	if (di->flags.vbus_ovv) {
@@ -1468,7 +1530,7 @@ static void ab8500_charger_check_hw_failure_work(struct work_struct *work)
 		}
 		if (!(reg_value & VBUS_OVV_TH)) {
 			di->flags.vbus_ovv = false;
-			power_supply_changed(&di->usb_chg.psy);
+			ab8500_power_supply_changed(di, &di->usb_chg.psy);
 		}
 	}
 	/* If we still have a failure, schedule a new check */
@@ -1538,7 +1600,7 @@ static void ab8500_charger_ac_work(struct work_struct *work)
 		di->ac.charger_connected = 0;
 	}
 
-	power_supply_changed(&di->ac_chg.psy);
+	ab8500_power_supply_changed(di, &di->ac_chg.psy);
 	sysfs_notify(&di->ac_chg.psy.dev->kobj, NULL, "present");
 }
 
@@ -1567,7 +1629,7 @@ void ab8500_charger_detect_usb_type_work(struct work_struct *work)
 	if (!(ret & USB_PW_CONN)) {
 		di->vbus_detected = 0;
 		ab8500_charger_set_usb_connected(di, false);
-		power_supply_changed(&di->usb_chg.psy);
+		ab8500_power_supply_changed(di, &di->usb_chg.psy);
 	} else {
 		di->vbus_detected = 1;
 
@@ -1577,7 +1639,8 @@ void ab8500_charger_detect_usb_type_work(struct work_struct *work)
 			ret = ab8500_charger_detect_usb_type(di);
 			if (!ret) {
 				ab8500_charger_set_usb_connected(di, true);
-				power_supply_changed(&di->usb_chg.psy);
+				ab8500_power_supply_changed(di,
+							    &di->usb_chg.psy);
 			}
 			break;
 
@@ -1595,7 +1658,8 @@ void ab8500_charger_detect_usb_type_work(struct work_struct *work)
 				if (!ret) {
 					ab8500_charger_set_usb_connected(di,
 						true);
-					power_supply_changed(&di->usb_chg.psy);
+					ab8500_power_supply_changed(di,
+						&di->usb_chg.psy);
 				}
 			}
 			break;
@@ -1628,7 +1692,7 @@ static void ab8500_charger_usb_link_status_work(struct work_struct *work)
 	if (!(ret & USB_PW_CONN)) {
 		di->vbus_detected = 0;
 		ab8500_charger_set_usb_connected(di, false);
-		power_supply_changed(&di->usb_chg.psy);
+		ab8500_power_supply_changed(di, &di->usb_chg.psy);
 	} else {
 		di->vbus_detected = 1;
 		ret = ab8500_charger_read_usb_type(di);
@@ -1640,11 +1704,11 @@ static void ab8500_charger_usb_link_status_work(struct work_struct *work)
 				return;
 
 			ab8500_charger_set_usb_connected(di, true);
-			power_supply_changed(&di->usb_chg.psy);
+			ab8500_power_supply_changed(di, &di->usb_chg.psy);
 		} else if (ret == -ENXIO) {
 			/* No valid charger type detected */
 			ab8500_charger_set_usb_connected(di, false);
-			power_supply_changed(&di->usb_chg.psy);
+			ab8500_power_supply_changed(di, &di->usb_chg.psy);
 		}
 	}
 }
@@ -1682,7 +1746,7 @@ static void ab8500_charger_usb_state_changed_work(struct work_struct *work)
 	case AB8500_BM_USB_STATE_SUSPEND:
 	case AB8500_BM_USB_STATE_MAX:
 		ab8500_charger_set_usb_connected(di, false);
-		power_supply_changed(&di->usb_chg.psy);
+		ab8500_power_supply_changed(di, &di->usb_chg.psy);
 		break;
 
 	case AB8500_BM_USB_STATE_RESUME:
@@ -1705,7 +1769,7 @@ static void ab8500_charger_usb_state_changed_work(struct work_struct *work)
 				return;
 
 			ab8500_charger_set_usb_connected(di, true);
-			power_supply_changed(&di->usb_chg.psy);
+			ab8500_power_supply_changed(di, &di->usb_chg.psy);
 		}
 		break;
 
@@ -1749,7 +1813,7 @@ static void ab8500_charger_check_usbchargernotok_work(struct work_struct *work)
 	}
 
 	if (prev_status != di->flags.usbchargernotok)
-		power_supply_changed(&di->usb_chg.psy);
+		ab8500_power_supply_changed(di, &di->usb_chg.psy);
 }
 
 /**
@@ -1779,7 +1843,7 @@ static void ab8500_charger_check_main_thermal_prot_work(
 	else
 		di->flags.main_thermal_prot = false;
 
-	power_supply_changed(&di->ac_chg.psy);
+	ab8500_power_supply_changed(di, &di->ac_chg.psy);
 }
 
 /**
@@ -1809,7 +1873,7 @@ static void ab8500_charger_check_usb_thermal_prot_work(
 	else
 		di->flags.usb_thermal_prot = false;
 
-	power_supply_changed(&di->usb_chg.psy);
+	ab8500_power_supply_changed(di, &di->usb_chg.psy);
 }
 
 /**
@@ -1859,7 +1923,7 @@ static irqreturn_t ab8500_charger_mainextchnotok_handler(int irq, void *_di)
 
 	dev_dbg(di->dev, "Main charger not ok\n");
 	di->flags.mainextchnotok = true;
-	power_supply_changed(&di->ac_chg.psy);
+	ab8500_power_supply_changed(di, &di->ac_chg.psy);
 
 	/* Schedule a new HW failure check */
 	queue_delayed_work(di->charger_wq, &di->check_hw_failure_work, 0);
@@ -2032,11 +2096,11 @@ static irqreturn_t ab8500_charger_chwdexp_handler(int irq, void *_di)
 	 */
 	if (di->ac.charger_online) {
 		di->ac.wd_expired = true;
-		power_supply_changed(&di->ac_chg.psy);
+		ab8500_power_supply_changed(di, &di->ac_chg.psy);
 	}
 	if (di->usb.charger_online) {
 		di->usb.wd_expired = true;
-		power_supply_changed(&di->usb_chg.psy);
+		ab8500_power_supply_changed(di, &di->usb_chg.psy);
 	}
 
 	return IRQ_HANDLED;
@@ -2055,7 +2119,7 @@ static irqreturn_t ab8500_charger_vbusovv_handler(int irq, void *_di)
 
 	dev_dbg(di->dev, "VBUS overvoltage detected\n");
 	di->flags.vbus_ovv = true;
-	power_supply_changed(&di->usb_chg.psy);
+	ab8500_power_supply_changed(di, &di->usb_chg.psy);
 
 	/* Schedule a new HW failure check */
 	queue_delayed_work(di->charger_wq, &di->check_hw_failure_work, 0);
@@ -2513,6 +2577,7 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 		goto free_device_info;
 	}
 	di->bat = plat->battery;
+	di->autopower = false;
 
 	/* AC supply */
 	/* power_supply base class */
@@ -2657,7 +2722,7 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 	if (charger_status & AC_PW_CONN) {
 		di->ac.charger_connected = 1;
 		di->ac_conn = true;
-		power_supply_changed(&di->ac_chg.psy);
+		ab8500_power_supply_changed(di, &di->ac_chg.psy);
 		sysfs_notify(&di->ac_chg.psy.dev->kobj, NULL, "present");
 	}
 
