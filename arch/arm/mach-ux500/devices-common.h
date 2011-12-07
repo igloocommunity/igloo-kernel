@@ -69,7 +69,7 @@ static inline struct platform_device *
 dbx500_add_msp_i2s(int id, resource_size_t base, int irq,
 		   struct msp_i2s_platform_data *pdata)
 {
-	return dbx500_add_platform_device_4k1irq("MSP_I2S", id, base, irq,
+	return dbx500_add_platform_device_4k1irq("ux500-msp-i2s", id, base, irq,
 						 pdata);
 }
 
