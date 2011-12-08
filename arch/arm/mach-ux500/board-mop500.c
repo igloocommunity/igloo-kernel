@@ -146,7 +146,7 @@ static struct abx500_accdet_platform_data ab8500_accdet_pdata = {
 
 static struct gpio_keys_button snowball_key_array[] = {
 	{
-		.gpio           = 32,
+		.gpio           = SNOWBALL_USER_PB_GPIO,
 		.type           = EV_KEY,
 		.code           = KEY_1,
 		.desc           = "userpb",
@@ -155,7 +155,7 @@ static struct gpio_keys_button snowball_key_array[] = {
 		.wakeup         = 1,
 	},
 	{
-		.gpio           = 151,
+		.gpio           = SNOWBALL_J1_PIN_8_GPIO,
 		.type           = EV_KEY,
 		.code           = KEY_2,
 		.desc           = "extkb1",
@@ -164,7 +164,7 @@ static struct gpio_keys_button snowball_key_array[] = {
 		.wakeup         = 1,
 	},
 	{
-		.gpio           = 152,
+		.gpio           = SNOWBALL_J1_PIN_9_GPIO,
 		.type           = EV_KEY,
 		.code           = KEY_3,
 		.desc           = "extkb2",
@@ -173,16 +173,7 @@ static struct gpio_keys_button snowball_key_array[] = {
 		.wakeup         = 1,
 	},
 	{
-		.gpio           = 161,
-		.type           = EV_KEY,
-		.code           = KEY_4,
-		.desc           = "extkb3",
-		.active_low     = 1,
-		.debounce_interval = 50,
-		.wakeup         = 1,
-	},
-	{
-		.gpio           = 162,
+		.gpio           = SNOWBALL_J1_PIN_14_GPIO,
 		.type           = EV_KEY,
 		.code           = KEY_5,
 		.desc           = "extkb4",
