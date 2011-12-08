@@ -11,16 +11,6 @@
 #include <linux/mfd/ab8500/gpio.h>
 #include <mach/gpio.h>
 
-/* Snowball GPIO for MMC card */
-#define SNOWBALL_SDMMC_EN_GPIO		217
-#define SNOWBALL_SDMMC_1V8_3V_GPIO	228
-#define SNOWBALL_SDMMC_CD_GPIO		218
-
-/* Snowball specific GPIO assignments, this board has no GPIO expander */
-#define SNOWBALL_ACCEL_INT1_GPIO	163
-#define SNOWBALL_ACCEL_INT2_GPIO	164
-#define SNOWBALL_MAGNET_DRDY_GPIO	165
-
 /* HREFv60-specific GPIO assignments, this board has no GPIO expander */
 #define HREFV60_TOUCH_RST_GPIO		143
 #define HREFV60_PROX_SENSE_GPIO		217
@@ -61,6 +51,16 @@
 #define GPIO_SDMMC_EN			MOP500_EGPIO(17)
 #define GPIO_SDMMC_1V8_3V_SEL		MOP500_EGPIO(18)
 
+/* Snowball GPIO for MMC card */
+#define SNOWBALL_SDMMC_EN_GPIO		217
+#define SNOWBALL_SDMMC_1V8_3V_GPIO	228
+#define SNOWBALL_SDMMC_CD_GPIO		218
+
+/* Snowball specific GPIO assignments, this board has no GPIO expander */
+#define SNOWBALL_ACCEL_INT1_GPIO	163
+#define SNOWBALL_ACCEL_INT2_GPIO	164
+#define SNOWBALL_MAGNET_DRDY_GPIO	165
+
 /*Snowball AB8500 GPIO */
 #define SNOWBALL_VSMPS2_1V8_GPIO	AB8500_PIN_GPIO1	/* SYSCLKREQ2/GPIO1 */
 #define SNOWBALL_PM_GPIO1_GPIO		AB8500_PIN_GPIO2	/* SYSCLKREQ3/GPIO2 */
@@ -70,6 +70,11 @@
 #define SNOWBALL_PME_ETH_GPIO		AB8500_PIN_GPIO24	/* SYSCLKREQ7/GPIO24 */
 #define SNOWBALL_EN_3V3_ETH_GPIO	AB8500_PIN_GPIO26	/* GPIO26 */
 
+/*Snowball buttons GPIO */
+#define SNOWBALL_USER_PB_GPIO		32
+#define SNOWBALL_J1_PIN_8_GPIO		151 /* AP_GPIO151 */
+#define SNOWBALL_J1_PIN_9_GPIO		152 /* AP_GPIO152 */
+#define SNOWBALL_J1_PIN_14_GPIO		162 /* AP_GPIO162 */
 
 struct i2c_board_info;
 
