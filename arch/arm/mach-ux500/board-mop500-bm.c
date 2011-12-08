@@ -149,13 +149,41 @@ static struct res_to_temp temp_tbl[] = {
 	{65,   9425},
 };
 
+#ifdef CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL
+/*
+ * Note that the batres_vs_temp table must be strictly sorted by falling
+ * temperature values to work.
+ */
+static struct batres_vs_temp temp_to_batres_tbl[] = {
+	{ 40, 120},
+	{ 30, 135},
+	{ 20, 165},
+	{ 10, 230},
+	{ 00, 325},
+	{-10, 445},
+	{-20, 595},
+};
+#else
+/*
+ * Note that the batres_vs_temp table must be strictly sorted by falling
+ * temperature values to work.
+ */
+static struct batres_vs_temp temp_to_batres_tbl[] = {
+	{ 60, 300},
+	{ 30, 300},
+	{ 20, 300},
+	{ 10, 300},
+	{ 00, 300},
+	{-10, 300},
+	{-20, 300},
+};
+#endif
 static const struct battery_type bat_type[] = {
 	[BATTERY_UNKNOWN] = {
 		/* First element always represent the UNKNOWN battery */
 		.name = POWER_SUPPLY_TECHNOLOGY_UNKNOWN,
 		.resis_high = 0,
 		.resis_low = 0,
-		.battery_resistance = 300,
 		.charge_full_design = 612,
 		.nominal_voltage = 3700,
 		.termination_vol = 4050,
@@ -175,6 +203,8 @@ static const struct battery_type bat_type[] = {
 		.r_to_t_tbl = temp_tbl,
 		.n_v_cap_tbl_elements = ARRAY_SIZE(cap_tbl),
 		.v_to_cap_tbl = cap_tbl,
+		.n_batres_tbl_elements = ARRAY_SIZE(temp_to_batres_tbl),
+		.batres_tbl = temp_to_batres_tbl,
 	},
 
 #ifdef CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL
@@ -182,7 +212,6 @@ static const struct battery_type bat_type[] = {
 		.name = POWER_SUPPLY_TECHNOLOGY_LIPO,
 		.resis_high = 53407,
 		.resis_low = 12500,
-		.battery_resistance = 300,
 		.charge_full_design = 900,
 		.nominal_voltage = 3600,
 		.termination_vol = 4150,
@@ -202,13 +231,14 @@ static const struct battery_type bat_type[] = {
 		.r_to_t_tbl = temp_tbl_A,
 		.n_v_cap_tbl_elements = ARRAY_SIZE(cap_tbl_A),
 		.v_to_cap_tbl = cap_tbl_A,
+		.n_batres_tbl_elements = ARRAY_SIZE(temp_to_batres_tbl),
+		.batres_tbl = temp_to_batres_tbl,
 
 	},
 	{
 		.name = POWER_SUPPLY_TECHNOLOGY_LIPO,
 		.resis_high = 165418,
 		.resis_low = 82869,
-		.battery_resistance = 300,
 		.charge_full_design = 900,
 		.nominal_voltage = 3600,
 		.termination_vol = 4150,
@@ -228,6 +258,8 @@ static const struct battery_type bat_type[] = {
 		.r_to_t_tbl = temp_tbl_B,
 		.n_v_cap_tbl_elements = ARRAY_SIZE(cap_tbl_B),
 		.v_to_cap_tbl = cap_tbl_B,
+		.n_batres_tbl_elements = ARRAY_SIZE(temp_to_batres_tbl),
+		.batres_tbl = temp_to_batres_tbl,
 	},
 #else
 /*
@@ -239,7 +271,6 @@ static const struct battery_type bat_type[] = {
 		.name = POWER_SUPPLY_TECHNOLOGY_LIPO,
 		.resis_high = 76000,
 		.resis_low = 53000,
-		.battery_resistance = 300,
 		.charge_full_design = 900,
 		.nominal_voltage = 3700,
 		.termination_vol = 4150,
@@ -259,12 +290,13 @@ static const struct battery_type bat_type[] = {
 		.r_to_t_tbl = temp_tbl,
 		.n_v_cap_tbl_elements = ARRAY_SIZE(cap_tbl),
 		.v_to_cap_tbl = cap_tbl,
+		.n_batres_tbl_elements = ARRAY_SIZE(temp_to_batres_tbl),
+		.batres_tbl = temp_to_batres_tbl,
 	},
 	{
 		.name = POWER_SUPPLY_TECHNOLOGY_LION,
 		.resis_high = 30000,
 		.resis_low = 10000,
-		.battery_resistance = 300,
 		.charge_full_design = 950,
 		.nominal_voltage = 3700,
 		.termination_vol = 4150,
@@ -284,12 +316,13 @@ static const struct battery_type bat_type[] = {
 		.r_to_t_tbl = temp_tbl,
 		.n_v_cap_tbl_elements = ARRAY_SIZE(cap_tbl),
 		.v_to_cap_tbl = cap_tbl,
+		.n_batres_tbl_elements = ARRAY_SIZE(temp_to_batres_tbl),
+		.batres_tbl = temp_to_batres_tbl,
 	},
 	{
 		.name = POWER_SUPPLY_TECHNOLOGY_LION,
 		.resis_high = 95000,
 		.resis_low = 76001,
-		.battery_resistance = 300,
 		.charge_full_design = 950,
 		.nominal_voltage = 3700,
 		.termination_vol = 4150,
@@ -309,6 +342,8 @@ static const struct battery_type bat_type[] = {
 		.r_to_t_tbl = temp_tbl,
 		.n_v_cap_tbl_elements = ARRAY_SIZE(cap_tbl),
 		.v_to_cap_tbl = cap_tbl,
+		.n_batres_tbl_elements = ARRAY_SIZE(temp_to_batres_tbl),
+		.batres_tbl = temp_to_batres_tbl,
 	},
 #endif
 };

@@ -253,6 +253,17 @@ struct res_to_temp {
 };
 
 /**
+ * struct batres_vs_temp - defines one point in a temp vs battery internal
+ * resistance curve.
+ * @temp:			battery pack temperature in Celcius
+ * @resist:			battery internal reistance in mOhm
+ */
+struct batres_vs_temp {
+	int temp;
+	int resist;
+};
+
+/**
  * struct v_to_cap - Table for translating voltage to capacity
  * @voltage:		Voltage in mV
  * @capacity:		Capacity in percent
@@ -346,6 +357,8 @@ struct ab8500_maxim_parameters {
  * @r_to_t_tbl:			table containing resistance to temp points
  * @n_v_cap_tbl_elements:	number of elements in v_to_cap_tbl
  * @v_to_cap_tbl:		Voltage to capacity (in %) table
+ * @n_batres_tbl_elements	number of elements in the batres_tbl
+ * @batres_tbl			battery internal resistance vs temperature table
  */
 struct battery_type {
 	int name;
@@ -371,6 +384,8 @@ struct battery_type {
 	struct res_to_temp *r_to_t_tbl;
 	int n_v_cap_tbl_elements;
 	struct v_to_cap *v_to_cap_tbl;
+	int n_batres_tbl_elements;
+	struct batres_vs_temp *batres_tbl;
 };
 
 /**

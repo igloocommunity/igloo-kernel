@@ -144,6 +144,7 @@ struct inst_curr_result_list {
  * @vbat_nom:		Nominal battery voltage in mV
  * @inst_curr:		Instantenous battery current in mA
  * @avg_curr:		Average battery current in mA
+ * @bat_temp		battery temperature
  * @fg_samples:		Number of samples used in the FG accumulation
  * @accu_charge:	Accumulated charge from the last conversion
  * @recovery_cnt:	Counter for recovery mode
@@ -180,6 +181,7 @@ struct ab8500_fg {
 	int vbat_nom;
 	int inst_curr;
 	int avg_curr;
+	int bat_temp;
 	int fg_samples;
 	int accu_charge;
 	int recovery_cnt;
@@ -812,6 +814,50 @@ static int ab8500_fg_uncomp_volt_to_capacity(struct ab8500_fg *di)
 }
 
 /**
+ * ab8500_fg_battery_resistance() - Returns the battery inner resistance
+ * @di:		pointer to the ab8500_fg structure
+ *
+ * Returns battery inner resistance added with the fuel gauge resistor value
+ * to get the total resistance in the whole link from gnd to bat+ node.
+ */
+static int ab8500_fg_battery_resistance(struct ab8500_fg *di)
+{
+	int i, tbl_size;
+	struct batres_vs_temp *tbl;
+	int resist = 0;
+
+	tbl = di->bat->bat_type[di->bat->batt_id].batres_tbl;
+	tbl_size = di->bat->bat_type[di->bat->batt_id].n_batres_tbl_elements;
+
+	for (i = 0; i < tbl_size; ++i) {
+		if (di->bat_temp / 10 > tbl[i].temp)
+			break;
+	}
+
+	if ((i > 0) && (i < tbl_size)) {
+		resist = interpolate(di->bat_temp / 10,
+			tbl[i].temp,
+			tbl[i].resist,
+			tbl[i-1].temp,
+			tbl[i-1].resist);
+	} else if (i == 0) {
+		resist = tbl[0].resist;
+	} else {
+		resist = tbl[tbl_size - 1].resist;
+	}
+
+	dev_dbg(di->dev, "%s Temp: %d battery internal resistance: %d"
+	    " fg resistance %d, total: %d (mOhm)\n",
+		__func__, di->bat_temp, resist, di->bat->fg_res / 10,
+		(di->bat->fg_res / 10) + resist);
+
+	/* fg_res variable is in 0.1mOhm */
+	resist += di->bat->fg_res / 10;
+
+	return resist;
+}
+
+/**
  * ab8500_fg_load_comp_volt_to_capacity() - Load compensated voltage based capacity
  * @di:		pointer to the ab8500_fg structure
  *
@@ -820,22 +866,19 @@ static int ab8500_fg_uncomp_volt_to_capacity(struct ab8500_fg *di)
  */
 static int ab8500_fg_load_comp_volt_to_capacity(struct ab8500_fg *di)
 {
-	int vbat_comp;
+	int vbat_comp, res;
 
 	di->inst_curr = ab8500_fg_inst_curr_blocking(di);
 	di->vbat = ab8500_fg_bat_voltage(di);
 
+	res = ab8500_fg_battery_resistance(di);
+
 	/* Use Ohms law to get the load compensated voltage */
-	vbat_comp = di->vbat - (di->inst_curr *
-		di->bat->bat_type[di->bat->batt_id].battery_resistance) / 1000;
+	vbat_comp = di->vbat - (di->inst_curr * res) / 1000;
 
 	dev_dbg(di->dev, "%s Measured Vbat: %dmV,Compensated Vbat %dmV, "
 		"R: %dmOhm, Current: %dmA\n",
-		__func__,
-		di->vbat,
-		vbat_comp,
-		di->bat->bat_type[di->bat->batt_id].battery_resistance,
-		di->inst_curr);
+		__func__, di->vbat, vbat_comp, res, di->inst_curr);
 
 	return ab8500_fg_volt_to_capacity(di, vbat_comp);
 }
@@ -1939,6 +1982,16 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
 				break;
 			}
 			break;
+		case POWER_SUPPLY_PROP_TEMP:
+			switch (ext->type) {
+			case POWER_SUPPLY_TYPE_BATTERY:
+			    if (di->flags.batt_id_received)
+				di->bat_temp = ret.intval;
+				break;
+			default:
+				break;
+			}
+			break;
 		default:
 			break;
 		}
@@ -2386,6 +2439,9 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 	/* Calibrate the fg first time */
 	di->flags.calibrate = true;
 	di->calib_state = AB8500_FG_CALIB_INIT;
+
+	/* Use room temp as default value until we get an update from driver. */
+	di->bat_temp = 210;
 
 	/* Run the FG algorithm */
 	queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
