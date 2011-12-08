@@ -207,6 +207,12 @@ static pin_cfg_t snowball_pins[] = {
 	/* MMC0: MicroSD card */
 	GPIO21_MC0_DAT31DIR     | PIN_OUTPUT_HIGH,
 
+	/* Snowball buttons */
+	GPIO32_GPIO		| PIN_INPUT_PULLUP, /* User PB   */
+	GPIO151_GPIO		| PIN_INPUT_PULLUP, /* J1 pin 8  */
+	GPIO152_GPIO		| PIN_INPUT_PULLUP, /* J1 pin 9  */
+	GPIO162_GPIO		| PIN_INPUT_PULLUP, /* J1 pin 14 */
+
 	/* MMC2: LAN */
 	GPIO86_SM_ADQ0,
 	GPIO87_SM_ADQ1,
@@ -243,6 +249,7 @@ static pin_cfg_t snowball_pins[] = {
 
 	/* WLAN/GBF */
 	GPIO171_GPIO		| PIN_OUTPUT_HIGH,/* GBF_ENA */
+	GPIO161_GPIO		| PIN_OUTPUT_LOW, /* WLAN_PMU_EN */
 	GPIO215_GPIO		| PIN_OUTPUT_LOW,/* WLAN_ENA */
 	GPIO216_GPIO		| PIN_INPUT_PULLUP,/* WLAN_IRQ */
 };
@@ -933,16 +940,6 @@ void __init mop500_pins_init(void)
 
 	ux500_pins_add(mop500_pins, ARRAY_SIZE(mop500_pins));
 
-	if (machine_is_hrefv60())
-		nmk_config_pins(mop500_pins_hrefv60,
-				ARRAY_SIZE(mop500_pins_hrefv60));
-	else if (machine_is_snowball())
-		nmk_config_pins(snowball_pins,
-				ARRAY_SIZE(snowball_pins));
-	else
-		nmk_config_pins(mop500_pins_default,
-				ARRAY_SIZE(mop500_pins_default));
-
 	switch (pinsfor) {
 	case PINS_FOR_U9500:
 		nmk_config_pins(u9500_pins, ARRAY_SIZE(u9500_pins));
@@ -953,6 +950,16 @@ void __init mop500_pins_init(void)
 	default:
 		break;
 	}
+
+	if (machine_is_hrefv60())
+		nmk_config_pins(mop500_pins_hrefv60,
+				ARRAY_SIZE(mop500_pins_hrefv60));
+	else if (machine_is_snowball())
+		nmk_config_pins(snowball_pins,
+				ARRAY_SIZE(snowball_pins));
+	else
+		nmk_config_pins(mop500_pins_default,
+				ARRAY_SIZE(mop500_pins_default));
 
 	suspend_set_pins_force_fn(mop500_pins_suspend_force,
 				  mop500_pins_suspend_force_mux);
