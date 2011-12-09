@@ -1394,6 +1394,7 @@ struct hci_conn_info_req {
 struct hci_auth_info_req {
 	bdaddr_t bdaddr;
 	__u8     type;
+	__u8     sec_level;
 };
 
 struct hci_inquiry_req {
