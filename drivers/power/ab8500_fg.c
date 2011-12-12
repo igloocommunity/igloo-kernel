@@ -153,7 +153,7 @@ struct inst_curr_result_list {
  * @recovery_needed:	Indicate if recovery is needed
  * @high_curr_mode:	Indicate if we're in high current mode
  * @init_capacity:	Indicate if initial capacity measuring should be done
- * @fg_off:		True if fg was off before current measurement
+ * @turn_off_fg:	True if fg was off before current measurement
  * @calib_state		State during offset calibration
  * @discharge_state:	Current discharge state
  * @charge_state:	Current charge state
@@ -190,7 +190,7 @@ struct ab8500_fg {
 	bool recovery_needed;
 	bool high_curr_mode;
 	bool init_capacity;
-	bool fg_off;
+	bool turn_off_fg;
 	enum ab8500_fg_calibration_state calib_state;
 	enum ab8500_fg_discharge_state discharge_state;
 	enum ab8500_fg_charge_state charge_state;
@@ -524,7 +524,7 @@ int ab8500_fg_inst_curr_start(struct ab8500_fg *di)
 
 	if (!(reg_val & CC_PWR_UP_ENA)) {
 		dev_dbg(di->dev, "%s Enable FG\n", __func__);
-		di->fg_off = true;
+		di->turn_off_fg = true;
 
 		/* Program the samples */
 		ret = abx500_set_register_interruptible(di->dev,
@@ -539,6 +539,8 @@ int ab8500_fg_inst_curr_start(struct ab8500_fg *di)
 			(CC_DEEP_SLEEP_ENA | CC_PWR_UP_ENA));
 		if (ret)
 			goto fail;
+	} else {
+		di->turn_off_fg = false;
 	}
 
 	/* Reset counter and Read request */
@@ -601,7 +603,7 @@ int ab8500_fg_inst_curr_finalize(struct ab8500_fg *di, int *res)
 	val = (val * QLSB_NANO_AMP_HOURS_X10 * 36 * 4) /
 		(1000 * di->bat->fg_res);
 
-	if (di->fg_off) {
+	if (di->turn_off_fg) {
 		dev_dbg(di->dev, "%s Disable FG\n", __func__);
 
 		/* Clear any pending read requests */
