@@ -929,9 +929,6 @@ void __init mop500_pins_init(void)
 	nmk_config_pins(mop500_pins_common,
 			ARRAY_SIZE(mop500_pins_common));
 
-	nmk_config_pins(mop500_pins_default,
-			ARRAY_SIZE(mop500_pins_default));
-
 	ux500_pins_add(mop500_pins, ARRAY_SIZE(mop500_pins));
 
 	switch (pinsfor) {
@@ -945,6 +942,9 @@ void __init mop500_pins_init(void)
 		break;
 	}
 
+	nmk_config_pins(mop500_pins_default,
+			ARRAY_SIZE(mop500_pins_default));
+
 	suspend_set_pins_force_fn(mop500_pins_suspend_force,
 				  mop500_pins_suspend_force_mux);
 }
@@ -955,6 +955,8 @@ void __init snowball_pins_init(void)
 			ARRAY_SIZE(mop500_pins_common));
 
 	ux500_pins_add(mop500_pins, ARRAY_SIZE(mop500_pins));
+
+	nmk_config_pins(u8500_pins, ARRAY_SIZE(u8500_pins));
 
 	nmk_config_pins(snowball_pins,
 			ARRAY_SIZE(snowball_pins));
