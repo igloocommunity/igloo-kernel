@@ -861,6 +861,37 @@ no_track_id:
 	}
 }
 
+static int cyttsp_reset_controller(struct cyttsp *ts)
+{
+	int ret;
+
+	ret = gpio_request(ts->platform_data->rst_gpio, "reset_pin");
+	if (ret) {
+		printk(KERN_ERR "cyttsp_reset_controller: touch gpio fail\n");
+		return ret;
+	}
+	ret = gpio_direction_output(ts->platform_data->rst_gpio, 1);
+	if (ret < 0) {
+		printk(KERN_ERR "cyttsp_reset_controller: reset gpio direction fail\n");
+		goto out;
+	}
+	/*
+	 * The start up procedure
+	 * Set the RESET pin to low
+	 * Wait for a period of 1 milisecond
+	 * Set the RESET pin to high
+	 * Wait for a period of 5 milisecond
+	 * Start the initial Sequence
+	 */
+	gpio_set_value(ts->platform_data->rst_gpio, 0);
+	usleep_range(10000, 20000);
+	gpio_set_value(ts->platform_data->rst_gpio, 1);
+	usleep_range(50000, 60000);
+out:
+	gpio_free(ts->platform_data->rst_gpio);
+	return ret;
+}
+
 static void cyttsp_xy_worker(struct cyttsp *ts)
 {
 	struct cyttsp_xydata xy_data;
@@ -885,6 +916,12 @@ static void cyttsp_xy_worker(struct cyttsp *ts)
 		printk(KERN_ERR "%s: Error, bad mode ps=%d hm=%02X tm=%02X\n",
 			__func__, ts->platform_data->power_state,
 			xy_data.hst_mode, xy_data.tt_mode);
+		retval = cyttsp_reset_controller(ts);
+		if (retval < 0) {
+			printk(KERN_ERR "%s: Error, conroller reset fail\n",
+					__func__);
+			goto exit_xy_worker;
+		}
 		retval = cyttsp_power_on(ts);
 		if (retval < 0)
 			printk(KERN_ERR "%s: Error, power on fail\n", __func__);
@@ -952,17 +989,9 @@ static void cyttsp_xy_worker(struct cyttsp *ts)
 	 * send no events if there were no
 	 * previous touches and no new touches
 	 */
-	if ((trc.prv_tch == CY_NTCH) && ((trc.cur_tch == CY_NTCH) ||
-				(trc.cur_tch > CY_MAX_TCH))) {
+	if ((trc.prv_tch == CY_NTCH) && ((trc.cur_tch == CY_NTCH))) {
 		if (++ts->ntch_count > CY_MAX_NTCH) {
-			/* TTSP device has a stuck operational mode */
-			printk(KERN_ERR "%s: Error, stuck no-touch ct=%d\n",
-				__func__, trc.cur_tch);
-			retval = cyttsp_power_on(ts);
-			if (retval < 0)
-				printk(KERN_ERR "%s: Error, power on fail\n",
-					__func__);
-			goto exit_xy_worker;
+			trc.cur_tch = CY_NTCH;
 		}
 	} else
 		ts->ntch_count = 0;
@@ -1992,35 +2021,74 @@ static ssize_t attr_fwloader_store(struct device *dev,
 	return  ret == size ? ret : -EINVAL;
 }
 
-int cyttsp_reset_controller(struct cyttsp *ts)
+static void cyttsp_close(struct input_dev *dev)
 {
-	int ret;
+	struct cyttsp *ts = dev_get_drvdata(&dev->dev);
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	unregister_early_suspend(&ts->early_suspend);
+#endif
+	del_timer_sync(&ts->timer);
+	cancel_work_sync(&ts->work);
+	free_irq(ts->irq, ts);
+	input_unregister_device(ts->input);
+	input_free_device(ts->input);
+	if (ts->platform_data->init)
+		ts->platform_data->init(0);
+	regulator_disable(ts->regulator);
+	kfree(ts);
+}
 
-	ret = gpio_request(ts->platform_data->rst_gpio, "reset_pin");
-	if (ret) {
-		printk(KERN_ERR "touch gpio failed\n");
-		return ret;
+static int cyttsp_open(struct input_dev *dev)
+{
+	struct cyttsp *ts = dev_get_drvdata(&dev->dev);
+	int ret = 0;
+	DBG(printk(KERN_INFO"%s: Enter\n", __func__);)
+
+	ts->regulator = regulator_get(ts->pdev, "vcpin");
+	if (IS_ERR(ts->regulator)) {
+		printk(KERN_ERR "%s: Error, regulator_get failed\n", __func__);
+		ts->regulator = NULL;
+		ret = PTR_ERR(ts->regulator);
+		goto error_regulator_get;
 	}
-	ret = gpio_direction_output(ts->platform_data->rst_gpio, 1);
+	ret = regulator_enable(ts->regulator);
 	if (ret < 0) {
-		printk(KERN_ERR "reset gpio direction failed\n");
-		goto out;
+		printk(KERN_ERR "%s: regulator enable failed\n",__func__);
+		goto error_regulator;
 	}
-	/*
-	 * The start up procedure
-	 * Set the RESET pin to low
-	 * Wait for a period of 1 milisecond
-	 * Set the RESET pin to high
-	 * Wait for a period of 5 milisecond
-	 * Start the initial Sequence
-	 */
-	gpio_set_value(ts->platform_data->rst_gpio, 0);
-	mdelay(1);
-	gpio_set_value(ts->platform_data->rst_gpio, 1);
-	mdelay(5);
-out:
-	gpio_free(ts->platform_data->rst_gpio);
-	return 0;
+	/* enable interrupts */
+	ts->irq = gpio_to_irq(ts->platform_data->irq_gpio);
+	ret = request_threaded_irq(ts->irq, NULL, cyttsp_irq,
+			IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+			ts->input->name, ts);
+	if (ret < 0) {
+		printk(KERN_ERR "%s: IRQ request failed r=%d\n",
+				__func__, ret);
+		ts->platform_data->power_state = CY_INVALID_STATE;
+		goto error_gpio_irq;
+	}
+	ret = cyttsp_reset_controller(ts);
+	if (ret < 0) {
+		printk(KERN_ERR "controller reset failed\n");
+		goto error_reset;
+	}
+	DBG(printk(KERN_INFO "%s: call power_on\n", __func__);)
+
+	ret = cyttsp_power_on(ts);
+	if (ret < 0)
+		printk(KERN_ERR "%s: Error, power on failed!\n", __func__);
+
+	return ret;
+
+error_reset:
+	if (ts->irq >= 0)
+		free_irq(ts->irq, ts);
+error_gpio_irq:
+	regulator_disable(ts->regulator);
+error_regulator:
+	regulator_put(ts->regulator);
+error_regulator_get:
+	return ret;
 }
 
 static struct device_attribute fwloader =
@@ -2030,7 +2098,7 @@ void *cyttsp_core_init(struct cyttsp_bus_ops *bus_ops, struct device *pdev)
 {
 	struct input_dev *input_device;
 	struct cyttsp *ts;
-	int retval = 0, ret = 0;
+	int retval = 0;
 
 	DBG(printk(KERN_INFO"%s: Enter\n", __func__);)
 
@@ -2051,11 +2119,6 @@ void *cyttsp_core_init(struct cyttsp_bus_ops *bus_ops, struct device *pdev)
 		printk(KERN_ERR "%s: platform init failed!\n", __func__);
 		goto error_init;
 	}
-	ret = cyttsp_reset_controller(ts);
-	if (ret < 0) {
-		printk(KERN_ERR "controller reset failed\n");
-		goto error_reset;
-	}
 
 	/* Create the input device and register it. */
 	input_device = input_allocate_device();
@@ -2065,33 +2128,17 @@ void *cyttsp_core_init(struct cyttsp_bus_ops *bus_ops, struct device *pdev)
 			__func__);
 		goto error_input_allocate_device;
 	}
-
 	ts->input = input_device;
 	input_device->name = ts->platform_data->name;
 	input_device->phys = ts->phys;
 	input_device->dev.parent = ts->pdev;
+	input_set_drvdata(ts->input, ts);
+	input_device->open = cyttsp_open;
+	input_device->close = cyttsp_close;
 
-	/* enable interrupts */
-	ts->irq = gpio_to_irq(ts->platform_data->irq_gpio);
-	retval = request_threaded_irq(ts->irq, NULL, cyttsp_irq,
-		IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-		ts->input->name, ts);
-	if (retval < 0) {
-		printk(KERN_ERR "%s: IRQ request failed r=%d\n",
-			__func__, retval);
-		ts->platform_data->power_state = CY_INVALID_STATE;
-		goto error_set_irq;
-	}
 	/* setup watchdog */
 	INIT_WORK(&ts->work, cyttsp_check_bl);
 	setup_timer(&ts->timer, cyttsp_timer, (unsigned long) ts);
-
-	DBG(printk(KERN_INFO "%s: call power_on\n", __func__);)
-	retval = cyttsp_power_on(ts);
-	if (retval < 0) {
-		printk(KERN_ERR "%s: Error, power on failed!\n", __func__);
-		goto error_power_on;
-	}
 
 	set_bit(EV_SYN, input_device->evbit);
 	set_bit(EV_KEY, input_device->evbit);
@@ -2143,19 +2190,6 @@ void *cyttsp_core_init(struct cyttsp_bus_ops *bus_ops, struct device *pdev)
 	}
 	DBG(printk(KERN_INFO "%s: Registered input device %s\n",
 		   __func__, input_device->name);)
-	ts->regulator = regulator_get(ts->pdev, "vcpin");
-	if (IS_ERR(ts->regulator)) {
-		printk(KERN_ERR "%s: Error, regulator_get failed\n", __func__);
-		ts->regulator = NULL;
-		goto error_input_register_device;
-	} else {
-		ret = regulator_enable(ts->regulator);
-		if (ret < 0) {
-			printk(KERN_ERR "%s: regulator enable failed\n",
-			__func__);
-			goto out_regulator_error;
-		}
-	}
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	ts->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
@@ -2169,27 +2203,17 @@ void *cyttsp_core_init(struct cyttsp_bus_ops *bus_ops, struct device *pdev)
 			__func__);
 		goto device_create_error;
 	}
-	dev_set_drvdata(pdev, ts);
 
 	return ts;
 
 device_create_error:
-	regulator_disable(ts->regulator);
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	unregister_early_suspend(&ts->early_suspend);
 #endif
-out_regulator_error:
-	regulator_put(ts->regulator);
 error_input_register_device:
 	input_unregister_device(input_device);
-error_power_on:
 	cancel_work_sync(&ts->work);
 	del_timer_sync(&ts->timer);
-	if (ts->irq >= 0)
-		free_irq(ts->irq, ts);
-error_set_irq:
-	input_free_device(input_device);
-error_reset:
 error_input_allocate_device:
 	if (ts->platform_data->init)
 		ts->platform_data->init(0);
