@@ -504,6 +504,45 @@ static inline void prcmu_write_masked(unsigned int reg, u32 mask, u32 value)
 		db8500_prcmu_write_masked(reg, mask, value);
 }
 
+static inline int prcmu_enable_a9wdog(u8 id)
+{
+	if (cpu_is_u5500())
+		return db5500_prcmu_enable_a9wdog(id);
+	else
+		return db8500_prcmu_enable_a9wdog(id);
+}
+
+static inline int prcmu_disable_a9wdog(u8 id)
+{
+	if (cpu_is_u5500())
+		return db5500_prcmu_disable_a9wdog(id);
+	else
+		return db8500_prcmu_disable_a9wdog(id);
+}
+
+static inline int prcmu_kick_a9wdog(u8 id)
+{
+	if (cpu_is_u5500())
+		return db5500_prcmu_kick_a9wdog(id);
+	else
+		return db8500_prcmu_kick_a9wdog(id);
+}
+
+static inline int prcmu_load_a9wdog(u8 id, u32 timeout)
+{
+	if (cpu_is_u5500())
+		return db5500_prcmu_load_a9wdog(id, timeout);
+	else
+		return db8500_prcmu_load_a9wdog(id, timeout);
+}
+
+static inline int prcmu_config_a9wdog(u8 num, bool sleep_auto_off)
+{
+	if (cpu_is_u5500())
+		return db5500_prcmu_config_a9wdog(num, sleep_auto_off);
+	else
+		return db8500_prcmu_config_a9wdog(num, sleep_auto_off);
+}
 #else
 
 static inline void __init prcmu_early_init(void) {}

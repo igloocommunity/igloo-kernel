@@ -492,11 +492,11 @@ void prcmu_ac_wake_req(void);
 void prcmu_ac_sleep_req(void);
 void db8500_prcmu_modem_reset(void);
 
-int prcmu_config_a9wdog(u8 num, bool sleep_auto_off);
-int prcmu_enable_a9wdog(u8 id);
-int prcmu_disable_a9wdog(u8 id);
-int prcmu_kick_a9wdog(u8 id);
-int prcmu_load_a9wdog(u8 id, u32 val);
+int db8500_prcmu_config_a9wdog(u8 num, bool sleep_auto_off);
+int db8500_prcmu_enable_a9wdog(u8 id);
+int db8500_prcmu_disable_a9wdog(u8 id);
+int db8500_prcmu_kick_a9wdog(u8 id);
+int db8500_prcmu_load_a9wdog(u8 id, u32 val);
 
 void db8500_prcmu_system_reset(u16 reset_code);
 int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll);
@@ -686,27 +686,27 @@ static inline u16 db8500_prcmu_get_reset_code(void)
 	return 0;
 }
 
-static inline int prcmu_config_a9wdog(u8 num, bool sleep_auto_off)
+static inline int db8500_prcmu_config_a9wdog(u8 num, bool sleep_auto_off)
 {
 	return 0;
 }
 
-static inline int prcmu_enable_a9wdog(u8 id)
+static inline int db8500_prcmu_enable_a9wdog(u8 id)
 {
 	return 0;
 }
 
-static inline int prcmu_disable_a9wdog(u8 id)
+static inline int db8500_prcmu_disable_a9wdog(u8 id)
 {
 	return 0;
 }
 
-static inline int prcmu_kick_a9wdog(u8 id)
+static inline int db8500_prcmu_kick_a9wdog(u8 id)
 {
 	return 0;
 }
 
-static inline int prcmu_load_a9wdog(u8 id, u32 val)
+static inline int db8500_prcmu_load_a9wdog(u8 id, u32 val)
 {
 	return 0;
 }
