@@ -22,6 +22,8 @@
 #include "devices-db8500.h"
 #include "board-mop500.h"
 
+#undef CONFIG_STE_DMA40 /* Temporarily disable DMA */
+
 /*
  * SDI 0 (MicroSD slot)
  */

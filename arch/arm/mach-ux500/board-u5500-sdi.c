@@ -22,6 +22,8 @@
 #include "devices-db5500.h"
 #include "board-u5500.h"
 
+#undef CONFIG_STE_DMA40 /* Temporarily disable DMA */
+
 /*
  * SDI 0 (eMMC)
  */
