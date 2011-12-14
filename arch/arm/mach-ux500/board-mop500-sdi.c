@@ -11,15 +11,16 @@
 #include <linux/amba/mmci.h>
 #include <linux/mmc/host.h>
 #include <linux/platform_device.h>
+#include <linux/delay.h>
 
 #include <asm/mach-types.h>
 #include <plat/ste_dma40.h>
 #include <mach/devices.h>
 #include <mach/hardware.h>
+#include <mach/ste-dma40-db8500.h>
 
 #include "devices-db8500.h"
 #include "board-mop500.h"
-#include "ste-dma40-db8500.h"
 
 /*
  * v2 has a new version of this block that need to be forced, the number found
@@ -58,6 +59,7 @@ static u32 mop500_sdi0_vdd_handler(struct device *dev, unsigned int vdd,
 		 */
 		gpio_direction_output(sdi0_vsel, 0);
 		gpio_direction_output(sdi0_en, 1);
+		udelay(100);
 		break;
 	case MMC_POWER_OFF:
 		gpio_direction_output(sdi0_vsel, 0);
@@ -66,26 +68,30 @@ static u32 mop500_sdi0_vdd_handler(struct device *dev, unsigned int vdd,
 	}
 
 	return MCI_FBCLKEN | MCI_CMDDIREN | MCI_DATA0DIREN |
-	       MCI_DATA2DIREN | MCI_DATA31DIREN;
+		MCI_DATA2DIREN;
 }
 
 #ifdef CONFIG_STE_DMA40
 struct stedma40_chan_cfg mop500_sdi0_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
 	.dir = STEDMA40_PERIPH_TO_MEM,
-	.src_dev_type = DB8500_DMA_DEV29_SD_MM0_RX,
+	.src_dev_type = DB8500_DMA_DEV1_SD_MMC0_RX,
 	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
 	.src_info.data_width = STEDMA40_WORD_WIDTH,
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+	.use_fixed_channel = true,
+	.phy_channel = 0,
 };
 
 static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
 	.mode = STEDMA40_MODE_LOGICAL,
 	.dir = STEDMA40_MEM_TO_PERIPH,
 	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
-	.dst_dev_type = DB8500_DMA_DEV29_SD_MM0_TX,
+	.dst_dev_type = DB8500_DMA_DEV1_SD_MMC0_TX,
 	.src_info.data_width = STEDMA40_WORD_WIDTH,
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+	.use_fixed_channel = true,
+	.phy_channel = 0,
 };
 #endif
 
@@ -104,39 +110,10 @@ static struct mmci_platform_data mop500_sdi0_data = {
 #endif
 };
 
-static void sdi0_configure(void)
-{
-	int ret;
-
-	ret = gpio_request(sdi0_en, "level shifter enable");
-	if (!ret)
-		ret = gpio_request(sdi0_vsel,
-				   "level shifter 1v8-3v select");
-
-	if (ret) {
-		pr_warning("unable to config sdi0 gpios for level shifter.\n");
-		return;
-	}
-
-	/* Select the default 2.9V and enable level shifter */
-	gpio_direction_output(sdi0_vsel, 0);
-	gpio_direction_output(sdi0_en, 1);
-
-	/* Add the device, force v2 to subrevision 1 */
-	db8500_add_sdi0(&mop500_sdi0_data, U8500_SDI_V2_PERIPHID);
-}
-
-void mop500_sdi_tc35892_init(void)
-{
-	mop500_sdi0_data.gpio_cd = GPIO_SDMMC_CD;
-	sdi0_en = GPIO_SDMMC_EN;
-	sdi0_vsel = GPIO_SDMMC_1V8_3V_SEL;
-	sdi0_configure();
-}
-
 /*
  * SDI1 (SDIO WLAN)
  */
+#ifdef SDIO_DMA_ON
 #ifdef CONFIG_STE_DMA40
 static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
@@ -156,6 +133,7 @@ static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
 	.dst_info.data_width = STEDMA40_WORD_WIDTH,
 };
 #endif
+#endif
 
 static struct mmci_platform_data mop500_sdi1_data = {
 	.ocr_mask	= MMC_VDD_29_30,
@@ -163,17 +141,49 @@ static struct mmci_platform_data mop500_sdi1_data = {
 	.capabilities	= MMC_CAP_4_BIT_DATA,
 	.gpio_cd	= -1,
 	.gpio_wp	= -1,
+#ifdef SDIO_DMA_ON
 #ifdef CONFIG_STE_DMA40
 	.dma_filter	= stedma40_filter,
 	.dma_rx_param	= &sdi1_dma_cfg_rx,
 	.dma_tx_param	= &sdi1_dma_cfg_tx,
 #endif
+#endif
 };
+
+static void sdi0_sdi1_configure(void)
+{
+        int ret;
+
+        ret = gpio_request(sdi0_en, "level shifter enable");
+        if (!ret)
+                ret = gpio_request(sdi0_vsel,
+                                   "level shifter 1v8-3v select");
+
+        if (ret) {
+                pr_warning("unable to config sdi0 gpios for level shifter.\n");
+                return;
+        }
+
+        /* Select the default 2.9V and enable level shifter */
+        gpio_direction_output(sdi0_vsel, 0);
+        gpio_direction_output(sdi0_en, 1);
+
+	/* Add the device, force v2 to subrevision 1 */
+	db8500_add_sdi0(&mop500_sdi0_data, U8500_SDI_V2_PERIPHID);
+	db8500_add_sdi1(&mop500_sdi1_data, U8500_SDI_V2_PERIPHID);
+}
+
+void mop500_sdi_tc35892_init(void)
+{
+	mop500_sdi0_data.gpio_cd = GPIO_SDMMC_CD;
+	sdi0_en = GPIO_SDMMC_EN;
+	sdi0_vsel = GPIO_SDMMC_1V8_3V_SEL;
+	sdi0_sdi1_configure();
+}
 
 /*
  * SDI 2 (POP eMMC, not on DB8500ed)
  */
-
 #ifdef CONFIG_STE_DMA40
 struct stedma40_chan_cfg mop500_sdi2_dma_cfg_rx = {
 	.mode = STEDMA40_MODE_LOGICAL,
@@ -253,7 +263,7 @@ void __init mop500_sdi_init(void)
 	/* On-board eMMC */
 	db8500_add_sdi4(&mop500_sdi4_data, U8500_SDI_V2_PERIPHID);
 	/*
-	 * On boards with the TC35892 GPIO expander, sdi0 will finally
+	 * On boards with the TC35892 GPIO expander, sdi0 and sdi1 will finally
 	 * be added when the TC35892 initializes and calls
 	 * mop500_sdi_tc35892_init() above.
 	 */
@@ -270,7 +280,7 @@ void __init snowball_sdi_init(void)
 	mop500_sdi0_data.cd_invert = true;
 	sdi0_en = SNOWBALL_SDMMC_EN_GPIO;
 	sdi0_vsel = SNOWBALL_SDMMC_1V8_3V_GPIO;
-	sdi0_configure();
+	sdi0_sdi1_configure();
 }
 
 void __init hrefv60_sdi_init(void)
@@ -283,7 +293,5 @@ void __init hrefv60_sdi_init(void)
 	mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;
 	sdi0_en = HREFV60_SDMMC_EN_GPIO;
 	sdi0_vsel = HREFV60_SDMMC_1V8_3V_GPIO;
-	sdi0_configure();
-	/* WLAN SDIO channel */
-	db8500_add_sdi1(&mop500_sdi1_data, U8500_SDI_V2_PERIPHID);
+	sdi0_sdi1_configure();
 }
