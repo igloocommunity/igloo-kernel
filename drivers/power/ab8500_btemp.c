@@ -22,6 +22,7 @@
 #include <linux/mfd/abx500.h>
 #include <linux/mfd/ab8500/bm.h>
 #include <linux/mfd/abx500/ab8500-gpadc.h>
+#include <linux/jiffies.h>
 
 #define VTVOUT_V			1800
 
@@ -350,6 +351,7 @@ static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
 	int res;
 	int inst_curr;
 	int i;
+	unsigned long stop_time;
 
 	/*
 	 * BATCTRL current sources are included on AB8500 cut2.0
@@ -376,16 +378,19 @@ static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
 	}
 
 	/*
-	 * Since there is no interrupt when current measurement id one,
-	 * loop for over 250ms, since 250ms is one sample conversion time
-	 * with 32.768 Khz RTC clock.
+	 * Since there is no interrupt when current measurement is done,
+	 * loop for over 250ms (250ms is one sample conversion time
+	 * with 32.768 Khz RTC clock). Note that a stop time must be set
+	 * since the ab8500_btemp_read_batctrl_voltage call can block and
+	 * take an unknown amount of time to complete.
 	 */
-
-	for (i = 0; i < 11; i++) {
+	stop_time = jiffies + msecs_to_jiffies(250);
+	i = 0;
+	do {
 		batctrl += ab8500_btemp_read_batctrl_voltage(di);
+		i++;
 		msleep(25);
-	}
-
+	} while (time_after(stop_time, jiffies));
 	batctrl /= i;
 
 	ret = ab8500_fg_inst_curr_finalize(di->fg, &inst_curr);
