@@ -231,6 +231,9 @@ static struct stedma40_platform_data dma40_plat_data = {
 	/* Audio is using physical channel 2 from MMDSP */
 	.disabled_channels = {2, -1},
 	.use_esram_lcla = true,
+	/* Physical channels for which HW LLI should not be used */
+	.soft_lli_chans = NULL,
+	.num_of_soft_lli_chans = 0,
 };
 
 #ifdef CONFIG_UX500_CONTEXT

@@ -14,8 +14,14 @@
 #include <plat/pincfg.h>
 #include "pins.h"
 #include <mach/cw1200_plat.h>
+#include <linux/clk.h>
 
 static void cw1200_release(struct device *dev);
+static int cw1200_clk_ctrl(const struct cw1200_platform_data *pdata,
+		bool enable);
+
+static int cw1200_power_ctrl(const struct cw1200_platform_data *pdata,
+		bool enable);
 
 static struct resource cw1200_href_resources[] = {
 	{
@@ -62,7 +68,9 @@ static struct resource cw1200_u9500_resources[] = {
 	},
 };
 
-static struct cw1200_platform_data cw1200_platform_data = { 0 };
+static struct cw1200_platform_data cw1200_platform_data = {
+	.clk_ctrl = cw1200_clk_ctrl,
+};
 
 static struct platform_device cw1200_device = {
 	.name = "cw1200_wlan",
@@ -72,6 +80,8 @@ static struct platform_device cw1200_device = {
 		.init_name = "cw1200_wlan",
 	},
 };
+
+static struct clk *clk_dev;
 
 const struct cw1200_platform_data *cw1200_get_platform_data(void)
 {
@@ -107,6 +117,68 @@ static int cw1200_pins_enable(bool enable)
 	return ret;
 }
 
+static int cw1200_clk_ctrl(const struct cw1200_platform_data *pdata,
+		bool enable)
+{
+	static const char *clock_name = "sys_clk_out";
+	int ret = 0;
+
+	if (enable) {
+		clk_dev = clk_get(&cw1200_device.dev, clock_name);
+		if (IS_ERR(clk_dev)) {
+			ret = PTR_ERR(clk_dev);
+			dev_warn(&cw1200_device.dev,
+				"%s: Failed to get clk '%s': %d\n",
+				__func__, clock_name, ret);
+		} else {
+			ret = clk_enable(clk_dev);
+			if (ret) {
+				clk_put(clk_dev);
+				dev_warn(&cw1200_device.dev,
+					"%s: Failed to enable clk '%s': %d\n",
+					__func__, clock_name, ret);
+			}
+		}
+	} else {
+		clk_disable(clk_dev);
+		clk_put(clk_dev);
+	}
+
+	return ret;
+}
+
+static int cw1200_power_ctrl(const struct cw1200_platform_data *pdata,
+		bool enable)
+{
+	static const char *vdd_name = "vdd";
+	struct regulator *vdd;
+	int ret = 0;
+
+	vdd = regulator_get(&cw1200_device.dev, vdd_name);
+	if (IS_ERR(vdd)) {
+		ret = PTR_ERR(vdd);
+		dev_warn(&cw1200_device.dev,
+				"%s: Failed to get regulator '%s': %d\n",
+				__func__, vdd_name, ret);
+	} else {
+		if (enable)
+			ret = regulator_enable(vdd);
+		else
+			ret = regulator_disable(vdd);
+
+		if (ret) {
+			dev_warn(&cw1200_device.dev,
+					"%s: Failed to %s regulator '%s': %d\n",
+					__func__, enable ? "enable" : "disable",
+					vdd_name, ret);
+		}
+		regulator_put(vdd);
+	}
+	return  ret;
+}
+
+
+
 int __init mop500_wlan_init(void)
 {
 	int ret;
@@ -114,7 +186,9 @@ int __init mop500_wlan_init(void)
 	if (pins_for_u9500()) {
 		cw1200_device.num_resources = ARRAY_SIZE(cw1200_u9500_resources);
 		cw1200_device.resource = cw1200_u9500_resources;
-	} else if (machine_is_u8500() || machine_is_nomadik()) {
+	} else if (machine_is_u8500() ||
+			   machine_is_nomadik() ||
+			   machine_is_snowball()) {
 		cw1200_device.num_resources = ARRAY_SIZE(cw1200_href_resources);
 		cw1200_device.resource = cw1200_href_resources;
 	} else if (machine_is_hrefv60()) {
@@ -129,12 +203,18 @@ int __init mop500_wlan_init(void)
 		return -ENOTSUPP;
 	}
 
-	cw1200_platform_data.mmc_id = "mmc3";
+	if (machine_is_snowball())
+		cw1200_platform_data.mmc_id = "mmc2";
+	else
+		cw1200_platform_data.mmc_id = "mmc3";
 
 	cw1200_platform_data.reset = &cw1200_device.resource[0];
 	cw1200_platform_data.irq = &cw1200_device.resource[1];
 
 	cw1200_device.dev.release = cw1200_release;
+
+	if (machine_is_snowball())
+		cw1200_platform_data.power_ctrl = cw1200_power_ctrl;
 
 	ret = cw1200_pins_enable(true);
 	if (WARN_ON(ret))

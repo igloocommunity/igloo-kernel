@@ -64,6 +64,8 @@ struct state_history {
 	u32 exit_counter;
 	ktime_t measure_begin;
 	int ape_blocked;
+	int uart_blocked;
+	int modem_blocked;
 	int time_blocked;
 	int both_blocked;
 	int gov_blocked;
@@ -86,6 +88,8 @@ static int verbose;
 
 static bool apidle_both_blocked;
 static bool apidle_ape_blocked;
+static bool apidle_modem_blocked;
+static bool apidle_uart_blocked;
 static bool apidle_time_blocked;
 static bool apidle_gov_blocked;
 
@@ -336,13 +340,15 @@ static void state_record_time(struct state_history *sh, int ctarget,
 	sh->states[sh->state].counter++;
 }
 
-void ux500_ci_dbg_register_reason(int idx, bool power_state_req,
+void ux500_ci_dbg_register_reason(int idx, bool ape, bool modem, bool uart,
 				  u32 time, u32 max_depth)
 {
 	if (cstates[idx].state == CI_IDLE && verbose) {
-		apidle_ape_blocked = power_state_req;
+		apidle_ape_blocked = ape;
+		apidle_uart_blocked = uart;
+		apidle_modem_blocked = modem;
 		apidle_time_blocked = time < cstates[idx + 1].threshold;
-		apidle_both_blocked = power_state_req && apidle_time_blocked;
+		apidle_both_blocked = (ape || uart || modem) && apidle_time_blocked;
 		apidle_gov_blocked = cstates[max_depth].state == CI_IDLE;
 	}
 }
@@ -369,6 +375,10 @@ void ux500_ci_dbg_log(int ctarget, ktime_t enter_time)
 			sh->both_blocked++;
 		if (apidle_ape_blocked)
 			sh->ape_blocked++;
+		if (apidle_uart_blocked)
+			sh->uart_blocked++;
+		if (apidle_modem_blocked)
+			sh->modem_blocked++;
 		if (apidle_time_blocked)
 			sh->time_blocked++;
 		if (apidle_gov_blocked)
@@ -457,6 +467,8 @@ static void state_history_reset(void)
 
 		sh->exit_counter = 0;
 		sh->ape_blocked = 0;
+		sh->uart_blocked = 0;
+		sh->modem_blocked = 0;
 		sh->time_blocked = 0;
 		sh->both_blocked = 0;
 		sh->gov_blocked = 0;
@@ -605,8 +617,11 @@ static void stats_disp_one(struct seq_file *s, struct state_history *sh,
 		   (u32) t_us, (u32)perc);
 
 	if (cstates[i].state == CI_IDLE && verbose)
-		seq_printf(s, ", reg:%d time:%d both:%d gov:%d",
-			   sh->ape_blocked, sh->time_blocked,
+		seq_printf(s,
+			   ", reg:%d modem: %d uart: %d time:%d both:%d gov:%d",
+			   sh->ape_blocked,
+			   sh->modem_blocked, sh->uart_blocked,
+			   sh->time_blocked,
 			   sh->both_blocked, sh->gov_blocked);
 
 	if (sh->states[i].counter && verbose)

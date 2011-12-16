@@ -1041,9 +1041,6 @@ static void musb_shutdown(struct platform_device *pdev)
 #if defined(CONFIG_USB_MUSB_TUSB6010) || defined(CONFIG_USB_MUSB_OMAP2PLUS) \
 	|| defined(CONFIG_USB_MUSB_AM35X)
 static ushort __initdata fifo_mode = 4;
-#elif defined(CONFIG_USB_MUSB_UX500) \
-	|| defined(CONFIG_USB_MUSB_UX500_MODULE)
-static ushort __initdata fifo_mode = 5;
 #else
 static ushort __initdata fifo_mode = 2;
 #endif
@@ -2407,7 +2404,7 @@ static const struct dev_pm_ops musb_dev_pm_ops = {
 	.runtime_resume = musb_runtime_resume,
 };
 
-#define MUSB_DEV_PM_OPS (&musb_dev_pm_ops)
+#define MUSB_DEV_PM_OPS NULL
 #else
 #define	MUSB_DEV_PM_OPS	NULL
 #endif

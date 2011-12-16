@@ -157,7 +157,7 @@ static struct abx500_accdet_platform_data ab8500_accdet_pdata = {
 
 static struct gpio_keys_button snowball_key_array[] = {
 	{
-		.gpio           = 32,
+		.gpio           = SNOWBALL_USER_PB_GPIO,
 		.type           = EV_KEY,
 		.code           = KEY_1,
 		.desc           = "userpb",
@@ -166,7 +166,7 @@ static struct gpio_keys_button snowball_key_array[] = {
 		.wakeup         = 1,
 	},
 	{
-		.gpio           = 151,
+		.gpio           = SNOWBALL_J1_PIN_8_GPIO,
 		.type           = EV_KEY,
 		.code           = KEY_2,
 		.desc           = "extkb1",
@@ -175,7 +175,7 @@ static struct gpio_keys_button snowball_key_array[] = {
 		.wakeup         = 1,
 	},
 	{
-		.gpio           = 152,
+		.gpio           = SNOWBALL_J1_PIN_9_GPIO,
 		.type           = EV_KEY,
 		.code           = KEY_3,
 		.desc           = "extkb2",
@@ -184,16 +184,7 @@ static struct gpio_keys_button snowball_key_array[] = {
 		.wakeup         = 1,
 	},
 	{
-		.gpio           = 161,
-		.type           = EV_KEY,
-		.code           = KEY_4,
-		.desc           = "extkb3",
-		.active_low     = 1,
-		.debounce_interval = 50,
-		.wakeup         = 1,
-	},
-	{
-		.gpio           = 162,
+		.gpio           = SNOWBALL_J1_PIN_14_GPIO,
 		.type           = EV_KEY,
 		.code           = KEY_5,
 		.desc           = "extkb4",
@@ -463,6 +454,32 @@ static struct ske_keypad_platform_data mop500_ske_keypad_data = {
 #endif
 
 
+#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
+/*
+ * GPIO-regulator wlan vbat data
+ */
+static struct fixed_voltage_config snowball_gpio_wlan_vbat_data = {
+	.supply_name		= "WLAN-VBAT",
+	.gpio			= SNOWBALL_EN_3V6_GPIO,
+	.microvolts		= 3600000,
+	.enable_high		= 1,
+	.init_data		= &gpio_wlan_vbat_regulator,
+	.startup_delay		= 3500, /* Startup time */
+};
+
+/*
+ * GPIO-regulator en 3v3 vbat data
+ */
+
+static struct fixed_voltage_config snowball_gpio_en_3v3_data = {
+	.supply_name		= "EN-3V3",
+	.gpio			= SNOWBALL_EN_3V3_ETH_GPIO,
+	.microvolts		= 3300000,
+	.enable_high		= 1,
+	.init_data		= &gpio_en_3v3_regulator,
+	.startup_delay		= 5000, /* 1200us according to data sheet */
+};
+#endif
 
 /*
  * TC35892
@@ -614,6 +631,24 @@ static void __init mop500_i2c_init(void)
 	db8500_add_i2c2(&u8500_i2c2_data);
 	db8500_add_i2c3(&u8500_i2c3_data);
 }
+
+#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
+static struct platform_device snowball_gpio_wlan_vbat_regulator_device = {
+	.name	= "reg-fixed-voltage",
+	.id	= 0,
+	.dev	= {
+		.platform_data	= &snowball_gpio_wlan_vbat_data,
+	},
+};
+
+static struct platform_device snowball_gpio_en_3v3_regulator_device = {
+	.name	= "reg-fixed-voltage",
+	.id	= 1,
+	.dev	= {
+		.platform_data	= &snowball_gpio_en_3v3_data,
+	},
+};
+#endif
 
 #ifdef CONFIG_UX500_GPIO_KEYS
 static struct gpio_keys_button mop500_gpio_keys[] = {
@@ -861,17 +896,20 @@ static struct cryp_platform_data u8500_cryp1_platform_data = {
 	}
 };
 
+static struct stedma40_chan_cfg u8500_hash_dma_cfg_tx = {
+	.dir = STEDMA40_MEM_TO_PERIPH,
+	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
+	.dst_dev_type = DB8500_DMA_DEV50_HAC1_TX,
+	.src_info.data_width = STEDMA40_WORD_WIDTH,
+	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+	.mode = STEDMA40_MODE_LOGICAL,
+	.src_info.psize = STEDMA40_PSIZE_LOG_16,
+	.dst_info.psize = STEDMA40_PSIZE_LOG_16,
+};
+
 static struct hash_platform_data u8500_hash1_platform_data = {
-	.mem_to_engine = {
-		.dir = STEDMA40_MEM_TO_PERIPH,
-		.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
-		.dst_dev_type = DB8500_DMA_DEV50_HAC1_TX,
-		.src_info.data_width = STEDMA40_WORD_WIDTH,
-		.dst_info.data_width = STEDMA40_WORD_WIDTH,
-		.mode = STEDMA40_MODE_LOGICAL,
-		.src_info.psize = STEDMA40_PSIZE_LOG_16,
-		.dst_info.psize = STEDMA40_PSIZE_LOG_16,
-	},
+	.mem_to_engine = &u8500_hash_dma_cfg_tx,
+	.dma_filter = stedma40_filter,
 };
 
 /* add any platform devices here - TODO */
@@ -1123,6 +1161,10 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
 	&ux500_hwmem_device,
 	&snowball_led_dev,
 	&snowball_key_dev,
+#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
+	&snowball_gpio_en_3v3_regulator_device,
+	&snowball_gpio_wlan_vbat_regulator_device,
+#endif
 	&snowball_sbnet_dev,
 	&ux500_mcde_device,
 	&ux500_b2r2_device,
@@ -1158,9 +1200,10 @@ static void __init mop500_init_machine(void)
 	hsi_register_board_info(u8500_hsi_devices,
 				ARRAY_SIZE(u8500_hsi_devices));
 #endif
+#ifdef CONFIG_LEDS_PWM
 	if (uib_is_stuib())
 		u8500_leds_data.num_leds = 2;
-
+#endif
 	if (machine_is_snowball()) {
 		platform_add_devices(snowball_platform_devs,
 					ARRAY_SIZE(snowball_platform_devs));

@@ -52,7 +52,7 @@
 /* Standby search time */
 #define AV8100_ON_TIME 1	/* 9 ms step */
 #define AV8100_DENC_OFF_TIME 3	/* 275 ms step if > V1. Not used if V1 */
-#define AV8100_HDMI_OFF_TIME 2	/* 140 ms step if V2. 80 ms step if V1 */
+#define AV8100_HDMI_OFF_TIME 0	/* 140 ms step if V2. 80 ms step if V1 */
 
 /* Command offsets */
 #define AV8100_COMMAND_OFFSET		0x10

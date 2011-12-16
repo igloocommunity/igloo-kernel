@@ -751,7 +751,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
 	      unsigned int status)
 {
 	/* First check for errors */
-	if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_TXUNDERRUN|MCI_RXOVERRUN)) {
+	if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_STARTBITERR|
+		      MCI_TXUNDERRUN|MCI_RXOVERRUN)) {
 		u32 remain, success;
 
 		/* Terminate the DMA transfer */
@@ -1031,8 +1032,9 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
 		dev_dbg(mmc_dev(host->mmc), "irq0 (data+cmd) %08x\n", status);
 
 		data = host->data;
-		if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_TXUNDERRUN|
-			      MCI_RXOVERRUN|MCI_DATAEND|MCI_DATABLOCKEND) && data)
+		if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_STARTBITERR|
+			      MCI_TXUNDERRUN|MCI_RXOVERRUN|MCI_DATAEND|
+			      MCI_DATABLOCKEND) && data)
 			mmci_data_irq(host, data, status);
 
 		cmd = host->cmd;
@@ -1579,9 +1581,24 @@ static int mmci_runtime_suspend(struct device *dev)
 	struct amba_device *adev = to_amba_device(dev);
 	struct mmc_host *mmc = amba_get_drvdata(adev);
 	unsigned long flags;
+	int ret;
+	struct mmc_ios ios;
 
 	if (mmc) {
 		struct mmci_host *host = mmc_priv(mmc);
+
+		/*
+		 * Let the ios_handler act on a POWER_OFF to potentially do some
+		 * power save actions.
+		 */
+		if (host->plat->ios_handler) {
+			memcpy(&ios, &mmc->ios, sizeof(struct mmc_ios));
+			ios.power_mode = MMC_POWER_OFF;
+			ret = host->plat->ios_handler(mmc_dev(mmc),
+						      &ios);
+			if (ret)
+				return ret;
+		}
 
 		spin_lock_irqsave(&host->lock, flags);
 
@@ -1628,6 +1645,14 @@ static int mmci_runtime_resume(struct device *dev)
 		writel(host->irqmask0_reg, host->base + MMCIMASK0);
 
 		spin_unlock_irqrestore(&host->lock, flags);
+
+		/*
+		 * Restore settings done by the ios_handler. This shall be done
+		 * quickly to keep request latency low.
+		 */
+		if (host->plat->ios_handler)
+			host->plat->ios_handler(mmc_dev(mmc),
+						&mmc->ios);
 	}
 
 	return 0;

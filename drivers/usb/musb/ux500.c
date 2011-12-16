@@ -59,6 +59,7 @@ void ux500_store_context(struct musb *musb)
 	if (is_host_enabled(musb)) {
 		context.frame = musb_readw(musb_base, MUSB_FRAME);
 		context.testmode = musb_readb(musb_base, MUSB_TESTMODE);
+		context.busctl = musb_read_ulpi_buscontrol(musb->mregs);
 	}
 	context.power = musb_readb(musb_base, MUSB_POWER);
 	context.intrtxe = musb_readw(musb_base, MUSB_INTRTXE);
@@ -66,8 +67,19 @@ void ux500_store_context(struct musb *musb)
 	context.intrusbe = musb_readb(musb_base, MUSB_INTRUSBE);
 	context.index = musb_readb(musb_base, MUSB_INDEX);
 	context.devctl = DEFAULT_DEVCTL;
+
 	for (i = 0; i < musb->config->num_eps; ++i) {
-		epio = musb->endpoints[i].regs;
+		struct musb_hw_ep       *hw_ep;
+
+		musb_writeb(musb_base, MUSB_INDEX, i);
+		hw_ep = &musb->endpoints[i];
+		if (!hw_ep)
+			continue;
+
+		epio = hw_ep->regs;
+		if (!epio)
+			continue;
+
 		context.index_regs[i].txmaxp =
 				musb_readw(epio, MUSB_TXMAXP);
 		context.index_regs[i].txcsr =
@@ -132,6 +144,7 @@ void ux500_restore_context(void)
 	if (is_host_enabled(musb)) {
 		musb_writew(musb_base, MUSB_FRAME, context.frame);
 		musb_writeb(musb_base, MUSB_TESTMODE, context.testmode);
+		musb_write_ulpi_buscontrol(musb->mregs, context.busctl);
 	 }
 	musb_writeb(musb_base, MUSB_POWER, context.power);
 	musb_writew(musb_base, MUSB_INTRTXE, context.intrtxe);
@@ -140,7 +153,17 @@ void ux500_restore_context(void)
 	musb_writeb(musb_base, MUSB_DEVCTL, context.devctl);
 
 	for (i = 0; i < musb->config->num_eps; ++i) {
-		epio = musb->endpoints[i].regs;
+		struct musb_hw_ep       *hw_ep;
+
+		musb_writeb(musb_base, MUSB_INDEX, i);
+		hw_ep = &musb->endpoints[i];
+		if (!hw_ep)
+			continue;
+
+		epio = hw_ep->regs;
+		if (!epio)
+			continue;
+
 		musb_writew(epio, MUSB_TXMAXP,
 			context.index_regs[i].txmaxp);
 		musb_writew(epio, MUSB_TXCSR,
@@ -205,11 +228,15 @@ static void musb_notify_idle(unsigned long _musb)
 
 	switch (musb->xceiv->state) {
 	case OTG_STATE_A_WAIT_BCON:
-		devctl &= ~MUSB_DEVCTL_SESSION;
-		musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
-		musb->xceiv->state = OTG_STATE_B_IDLE;
-		MUSB_DEV_MODE(musb);
+		if (devctl & MUSB_DEVCTL_BDEVICE) {
+			musb->xceiv->state = OTG_STATE_B_IDLE;
+			MUSB_DEV_MODE(musb);
+		} else {
+			musb->xceiv->state = OTG_STATE_A_IDLE;
+			MUSB_HST_MODE(musb);
+		}
 		break;
+
 	case OTG_STATE_A_SUSPEND:
 	default:
 		break;
@@ -239,6 +266,8 @@ static int musb_otg_notifications(struct notifier_block *nb,
 
 	case USB_EVENT_NONE:
 		dev_dbg(musb->controller, "VBUS Disconnect\n");
+		if (is_otg_enabled(musb))
+			ux500_musb_set_vbus(musb, 0);
 
 		break;
 	default:
@@ -340,10 +369,34 @@ static void ux500_musb_try_idle(struct musb *musb, unsigned long timeout)
 		(unsigned long)jiffies_to_msecs(timeout - jiffies));
 	mod_timer(&notify_timer, timeout);
 }
+
 static void ux500_musb_enable(struct musb *musb)
 {
 	ux500_store_context(musb);
 }
+
+static struct usb_ep *ux500_musb_configure_endpoints(struct musb *musb,
+		u8 type, struct usb_endpoint_descriptor  *desc)
+{
+	struct usb_ep *ep = NULL;
+	struct usb_gadget *gadget = &musb->g;
+	char name[4];
+
+	if (USB_ENDPOINT_XFER_INT == type) {
+		list_for_each_entry(ep, &gadget->ep_list, ep_list) {
+			if (ep->maxpacket == 512)
+				continue;
+			if (NULL == ep->driver_data) {
+				strncpy(name, (ep->name + 3), 4);
+				if (USB_DIR_IN & desc->bEndpointAddress)
+					if (strcmp("in", name) == 0)
+						return ep;
+			}
+		}
+	}
+	return ep;
+}
+
 static int ux500_musb_init(struct musb *musb)
 {
 	int status;
@@ -389,6 +442,7 @@ static const struct musb_platform_ops ux500_ops = {
 	.try_idle	= ux500_musb_try_idle,
 
 	.enable		= ux500_musb_enable,
+	.configure_endpoints	= ux500_musb_configure_endpoints,
 };
 
 /**

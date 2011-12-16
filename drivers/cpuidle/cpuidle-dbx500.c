@@ -288,7 +288,7 @@ static int determine_sleep_state(u32 *sleep_time)
 
 	int cpu;
 	int max_depth;
-	bool power_state_req;
+	bool uart, modem, ape;
 
 	/* If first cpu to sleep, go to most shallow sleep state */
 	if (!is_last_cpu_running())
@@ -306,8 +306,6 @@ static int determine_sleep_state(u32 *sleep_time)
 			return CI_WFI;
 	}
 
-	power_state_req = power_state_active_is_enabled() ||
-		prcmu_is_ac_wake_requested();
 
 	(*sleep_time) = get_remaining_sleep_time(NULL, NULL);
 
@@ -324,6 +322,10 @@ static int determine_sleep_state(u32 *sleep_time)
 			max_depth = per_cpu(cpu_state, cpu)->gov_cstate;
 	}
 
+	uart = ux500_ci_dbg_force_ape_on();
+	ape = power_state_active_is_enabled();
+	modem = prcmu_is_ac_wake_requested();
+
 	for (i = max_depth; i > 0; i--) {
 
 		if ((*sleep_time) <= cstates[i].threshold)
@@ -331,8 +333,7 @@ static int determine_sleep_state(u32 *sleep_time)
 
 		if (cstates[i].APE == APE_OFF) {
 			/* This state says APE should be off */
-			if (power_state_req ||
-			    ux500_ci_dbg_force_ape_on())
+			if (ape || modem || uart)
 				continue;
 		}
 
@@ -340,7 +341,7 @@ static int determine_sleep_state(u32 *sleep_time)
 		break;
 	}
 
-	ux500_ci_dbg_register_reason(i, power_state_req,
+	ux500_ci_dbg_register_reason(i, ape, modem, uart,
 				     (*sleep_time),
 				     max_depth);
 	return max(CI_WFI, i);

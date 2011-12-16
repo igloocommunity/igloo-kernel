@@ -1733,6 +1733,14 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	return 0;
 }
 
+static struct usb_ep *musb_gadget_configure_ep(struct usb_gadget *gadget,
+		u8 type, struct usb_endpoint_descriptor *desc)
+{
+	struct musb	*musb = gadget_to_musb(gadget);
+
+	return musb_platform_configure_ep(musb, type, desc);
+}
+
 static const struct usb_gadget_ops musb_gadget_operations = {
 	.get_frame		= musb_gadget_get_frame,
 	.wakeup			= musb_gadget_wakeup,
@@ -1740,6 +1748,7 @@ static const struct usb_gadget_ops musb_gadget_operations = {
 	/* .vbus_session		= musb_gadget_vbus_session, */
 	.vbus_draw		= musb_gadget_vbus_draw,
 	.pullup			= musb_gadget_pullup,
+	.configure_ep		= musb_gadget_configure_ep,
 };
 
 /* ----------------------------------------------------------------------- */

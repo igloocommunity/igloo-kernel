@@ -55,11 +55,6 @@ static struct adp1653_platform_data __initdata adp1653_pdata_u8500_uib = {
 
 static struct i2c_board_info __initdata mop500_i2c2_devices[] = {
 	{
-		/* LSM303DLH Accelerometer */
-		I2C_BOARD_INFO("lsm303dlh_a", 0x18),
-		.platform_data = &lsm303dlh_pdata,
-	},
-	{
 		/* LSM303DLH Magnetometer */
 		I2C_BOARD_INFO("lsm303dlh_m", 0x1E),
 		.platform_data = &lsm303dlh_pdata,
@@ -78,6 +73,30 @@ static struct i2c_board_info __initdata mop500_i2c2_devices[] = {
 		I2C_BOARD_INFO("adp1653", 0x30),
 		.platform_data = &adp1653_pdata_u8500_uib
 	}
+};
+
+/*
+ * Break this out due to the fact that this have changed address on Snowball
+ */
+static struct i2c_board_info __initdata mop500_2_i2c2_devices[] = {
+       {
+               /* LSM303DLH Accelerometer */
+               I2C_BOARD_INFO("lsm303dlh_a", 0x18),
+               .platform_data = &lsm303dlh_pdata,
+       },
+};
+
+/*
+ * This is needed due to the fact that the i2c address changed in Snowball V7 =<
+ * and there is no way of knowing if the HW is Snowball V7 or higher so we just
+ * have to try and fail.
+ */
+static struct i2c_board_info __initdata snowball_i2c2_devices[] = {
+       {
+               /* LSM303DLH Accelerometer */
+               I2C_BOARD_INFO("lsm303dlh_a", 0x19),
+               .platform_data = &lsm303dlh_pdata,
+       },
 };
 
 /*
@@ -170,6 +189,37 @@ static struct i2c_board_info __initdata mop500_i2c0_devices_stuib[] = {
 		.flags = I2C_CLIENT_WAKE,
 	},
 };
+
+/*
+ * Register/Add i2c sensors for Snowball
+ */
+void mop500_sensors_probe_add_lsm303dlh_a(void)
+{
+       static const int busnum = 2;
+       struct i2c_adapter *adap;
+       struct i2c_client *client;
+       static const unsigned short i2c_addr_list[] = {
+               0x18, 0x19, I2C_CLIENT_END };
+       struct i2c_board_info i2c_info = {
+                       /* LSM303DLH Accelerometer */
+                       I2C_BOARD_INFO("lsm303dlh_a", 0),
+                       .platform_data = &lsm303dlh_pdata,
+       };
+
+       adap = i2c_get_adapter(busnum);
+       if (!adap) {
+               /* We have no i2c adapter yet lets create it. */
+               pr_err(__FILE__ ": Could not get adapter %d\n", busnum);
+               return;
+       }
+       client = i2c_new_probed_device(adap, &i2c_info,
+                       i2c_addr_list, NULL);
+       if (!client)
+               pr_err(__FILE__ ": failed to register %s to i2c%d\n",
+                               i2c_info.type,
+                               busnum);
+       i2c_put_adapter(adap);
+}
 
 /*
  * BU21013 ROHM touchscreen interface on the STUIBs
@@ -342,4 +392,25 @@ void __init mop500_stuib_init(void)
 	}
 	mop500_uib_i2c_add(2, mop500_i2c2_devices,
 			ARRAY_SIZE(mop500_i2c2_devices));
+
+
+    if (machine_is_snowball()) {
+        if (cpu_is_u8500v21()) {
+            /* This is ugly but we cant know what address
+             * to use */
+			printk("%s: **** Try to add Accelometer and cpu_is_u8500v21 \n",
+					__func__);
+            mop500_sensors_probe_add_lsm303dlh_a();
+        } else {/* Add the accelerometer with new addr */
+			printk("%s: **** Try to add Accelometer old way \n",
+					__func__);
+            mop500_uib_i2c_add(2, snowball_i2c2_devices,
+                           ARRAY_SIZE(snowball_i2c2_devices));
+		}
+    } else { /* none snowball have the old addr */
+	     printk("%s: **** Ops on snowball but not a snowball Accelometer\n",
+					__func__);
+         mop500_uib_i2c_add(2, mop500_2_i2c2_devices,
+                               ARRAY_SIZE(mop500_2_i2c2_devices));
+	}
 }

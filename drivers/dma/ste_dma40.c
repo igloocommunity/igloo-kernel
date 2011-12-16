@@ -209,6 +209,7 @@ struct d40_lcla_pool {
  * @allocated_dst: Same as for src but is dst.
  * allocated_dst and allocated_src uses the D40_ALLOC* defines as well as
  * event line number.
+ * @use_soft_lli: To mark if the linked lists of channel are managed by SW.
  */
 struct d40_phy_res {
 	spinlock_t lock;
@@ -216,6 +217,7 @@ struct d40_phy_res {
 	int	   num;
 	u32	   allocated_src;
 	u32	   allocated_dst;
+	bool	   use_soft_lli;
 };
 
 struct d40_base;
@@ -244,7 +246,6 @@ struct d40_base;
  * @dma_cfg: The client configuration of this dma channel.
  * @configured: whether the dma_cfg configuration is valid
  * @base: Pointer to the device instance struct.
- * @cdesc: Cyclic descriptor
  * @src_def_cfg: Default cfg register setting for src.
  * @dst_def_cfg: Default cfg register setting for dst.
  * @log_def: Default logical channel settings.
@@ -275,7 +276,6 @@ struct d40_chan {
 	struct stedma40_chan_cfg	 dma_cfg;
 	bool				 configured;
 	struct d40_base			*base;
-	struct stedma40_cyclic_desc	*cdesc;
 	/* Default register configurations */
 	u32				 src_def_cfg;
 	u32				 dst_def_cfg;
@@ -634,7 +634,16 @@ static int d40_desc_log_lli_to_lcxa(struct d40_chan *d40c,
 	if ((d40d->lli_len - d40d->lli_current) > 1 ||
 	     d40d->cyclic || !use_lcpa) {
 
-		curr_lcla = d40_lcla_alloc_one(d40c, d40d);
+		/*
+		 * If the channel is expected to use only soft_lli don't
+		 * allocate a lcla. This is to avoid a HW issue that exists
+		 * in some controller during a peripheral to memory transfer
+		 * that uses linked lists.
+		 */
+		if (!(d40c->phy_chan->use_soft_lli &&
+			d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM))
+			curr_lcla = d40_lcla_alloc_one(d40c, d40d);
+
 		first_lcla = curr_lcla;
 	}
 
@@ -1339,8 +1348,7 @@ static dma_cookie_t d40_tx_submit(struct dma_async_tx_descriptor *tx)
 
 	d40d->txd.cookie = d40c->chan.cookie;
 
-	if (!d40c->cdesc)
-		d40_desc_queue(d40c, d40d);
+	d40_desc_queue(d40c, d40d);
 
 	spin_unlock_irqrestore(&d40c->lock, flags);
 
@@ -1391,18 +1399,18 @@ static void dma_tc_handle(struct d40_chan *d40c)
 	struct d40_desc *d40d;
 	bool islastactive;
 
-	if (d40c->cdesc) {
-		d40c->pending_tx++;
-		tasklet_schedule(&d40c->tasklet);
-		return;
-	}
-
 	/* Get first active entry from list */
 redo:
 	d40d = d40_first_active_get(d40c);
 
 	if (d40d == NULL)
 		return;
+
+	if (d40d->cyclic) {
+		d40c->pending_tx++;
+		tasklet_schedule(&d40c->tasklet);
+		return;
+	}
 
 	d40_lcla_free_all(d40c, d40d);
 
@@ -1450,16 +1458,17 @@ static void dma_tasklet(unsigned long data)
 
 	spin_lock_irqsave(&d40c->lock, flags);
 
-	if (d40c->cdesc)
-		d40d = d40c->cdesc->d40d;
-	else {
-		/* Get first active entry from list */
-		d40d = d40_first_done(d40c);
-		if (d40d == NULL)
+	/* Get first entry from the done list */
+	d40d = d40_first_done(d40c);
+	if (d40d == NULL) {
+		/* Check if we have reached here for cyclic job */
+		d40d = d40_first_active_get(d40c);
+		if (!d40d->cyclic)
 			goto err;
-
-		d40c->completed = d40d->txd.cookie;
 	}
+
+	if (!d40d->cyclic)
+		d40c->completed = d40d->txd.cookie;
 
 	/*
 	 * If terminating a channel pending_tx is set to zero.
@@ -1472,18 +1481,10 @@ static void dma_tasklet(unsigned long data)
 
 	/* Callback to client */
 
-	if (d40c->cdesc) {
-		callback = d40c->cdesc->period_callback;
-		callback_param = d40c->cdesc->period_callback_param;
+	callback = d40d->txd.callback;
+	callback_param = d40d->txd.callback_param;
 
-		if (!callback) {
-			callback = d40d->txd.callback;
-			callback_param = d40d->txd.callback_param;
-		}
-	} else {
-		callback = d40d->txd.callback;
-		callback_param = d40d->txd.callback_param;
-
+	if (!d40d->cyclic) {
 		if (async_tx_test_ack(&d40d->txd)) {
 			d40_desc_remove(d40d);
 			d40_desc_free(d40c, d40d);
@@ -2140,6 +2141,9 @@ d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
 	if (desc == NULL)
 		goto err;
 
+	if (sg_next(&sg_src[sg_len - 1]) == sg_src)
+		desc->cyclic = true;
+
 	if (direction != DMA_NONE) {
 		dma_addr_t dev_addr = d40_get_dev_addr(chan, direction);
 
@@ -2410,11 +2414,6 @@ static void d40_issue_pending(struct dma_chan *chan)
 		return;
 	}
 
-	if (d40c->cdesc) {
-		stedma40_cyclic_start(chan);
-		return;
-	}
-
 	spin_lock_irqsave(&d40c->lock, flags);
 
 	list_splice_tail_init(&d40c->pending_queue, &d40c->queue);
@@ -2447,9 +2446,6 @@ static void d40_terminate_all(struct dma_chan *chan)
 	d40c->busy = false;
 
 	spin_unlock_irqrestore(&d40c->lock, flags);
-
-	if (d40c->cdesc)
-		stedma40_cyclic_free(chan);
 }
 
 static int
@@ -2708,194 +2704,32 @@ dma_addr_t stedma40_get_dst_addr(struct dma_chan *chan)
 }
 EXPORT_SYMBOL(stedma40_get_dst_addr);
 
-int stedma40_cyclic_start(struct dma_chan *chan)
+static struct dma_async_tx_descriptor *
+dma40_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t dma_addr,
+		     size_t buf_len, size_t period_len,
+		     enum dma_data_direction direction)
 {
-	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
-	unsigned long flags;
-	int ret = -EINVAL;
-
-	spin_lock_irqsave(&d40c->lock, flags);
-
-	if (!d40c->cdesc)
-		goto out;
-
-	d40_usage_inc(d40c);
-
-	ret = d40_start(d40c);
-	if (!ret)
-		d40c->busy = true;
-	else
-		d40_usage_dec(d40c);
-
-out:
-	spin_unlock_irqrestore(&d40c->lock, flags);
-	return ret;
-}
-EXPORT_SYMBOL(stedma40_cyclic_start);
-
-void stedma40_cyclic_stop(struct dma_chan *chan)
-{
-	d40_terminate_all(chan);
-}
-EXPORT_SYMBOL(stedma40_cyclic_stop);
-
-void stedma40_cyclic_free(struct dma_chan *chan)
-{
-	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
-	struct stedma40_cyclic_desc *cdesc;
-	unsigned long flags;
-
-	spin_lock_irqsave(&d40c->lock, flags);
-
-	cdesc = d40c->cdesc;
-	if (!cdesc) {
-		spin_unlock_irqrestore(&d40c->lock, flags);
-		return;
-	}
-
-	d40c->cdesc = NULL;
-	d40_lcla_free_all(d40c, cdesc->d40d);
-
-	spin_unlock_irqrestore(&d40c->lock, flags);
-
-	kfree(cdesc);
-}
-EXPORT_SYMBOL(stedma40_cyclic_free);
-
-struct stedma40_cyclic_desc *
-stedma40_cyclic_prep_sg(struct dma_chan *chan,
-			struct scatterlist *sgl,
-			unsigned int sg_len,
-			enum dma_data_direction direction,
-			unsigned long dma_flags)
-{
-	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
-	struct stedma40_cyclic_desc *cdesc;
-	struct d40_desc *d40d;
-	dma_addr_t dev_addr;
-	unsigned long flags;
-	void *mem;
-	int err;
-	dma_addr_t src_dev_addr = 0;
-	dma_addr_t dst_dev_addr = 0;
-
-	mem = kzalloc(sizeof(struct stedma40_cyclic_desc)
-		      + sizeof(struct d40_desc), GFP_ATOMIC);
-	if (!mem)
-		return ERR_PTR(-ENOMEM);
-
-	cdesc = mem;
-	d40d = cdesc->d40d = mem + sizeof(struct stedma40_cyclic_desc);
-
-	spin_lock_irqsave(&d40c->lock, flags);
-
-	if (d40c->phy_chan == NULL) {
-		chan_err(d40c, "Cannot prepare unallocated channel\n");
-		err = -EINVAL;
-		goto out;
-	}
-
-	if (d40c->cdesc || d40c->busy) {
-		chan_err(d40c, "Cannot prepare cyclic job for busy channel\n");
-		err = -EBUSY;
-		goto out;
-	}
-
-	d40d->cyclic = true;
-	d40d->txd.flags = dma_flags;
-	INIT_LIST_HEAD(&d40d->node);
-
-	err = d40_pool_lli_alloc(d40c, d40d, sg_len);
-	if (err < 0) {
-		chan_err(d40c, "Could not allocate lli\n");
-		goto out;
-	}
-
-	d40_usage_inc(d40c);
-
-	dev_addr = d40_get_dev_addr(d40c, direction);
-
-	if (direction == DMA_FROM_DEVICE)
-		src_dev_addr = dev_addr;
-	else if (direction == DMA_TO_DEVICE)
-		dst_dev_addr = dev_addr;
-
-	if (chan_is_logical(d40c))
-		err = d40_prep_sg_log(d40c, d40d, sgl, sgl,
-					sg_len, src_dev_addr, dst_dev_addr);
-	else
-		err = d40_prep_sg_phy(d40c, d40d, sgl, sgl,
-					sg_len, src_dev_addr, dst_dev_addr);
-
-	if (err) {
-		chan_err(d40c,"Failed to prepare %s slave sg job: %d\n",
-			chan_is_logical(d40c) ? "log" : "phy", err);
-		goto out2;
-	}
-
-	d40d->lli_len = sg_len;
-	d40d->lli_current = 0;
-
-	d40_desc_load(d40c, d40d);
-
-	/*
-	 * Couldn't get enough LCLA.  We don't support splitting of cyclic
-	 * jobs.
-	 */
-	if (d40d->lli_current != d40d->lli_len) {
-		chan_err(d40c,"Couldn't prepare cyclic job: not enough LCLA");
-		err = -EBUSY;
-		goto out2;
-	}
-
-	d40c->cdesc = cdesc;
-	d40_usage_dec(d40c);
-	spin_unlock_irqrestore(&d40c->lock, flags);
-	return cdesc;
-out2:
-	d40_usage_dec(d40c);
-out:
-	if (d40c->phy_chan)
-		d40_lcla_free_all(d40c, cdesc->d40d);
-	kfree(cdesc);
-	spin_unlock_irqrestore(&d40c->lock, flags);
-	return ERR_PTR(err);
-}
-EXPORT_SYMBOL(stedma40_cyclic_prep_sg);
-
-struct dma_async_tx_descriptor *
-dma40_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
-		      size_t buf_len, size_t period_len,
-		      enum dma_data_direction direction)
-{
-	unsigned int sg_len = buf_len / period_len;
-	struct stedma40_cyclic_desc *cdesc;
+	unsigned int periods = buf_len / period_len;
 	struct dma_async_tx_descriptor *txd;
 	struct scatterlist *sg;
 	int i;
 
-	sg = kzalloc(sizeof(struct scatterlist) * sg_len, GFP_ATOMIC);
-	if (!sg)
-		return ERR_PTR(-ENOMEM);
-
-	sg_init_table(sg, sg_len);
-	for (i = 0; i < sg_len; i++) {
-	        sg_dma_address(&sg[i]) = buf_addr + i * period_len;
-	        sg_dma_len(&sg[i]) = period_len;
+	sg = kcalloc(periods + 1, sizeof(struct scatterlist), GFP_ATOMIC);
+	for (i = 0; i < periods; i++) {
+		sg_dma_address(&sg[i]) = dma_addr;
+		sg_dma_len(&sg[i]) = period_len;
+		dma_addr += period_len;
 	}
 
-	cdesc = stedma40_cyclic_prep_sg(chan, sg, sg_len, direction,
-					DMA_PREP_INTERRUPT);
+	sg[periods].offset = 0;
+	sg[periods].length = 0;
+	sg[periods].page_link =
+		((unsigned long)sg | 0x01) & ~0x02;
+
+	txd = d40_prep_sg(chan, sg, sg, periods, direction,
+			  DMA_PREP_INTERRUPT);
+
 	kfree(sg);
-
-	if (IS_ERR(cdesc))
-		return ERR_PTR(PTR_ERR(cdesc));
-
-	txd = &cdesc->d40d->txd;
-
-	txd->flags = DMA_PREP_INTERRUPT;
-	dma_async_tx_descriptor_init(txd, chan);
-	txd->tx_submit = d40_tx_submit;
 
 	return txd;
 }
@@ -3140,6 +2974,13 @@ static int __init d40_phy_res_init(struct d40_base *base)
 		base->phy_res[chan].allocated_dst = D40_ALLOC_PHY;
 		base->phy_res[chan].reserved = true;
 		num_phy_chans_avail--;
+	}
+
+	/* Mark soft_lli channels */
+	for (i = 0; i < base->plat_data->num_of_soft_lli_chans; i++) {
+		int chan = base->plat_data->soft_lli_chans[i];
+
+		base->phy_res[chan].use_soft_lli = true;
 	}
 
 	dev_info(base->dev, "%d of %d physical DMA channels available\n",

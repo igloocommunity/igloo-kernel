@@ -13,6 +13,48 @@
 #include <linux/regulator/ab8500.h>
 #include "board-mop500-regulators.h"
 
+#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
+/*
+ * GPIO regulator controlled by the ab8500 GPIO16
+ */
+static struct regulator_consumer_supply gpio_wlan_vbat_consumers[] = {
+	/* for cg2900 chip */
+	REGULATOR_SUPPLY("vdd", "cg2900-uart.0"),
+	/* for cw1200 chip */
+	REGULATOR_SUPPLY("vdd", "cw1200_wlan"),
+};
+
+struct regulator_init_data gpio_wlan_vbat_regulator = {
+	.constraints = {
+		.name = "WLAN-VBAT",
+		.min_uV = 3600000,
+		.max_uV = 3600000,
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies = ARRAY_SIZE(gpio_wlan_vbat_consumers),
+	.consumer_supplies = gpio_wlan_vbat_consumers,
+};
+
+/*
+ * GPIO regulator controlled by the ab8500 GPIO26
+ */
+static struct regulator_consumer_supply gpio_en_3v3_consumers[] = {
+	/* for LAN chip */
+	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
+};
+
+struct regulator_init_data gpio_en_3v3_regulator = {
+	.constraints = {
+		.name = "EN-3V3",
+		.min_uV = 3300000,
+		.max_uV = 3300000,
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies = ARRAY_SIZE(gpio_en_3v3_consumers),
+	.consumer_supplies = gpio_en_3v3_consumers,
+};
+#endif
+
 /*
  * TPS61052 regulator
  */
@@ -38,6 +80,10 @@ struct regulator_init_data tps61052_regulator = {
 };
 
 static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
+	/* lps001wp baromenter i2c dev name is 2-005c
+	 * maybe change that in the driver, like for lsm303dlh drivers
+	 */
+	REGULATOR_SUPPLY("vdd", "2-005c"),
 	/* Main display, u8500 R3 uib */
 	REGULATOR_SUPPLY("vddi", "mcde_disp_sony_acx424akp.0"),
 	/* Main display, u8500 uib and ST uib */

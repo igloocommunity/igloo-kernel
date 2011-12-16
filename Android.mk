@@ -54,6 +54,20 @@ $(KERNEL_LIBPATH)/$(LOCAL_SRC_FILES): build-kernel
 
 include $(BUILD_PREBUILT)
 
+include $(CLEAR_VARS)
+
+KERNEL_LIBPATH := $(KERNEL_OUTPUT)/arch/arm/boot
+LOCAL_PATH := $(KERNEL_LIBPATH)
+LOCAL_SRC_FILES := zImage
+LOCAL_MODULE := $(LOCAL_SRC_FILES)
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := EXECUTABLES
+LOCAL_MODULE_PATH := $(PRODUCT_OUT)
+
+$(KERNEL_LIBPATH)/$(LOCAL_SRC_FILES): build-kernel
+
+include $(BUILD_PREBUILT)
+
 # Configures, builds and installs the kernel. KERNEL_DEFCONFIG usually
 # comes from the BoardConfig.mk file, but can be overridden on the
 # command line or by an environment variable.
@@ -128,9 +142,6 @@ clean clobber : clean-kernel
 
 clean-kernel:
 	$(MAKE) $(PRIVATE_KERNEL_ARGS) clean
-
-$(INSTALLED_KERNEL_TARGET): $(PRODUCT_OUT)/uImage
-	ln -sf $(notdir $<) $@
 
 
 endif

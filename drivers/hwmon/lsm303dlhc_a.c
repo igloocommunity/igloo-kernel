@@ -400,6 +400,13 @@ static ssize_t lsm303dlhc_a_store_mode(struct device *dev,
 
 	data = lsm303dlhc_a_read(ddata, CTRL_REG1, "CTRL_REG1");
 
+	/*
+	 * If chip doesn't get reset during suspend/resume,
+	 * x,y and z axis bits are getting cleared,so set
+	 * these bits to get x,y,z data.
+	 */
+	data |= LSM303DLHC_A_CR1_AXIS_ENABLE;
+
 	data &= ~LSM303DLHC_A_CR1_MODE_MASK;
 
 	ddata->mode = val;
@@ -518,6 +525,11 @@ static int __devinit lsm303dlhc_a_probe(struct i2c_client *client,
 	}
 
 	if (adata->regulator) {
+		/*
+		 * 130 microamps typical with magnetic sensor setting ODR = 7.5
+		 * Hz, Accelerometer sensor ODR = 50 Hz.  Double for safety.
+		 */
+		regulator_set_optimum_mode(adata->regulator, 130 * 2);
 		regulator_enable(adata->regulator);
 		adata->device_status = DEVICE_ON;
 	}

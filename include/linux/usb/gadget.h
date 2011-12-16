@@ -430,6 +430,8 @@ struct usb_gadget_ops {
 	int	(*pullup) (struct usb_gadget *, int is_on);
 	int	(*ioctl)(struct usb_gadget *,
 				unsigned code, unsigned long param);
+	struct usb_ep* (*configure_ep)(struct usb_gadget *, u8 type,
+				struct usb_endpoint_descriptor *);
 };
 
 /**

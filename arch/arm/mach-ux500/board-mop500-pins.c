@@ -13,6 +13,7 @@
 #include <asm/mach-types.h>
 #include <plat/pincfg.h>
 #include <linux/gpio/nomadik.h>
+#include <linux/mfd/ab8500/gpio.h>
 
 #include <mach/hardware.h>
 #include <mach/suspend.h>
@@ -201,6 +202,12 @@ static pin_cfg_t snowball_pins[] = {
 	/* MMC0: MicroSD card */
 	GPIO21_MC0_DAT31DIR     | PIN_OUTPUT_HIGH,
 
+	/* Snowball buttons */
+	GPIO32_GPIO		| PIN_INPUT_PULLUP, /* User PB   */
+	GPIO151_GPIO		| PIN_INPUT_PULLUP, /* J1 pin 8  */
+	GPIO152_GPIO		| PIN_INPUT_PULLUP, /* J1 pin 9  */
+	GPIO162_GPIO		| PIN_INPUT_PULLUP, /* J1 pin 14 */
+
 	/* MMC2: LAN */
 	GPIO86_SM_ADQ0,
 	GPIO87_SM_ADQ1,
@@ -237,6 +244,7 @@ static pin_cfg_t snowball_pins[] = {
 
 	/* WLAN/GBF */
 	GPIO171_GPIO		| PIN_OUTPUT_HIGH,/* GBF_ENA */
+	GPIO161_GPIO		| PIN_OUTPUT_LOW, /* WLAN_PMU_EN */
 	GPIO215_GPIO		| PIN_OUTPUT_LOW,/* WLAN_ENA */
 	GPIO216_GPIO		| PIN_INPUT_PULLUP,/* WLAN_IRQ */
 };
@@ -246,23 +254,31 @@ static pin_cfg_t snowball_pins[] = {
  */
 
 static UX500_PINS(mop500_pins_i2c0,
-	GPIO147_I2C0_SCL,
-	GPIO148_I2C0_SDA,
+	GPIO147_I2C0_SCL |
+		PIN_SLPM_GPIO | PIN_SLPM_INPUT_NOPULL,
+	GPIO148_I2C0_SDA |
+		PIN_SLPM_GPIO | PIN_SLPM_INPUT_NOPULL,
 );
 
 static UX500_PINS(mop500_pins_i2c1,
-	GPIO16_I2C1_SCL,
-	GPIO17_I2C1_SDA,
+	GPIO16_I2C1_SCL |
+		PIN_SLPM_GPIO | PIN_SLPM_INPUT_NOPULL,
+	GPIO17_I2C1_SDA |
+		PIN_SLPM_GPIO | PIN_SLPM_INPUT_NOPULL,
 );
 
 static UX500_PINS(mop500_pins_i2c2,
-	GPIO10_I2C2_SDA,
-	GPIO11_I2C2_SCL,
+	GPIO10_I2C2_SDA |
+		PIN_SLPM_GPIO | PIN_SLPM_INPUT_NOPULL,
+	GPIO11_I2C2_SCL |
+		PIN_SLPM_GPIO | PIN_SLPM_INPUT_NOPULL,
 );
 
 static UX500_PINS(mop500_pins_i2c3,
-	GPIO229_I2C3_SDA,
-	GPIO230_I2C3_SCL,
+	GPIO229_I2C3_SDA |
+		PIN_SLPM_GPIO | PIN_SLPM_INPUT_NOPULL,
+	GPIO230_I2C3_SCL |
+		PIN_SLPM_GPIO | PIN_SLPM_INPUT_NOPULL,
 );
 
 static UX500_PINS(mop500_pins_mcde_tvout,
@@ -431,6 +447,7 @@ static pin_cfg_t mop500_pins_common_power_save_bank0[] = {
 
 	GPIO8_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO9_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+	/* 10-11 - I2C2 */
 	GPIO10_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO11_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 
@@ -439,8 +456,10 @@ static pin_cfg_t mop500_pins_common_power_save_bank0[] = {
 	GPIO14_GPIO | PIN_SLPM_OUTPUT_LOW | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO15_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 
+	/* 16-17 - I2C1 */
 	GPIO16_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO17_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+
 	GPIO18_GPIO | PIN_SLPM_OUTPUT_HIGH | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO19_GPIO | PIN_SLPM_OUTPUT_HIGH | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 
@@ -473,6 +492,7 @@ static pin_cfg_t mop500_pins_common_power_save_bank0_href60[] = {
 
 	GPIO8_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO9_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+	/* 10-11 - I2C2 */
 	GPIO10_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO11_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 
@@ -481,11 +501,12 @@ static pin_cfg_t mop500_pins_common_power_save_bank0_href60[] = {
 	GPIO14_GPIO | PIN_SLPM_OUTPUT_LOW | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO15_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 
+	/* 16-17 - I2C1 */
 	GPIO16_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO17_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+
 	GPIO18_GPIO | PIN_SLPM_OUTPUT_HIGH | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO19_GPIO | PIN_SLPM_OUTPUT_HIGH | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
-
 	GPIO20_GPIO | PIN_SLPM_OUTPUT_HIGH | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO21_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO22_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
@@ -626,9 +647,11 @@ static pin_cfg_t mop500_pins_common_power_save_bank4[] = {
 	GPIO145_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 
 	GPIO146_GPIO | PIN_SLPM_OUTPUT_LOW | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
-	GPIO147_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 
+	/* 147-148 - I2C0 */
+	GPIO147_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO148_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+
 	GPIO149_GPIO | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO150_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO151_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
@@ -813,6 +836,7 @@ static pin_cfg_t mop500_pins_common_power_save_bank7[] = {
 	GPIO227_GPIO | PIN_SLPM_OUTPUT_LOW | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 
 	GPIO228_GPIO | PIN_SLPM_OUTPUT_LOW | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+	/* 229-230 - I2C3 */
 	GPIO229_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO230_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 };
@@ -824,6 +848,7 @@ static pin_cfg_t mop500_pins_common_power_save_bank7_href60[] = {
 	GPIO227_GPIO | PIN_SLPM_OUTPUT_LOW | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 
 	GPIO228_GPIO | PIN_SLPM_OUTPUT_LOW | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+	/* 229-230 - I2C3 */
 	GPIO229_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO230_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 };
@@ -971,6 +996,15 @@ int pins_for_u9500(void)
 	return 0;
 }
 
+static UX500_PINS(mop500_offchip_gpio_cfg,
+	/*
+	 * Workaround for auto shutdown of 3.2MHz oscillator during
+	 * deep sleep. APESPICSn/GPIO37 must be floating on the board
+	 * to use this fix.
+	 */
+	AB8500_PIN_GPIO37 | PIN_OUTPUT_HIGH,
+);
+
 void __init mop500_pins_init(void)
 {
 	nmk_config_pins(mop500_pins_common,
@@ -985,16 +1019,6 @@ void __init mop500_pins_init(void)
 		ux500_pins_add(mop500_runtime_pins_old,
 			       ARRAY_SIZE(mop500_runtime_pins_old));
 
-	if (machine_is_hrefv60())
-		nmk_config_pins(mop500_pins_hrefv60,
-				ARRAY_SIZE(mop500_pins_hrefv60));
-	else if (machine_is_snowball())
-		nmk_config_pins(snowball_pins,
-				ARRAY_SIZE(snowball_pins));
-	else
-		nmk_config_pins(mop500_pins_default,
-				ARRAY_SIZE(mop500_pins_default));
-
 	switch (pinsfor) {
 	case PINS_FOR_U9500:
 		nmk_config_pins(u9500_pins, ARRAY_SIZE(u9500_pins));
@@ -1006,7 +1030,26 @@ void __init mop500_pins_init(void)
 		break;
 	}
 
+	if (machine_is_hrefv60())
+		nmk_config_pins(mop500_pins_hrefv60,
+				ARRAY_SIZE(mop500_pins_hrefv60));
+	else if (machine_is_snowball())
+		nmk_config_pins(snowball_pins,
+				ARRAY_SIZE(snowball_pins));
+	else
+		nmk_config_pins(mop500_pins_default,
+				ARRAY_SIZE(mop500_pins_default));
+
 	suspend_set_pins_force_fn(mop500_pins_suspend_force,
 				  mop500_pins_suspend_force_mux);
 }
 
+static int __init mop500_offchip_gpio_init(void)
+{
+	if (machine_is_hrefv60())
+                ux500_offchip_gpio_init(&mop500_offchip_gpio_cfg);
+
+	return 0;
+}
+/* Let gpio chip drivers initialize. */
+late_initcall(mop500_offchip_gpio_init);

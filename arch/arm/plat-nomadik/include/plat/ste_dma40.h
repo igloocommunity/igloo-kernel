@@ -141,6 +141,12 @@ struct stedma40_chan_cfg {
  * @memcpy_conf_phy: default configuration of physical channel memcpy
  * @memcpy_conf_log: default configuration of logical channel memcpy
  * @disabled_channels: A vector, ending with -1, that marks physical channels
+ * @soft_lli_chans: A vector, that marks physical channels will use LLI by SW
+ * 		    which avoids HW bug that exists in some versions of the
+ * 		    controller. SoftLLI introduces relink overhead that could
+ *		    impact performace for certain use cases.
+ * @num_of_soft_lli_chans: The number of channels that needs to be configured
+ *			   to use SoftLLI.
  * @use_esram_lcla: flag for mapping the lcla into esram region
  * that are for different reasons not available for the driver.
  */
@@ -153,28 +159,12 @@ struct stedma40_platform_data {
 	struct stedma40_chan_cfg	*memcpy_conf_phy;
 	struct stedma40_chan_cfg	*memcpy_conf_log;
 	int				 disabled_channels[STEDMA40_MAX_PHYS];
+	int				*soft_lli_chans;
+	int				 num_of_soft_lli_chans;
 	bool				 use_esram_lcla;
 };
 
 struct d40_desc;
-
-/**
- * struct stedma40_cyclic_desc - Cyclic DMA descriptor
- * @d40d: DMA driver internal descriptor
- * @period_callback: callback to be called after every link/period if
- *		     the DMA_PREP_INTERRUPT flag is used when preparing
- *		     the transaction
- * @period_callback_param: handle passed to the period_callback
- *
- * A pointer to a structure of this type is returned from the
- * stedma40_cyclic_prep_sg() function.  The period_callback and
- * period_callback_param members can be set by the client.
- */
-struct stedma40_cyclic_desc {
-	struct d40_desc *d40d;
-	dma_async_tx_callback period_callback;
-	void *period_callback_param;
-};
 
 int stedma40_set_dev_addr(struct dma_chan *chan,
 			  dma_addr_t src_dev_addr,
@@ -197,52 +187,6 @@ dma_addr_t stedma40_get_src_addr(struct dma_chan *chan);
  * written by the DMA.
  */
 dma_addr_t stedma40_get_dst_addr(struct dma_chan *chan);
-
-/**
- * stedma40_cyclic_prep_sg - prepare a cyclic DMA transfer
- * @chan: the DMA channel to prepare
- * @sgl: scatter list
- * @sg_len: number of links in the scatter list
- * @direction: transfer direction, to or from device
- * @dma_flags: DMA_PREP_INTERRUPT if a callback is required after every link.
- *	       See period_callback in struct stedma40_cyclic_desc.
- *
- * Must be called before trying to start a cyclic DMA transfer.  Returns
- * ERR_PTR(-errno) on failure.
- */
-struct stedma40_cyclic_desc *
-stedma40_cyclic_prep_sg(struct dma_chan *chan,
-			struct scatterlist *sgl,
-			unsigned int sg_len,
-			enum dma_data_direction direction,
-			unsigned long dma_flags);
-
-/**
- * stedma40_cyclic_start - start the cyclic DMA transfer
- * @chan: the DMA channel to start
- *
- * The cyclic DMA must have been prepared earlier with
- * stedma40_cyclic_prep_sg().
- */
-int stedma40_cyclic_start(struct dma_chan *chan);
-
-/**
- * stedma40_cyclic_stop() - stop the cyclic DMA transfer
- * @chan: the DMA channel to stop
- *
- * Stops a cyclic DMA transfer which was previously started with
- * stedma40_cyclic_start().
- */
-void stedma40_cyclic_stop(struct dma_chan *chan);
-
-/**
- * stedma40_cyclic_free() - free cyclic DMA resources
- * @chan: the DMA channel
- *
- * Must be called to free any resources used for cyclic DMA which have been
- * allocated in stedma40_cyclic_prep_sg().
- */
-void stedma40_cyclic_free(struct dma_chan *chan);
 
 /**
  * setdma40_residue() - Returna the remaining bytes to transfer.

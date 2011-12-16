@@ -137,9 +137,14 @@ static void cpufreq_interactive_timer(unsigned long data)
 
 	if (delta_idle > delta_time)
 		cpu_load = 0;
-	else
-		cpu_load = 100 * (delta_time - delta_idle) / delta_time;
+	else {
+		unsigned long long load;
 
+		load = 100llu * (delta_time - delta_idle);
+		do_div(load, delta_time);
+
+		cpu_load = load;
+	}
 	delta_idle = (unsigned int) cputime64_sub(now_idle,
 						pcpu->freq_change_time_in_idle);
 	delta_time = (unsigned int) cputime64_sub(pcpu->timer_run_time,
@@ -147,9 +152,14 @@ static void cpufreq_interactive_timer(unsigned long data)
 
 	if (delta_idle > delta_time)
 		load_since_change = 0;
-	else
-		load_since_change =
-			100 * (delta_time - delta_idle) / delta_time;
+	else {
+		unsigned long long load;
+
+		load = 100llu * (delta_time - delta_idle);
+		do_div(load, delta_time);
+
+		load_since_change = load;
+	}
 
 	/*
 	 * Choose greater of short-term load (since last idle timer
