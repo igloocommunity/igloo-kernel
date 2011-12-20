@@ -290,6 +290,8 @@ static void ab8500_power_loss_handling(struct ab8500_charger *di)
 
 	if (di->autopower)
 		regs[0x0] |= 0x8;
+	else
+		regs[0x0] &= ~0x8;
 
 	for (loop = 0 ; loop < banksize; loop++)
 		(void) abx500_set_register_interruptible(di->dev, 0x15,
