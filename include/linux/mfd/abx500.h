@@ -374,6 +374,7 @@ struct abx500_bm_charger_parameters {
  * @abx500_adc_therm	placement of thermistor, batctrl or battemp adc
  * @chg_unknown_bat	flag to enable charging of unknown batteries
  * @enable_overshoot	flag to enable VBAT overshoot control
+ * @auto_trig		flag to enable auto adc trigger
  * @fg_res		resistance of FG resistor in 0.1mOhm
  * @n_btypes		number of elements in array bat_type
  * @batt_id		index of the identified battery in array bat_type
@@ -399,6 +400,7 @@ struct abx500_bm_data {
 	bool no_maintenance;
 	bool chg_unknown_bat;
 	bool enable_overshoot;
+	bool auto_trig;
 	enum abx500_adc_therm adc_therm;
 	int fg_res;
 	int n_btypes;
