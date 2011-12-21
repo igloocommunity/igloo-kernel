@@ -20,7 +20,9 @@
 #include <linux/amba/pl022.h>
 #include <linux/amba/serial.h>
 #include <linux/spi/spi.h>
+#ifdef CONFIG_HSI
 #include <linux/hsi/hsi.h>
+#endif
 #include <linux/mfd/ab8500.h>
 #include <linux/regulator/ab8500.h>
 #include <linux/mfd/tc3589x.h>
@@ -32,7 +34,9 @@
 #include <linux/gpio_keys.h>
 #include <linux/delay.h>
 #include <linux/mfd/ab8500/denc.h>
+#ifdef CONFIG_STM_MSP_I2S
 #include <linux/spi/stm_msp.h>
+#endif
 #include <linux/leds_pwm.h>
 #include <linux/pwm_backlight.h>
 #include <linux/gpio/nomadik.h>
@@ -49,14 +53,20 @@
 #include <mach/setup.h>
 #include <mach/devices.h>
 #include <mach/sensors1p.h>
+#ifdef CONFIG_INPUT_AB8500_ACCDET
 #include <mach/abx500-accdet.h>
+#endif
 #include <mach/irqs.h>
 #include <mach/ste-dma40-db8500.h>
 #ifdef CONFIG_U8500_SIM_DETECT
 #include <mach/sim_detect.h>
 #endif
+#ifdef CONFIG_CRYPTO_DEV_UX500
 #include <mach/crypto-ux500.h>
+#endif
+#ifdef CONFIG_AV8100
 #include <video/av8100.h>
+#endif
 
 #ifdef CONFIG_KEYBOARD_NOMADIK_SKE
 #include <plat/ske.h>
@@ -68,7 +78,9 @@
 #include "board-mop500.h"
 #include "board-mop500-regulators.h"
 #include "board-mop500-bm.h"
+#if defined(CONFIG_CW1200) || defined(CONFIG_CW1200_MODULE)
 #include "board-mop500-wlan.h"
+#endif
 
 #ifdef CONFIG_AB8500_DENC
 static struct ab8500_denc_platform_data ab8500_denc_pdata = {
@@ -515,6 +527,7 @@ static struct lp5521_led_config lp5521_pri_led[] = {
 	},
 };
 
+#ifdef CONFIG_AV8100
 static struct av8100_platform_data av8100_plat_data = {
 	.irq			= NOMADIK_GPIO_TO_IRQ(192),
 	.reset			= MOP500_HDMI_RST_GPIO,
@@ -523,7 +536,7 @@ static struct av8100_platform_data av8100_plat_data = {
 	.alt_powerupseq		= true,
 	.mclk_freq		= 3, /* MCLK_RNG_31_38 */
 };
-
+#endif
 
 static struct lp5521_platform_data __initdata lp5521_pri_data = {
 	.label		= "lp5521_pri",
@@ -563,20 +576,24 @@ static struct i2c_board_info __initdata mop500_i2c0_devices[] = {
 		.irq		= NOMADIK_GPIO_TO_IRQ(217),
 		.platform_data  = &mop500_tc35892_data,
 	},
+#ifdef CONFIG_AV8100
 	{
 		I2C_BOARD_INFO("av8100", 0x70),
 		.platform_data = &av8100_plat_data,
 	},
+#endif
 	/* I2C0 devices only available prior to HREFv60 */
 };
 
 #define NUM_PRE_V60_I2C0_DEVICES 1
 
 static struct i2c_board_info __initdata snowball_i2c0_devices[] = {
+#ifdef CONFIG_AV8100
 	{
 		I2C_BOARD_INFO("av8100", 0x70),
 		.platform_data = &av8100_plat_data,
 	},
+#endif
 };
 
 static struct i2c_board_info __initdata mop500_i2c2_devices[] = {
@@ -878,6 +895,7 @@ struct platform_device sensors1p_device = {
 };
 #endif
 
+#ifdef CONFIG_CRYPTO_DEV_UX500
 static struct cryp_platform_data u8500_cryp1_platform_data = {
 	.mem_to_engine = {
 		.dir = STEDMA40_MEM_TO_PERIPH,
@@ -913,6 +931,7 @@ static struct hash_platform_data u8500_hash1_platform_data = {
 		.dst_info.psize = STEDMA40_PSIZE_LOG_16,
 	},
 };
+#endif
 
 /* add any platform devices here - TODO */
 static struct platform_device *mop500_platform_devs[] __initdata = {
@@ -928,7 +947,9 @@ static struct platform_device *mop500_platform_devs[] __initdata = {
 	&ux500_mmio_device,
 #endif
 	&ux500_hwmem_device,
+#ifdef CONFIG_FB_MCDE
 	&u8500_mcde_device,
+#endif
 	&u8500_b2r2_device,
 	&u8500_thsens_device,
 #ifdef CONFIG_STE_TRACE_MODEM
@@ -953,6 +974,7 @@ static struct platform_device *mop500_platform_devs[] __initdata = {
 #endif
 };
 
+#ifdef CONFIG_STM_MSP_I2S
 /*
  * MSP-SPI
  */
@@ -1006,12 +1028,18 @@ static struct pl022_ssp_controller ssp0_platform_data = {
 	.num_chipselect = NUM_SSP_CLIENTS,
 };
 
+
 static void __init mop500_spi_init(void)
 {
 	db8500_add_ssp0(&ssp0_platform_data);
 	if (!machine_is_snowball())
 		db8500_add_msp2_spi(&mop500_msp2_spi_data);
 }
+#else
+static void __init mop500_spi_init(void)
+{
+}
+#endif /* CONFIG_STM_MSP_I2S */
 
 #ifdef CONFIG_STE_DMA40_REMOVE
 static struct stedma40_chan_cfg uart0_dma_cfg_rx = {
@@ -1156,8 +1184,10 @@ static void __init mop500_uart_init(void)
 
 static void __init u8500_cryp1_hash1_init(void)
 {
+#ifdef CONFIG_CRYPTO_DEV_UX500
 	db8500_add_cryp1(&u8500_cryp1_platform_data);
 	db8500_add_hash1(&u8500_hash1_platform_data);
+#endif
 }
 
 static struct platform_device *snowball_platform_devs[] __initdata = {
@@ -1171,7 +1201,9 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
 	&snowball_gpio_wlan_vbat_regulator_device,
 #endif
 	&snowball_sbnet_dev,
+#ifdef CONFIG_FB_MCDE
 	&u8500_mcde_device,
+#endif
 	&u8500_b2r2_device,
 };
 
@@ -1213,11 +1245,10 @@ static void __init mop500_init_machine(void)
 	mop500_spi_init();
 	mop500_uart_init();
 
-	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
-
-	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
+	i2c_register_board_info(0, mop500_i2c0_devices,
+			ARRAY_SIZE(mop500_i2c0_devices));
 	i2c_register_board_info(2, mop500_i2c2_devices,
-				ARRAY_SIZE(mop500_i2c2_devices));
+			ARRAY_SIZE(mop500_i2c2_devices));
 
 	/* This board has full regulator constraints */
 	regulator_has_full_constraints();
@@ -1279,10 +1310,14 @@ static void __init hrefv60_init_machine(void)
 
 	mop500_i2c_init();
 	mop500_sdi_init();
-	mop500_msp_init();
 	mop500_spi_init();
 	mop500_uart_init();
+#ifdef CONFIG_STM_MSP_I2S
+	mop500_msp_init();
+#endif
+#if defined(CONFIG_CW1200) || defined(CONFIG_CW1200_MODULE)
 	mop500_wlan_init();
+#endif
 
 #ifdef CONFIG_KEYBOARD_NOMADIK_SKE
 	db8500_add_ske_keypad(&mop500_ske_keypad_data);
@@ -1295,9 +1330,11 @@ static void __init hrefv60_init_machine(void)
 	i2c_register_board_info(2, mop500_i2c2_devices,
 			ARRAY_SIZE(mop500_i2c2_devices));
 
+#ifdef CONFIG_SENSORS_LSM303DLH
 	/* Snowball want sensors, u8500 get them from stuib */
 	if (machine_is_snowball())
 		mop500_sensors_init();
+#endif
 
 	/* This board has full regulator constraints */
 	regulator_has_full_constraints();

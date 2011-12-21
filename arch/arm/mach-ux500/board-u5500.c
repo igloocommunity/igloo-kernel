@@ -12,15 +12,23 @@
 #include <linux/i2c.h>
 #include <linux/mfd/ab5500/ab5500.h>
 #include <linux/amba/pl022.h>
+#ifdef CONFIG_STM_I2S
 #include <linux/i2s/i2s.h>
+#endif
 #include <linux/led-lm3530.h>
 #include <../drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h>
 #include <linux/input/matrix_keypad.h>
+#ifdef CONFIG_SENSORS_LSM303DLH
 #include <linux/lsm303dlh.h>
+#endif
 #include <linux/leds-ab5500.h>
+#ifdef CONFIG_TOUCHSCREEN_CYTTSP_SPI
 #include <linux/cyttsp.h>
+#endif
 
+#ifdef CONFIG_AV8100
 #include <video/av8100.h>
+#endif
 
 #include <asm/mach/arch.h>
 #include <asm/mach-types.h>
@@ -30,7 +38,9 @@
 
 #include <mach/hardware.h>
 #include <mach/ste-dma40-db5500.h>
+#ifdef CONFIG_STM_I2S
 #include <mach/msp.h>
+#endif
 #include <mach/devices.h>
 #include <mach/setup.h>
 #include <mach/db5500-keypad.h>
@@ -44,6 +54,7 @@
 #include "board-u5500-bm.h"
 #include "board-u5500-wlan.h"
 
+#ifdef CONFIG_SENSORS_LSM303DLH
 /*
  * LSM303DLH
  */
@@ -58,6 +69,7 @@ static struct lsm303dlh_platform_data __initdata lsm303dlh_pdata = {
 	.negative_y = 0,
 	.negative_z = 1,
 };
+#endif
 
 /*
  * Touchscreen
@@ -185,6 +197,7 @@ static struct i2c_board_info __initdata u5500_i2c1_devices[] = {
 };
 
 static struct i2c_board_info __initdata u5500v1_i2c2_sensor_devices[] = {
+#ifdef CONFIG_SENSORS_LSM303DLH
  	{
  		/* LSM303DLH Accelerometer */
  		I2C_BOARD_INFO("lsm303dlh_a", 0x19),
@@ -195,9 +208,11 @@ static struct i2c_board_info __initdata u5500v1_i2c2_sensor_devices[] = {
 		I2C_BOARD_INFO("lsm303dlh_m", 0x1E),
 		.platform_data = &lsm303dlh_pdata,
 	},
+#endif
 };
 
 static struct i2c_board_info __initdata u5500v2_i2c2_sensor_devices[] = {
+#ifdef CONFIG_SENSORS_LSM303DLH
 	{
 		/* LSM303DLHC Accelerometer */
 		I2C_BOARD_INFO("lsm303dlhc_a", 0x19),
@@ -208,6 +223,7 @@ static struct i2c_board_info __initdata u5500v2_i2c2_sensor_devices[] = {
 		I2C_BOARD_INFO("lsm303dlh_m", 0x1E),
 		.platform_data = &lsm303dlh_pdata,
 	},
+#endif
 };
 
 static struct i2c_board_info __initdata u5500_i2c2_devices[] = {
@@ -331,6 +347,7 @@ static struct db5500_keypad_platform_data u5500_keypad_board = {
 	.switch_delay	= 200, /* in jiffies */
 };
 
+#ifdef CONFIG_STM_I2S
 /*
  * MSP
  */
@@ -402,6 +419,11 @@ static void __init u5500_msp_init(void)
 
 	i2s_register_board_info(ARRAY_AND_SIZE(stm_i2s_board_info));
 }
+#else
+static void __init u5500_msp_init(void)
+{
+}
+#endif
 
 /*
  * SPI
@@ -529,7 +551,9 @@ static struct hash_platform_data u5500_hash1_platform_data = {
 
 static struct platform_device *u5500_platform_devices[] __initdata = {
 	&u5500_ab5500_device,
+#ifdef CONFIG_FB_MCDE
 	&u5500_mcde_device,
+#endif
 	&ux500_hwmem_device,
 	&u5500_b2r2_device,
 	&u5500_mloader_device,
