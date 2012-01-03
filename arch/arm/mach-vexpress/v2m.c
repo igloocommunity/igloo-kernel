@@ -442,11 +442,17 @@ static void __init v2m_init(void)
 	ct_desc->init_tile();
 }
 
+static const char *vexpress_dt_match[] __initdata = {
+	"arm,vexpress",
+	NULL,
+};
+
 MACHINE_START(VEXPRESS, "ARM-Versatile Express")
-	.boot_params	= PLAT_PHYS_OFFSET + 0x00000100,
+	.atag_offset	= 0x100,
 	.map_io		= v2m_map_io,
 	.init_early	= v2m_init_early,
 	.init_irq	= v2m_init_irq,
 	.timer		= &v2m_timer,
 	.init_machine	= v2m_init,
+	.dt_compat	= vexpress_dt_match,
 MACHINE_END

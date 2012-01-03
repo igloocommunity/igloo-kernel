@@ -3287,11 +3287,7 @@ static int l2cap_streaming_reassembly_sdu(struct l2cap_chan *chan, struct sk_buf
 			break;
 		}
 
-		err = chan->ops->recv(chan->data, skb);
-		if (!err)
-			return 0;
-
-		break;
+		return chan->ops->recv(chan->data, skb);
 
 	case L2CAP_SDU_START:
 		if (test_bit(CONN_SAR_SDU, &chan->conn_state)) {
@@ -3793,6 +3789,7 @@ static inline int l2cap_data_channel(struct l2cap_conn *conn, u16 cid, struct sk
 {
 	struct l2cap_chan *chan;
 	struct sock *sk = NULL;
+	struct l2cap_pinfo *pi;
 	u16 control;
 	u8 tx_seq;
 	int len;
@@ -3804,7 +3801,7 @@ static inline int l2cap_data_channel(struct l2cap_conn *conn, u16 cid, struct sk
 	}
 
 	sk = chan->sk;
-
+	pi = l2cap_pi(sk);
 	BT_DBG("chan %p, len %d", chan, skb->len);
 
 	if (chan->state != BT_CONNECTED)
