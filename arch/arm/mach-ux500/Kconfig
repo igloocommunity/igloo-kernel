@@ -138,4 +138,6 @@ config UX500_L2X0_PREFETCH_CTRL
 
 source "arch/arm/mach-ux500/pm/Kconfig"
 
+source "arch/arm/mach-ux500/Kconfig-arch"
+
 endif
