@@ -71,6 +71,7 @@ struct mmc_ext_csd {
 	bool			hpi_en;			/* HPI enablebit */
 	bool			hpi;			/* HPI support bit */
 	unsigned int		hpi_cmd;		/* cmd used as HPI */
+	unsigned int		boot_locked;
 	u8			raw_partition_support;	/* 160 */
 	u8			raw_erased_mem_count;	/* 181 */
 	u8			raw_ext_csd_structure;	/* 194 */
@@ -177,6 +178,14 @@ struct sdio_func_tuple;
 #define MAX_MMC_PART_NAME_LEN	20
 
 /*
+ * Partition area type, boot or gp
+ */
+enum mmc_part_area_type {
+	MMC_BLK_DATA_AREA_BOOT,
+	MMC_BLK_DATA_AREA_GP,
+};
+
+/*
  * MMC Physical partitions
  */
 struct mmc_part {
@@ -184,6 +193,7 @@ struct mmc_part {
 	unsigned int	part_cfg;	/* partition type */
 	char	name[MAX_MMC_PART_NAME_LEN];
 	bool	force_ro;	/* to make boot parts RO by default */
+	int	area_type;
 };
 
 /*
@@ -261,12 +271,14 @@ struct mmc_card {
  * This function fill contents in mmc_part.
  */
 static inline void mmc_part_add(struct mmc_card *card, unsigned int size,
-			unsigned int part_cfg, char *name, int idx, bool ro)
+			unsigned int part_cfg, char *name, int idx, bool ro,
+			int area_type)
 {
 	card->part[card->nr_parts].size = size;
 	card->part[card->nr_parts].part_cfg = part_cfg;
 	sprintf(card->part[card->nr_parts].name, name, idx);
 	card->part[card->nr_parts].force_ro = ro;
+	card->part[card->nr_parts].area_type = area_type;
 	card->nr_parts++;
 }
 
