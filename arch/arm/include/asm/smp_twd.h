@@ -25,4 +25,12 @@ extern void __iomem *twd_base;
 void twd_timer_setup(struct clock_event_device *);
 void twd_timer_stop(struct clock_event_device *);
 
+#if defined(CONFIG_HOTPLUG) || defined(CONFIG_CPU_IDLE)
+void twd_save(void);
+void twd_restore(void);
+#else
+static inline void twd_save(void) { }
+static inline void twd_restore(void) { }
+#endif
+
 #endif

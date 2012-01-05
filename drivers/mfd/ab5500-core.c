@@ -22,8 +22,8 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/random.h>
-#include <linux/mfd/ab5500/ab5500.h>
 #include <linux/mfd/abx500.h>
+#include <linux/mfd/abx500/ab5500.h>
 #include <linux/list.h>
 #include <linux/bitops.h>
 #include <linux/spinlock.h>
@@ -388,7 +388,7 @@ static struct ab5500_i2c_banks ab5500_bank_ranges[AB5500_NUM_DEVICES] = {
 			},
 		},
 	},
-	[AB5500_DEVID_FUELGAUGE] =   {
+	[AB5500_DEVID_FG] =   {
 		.nbanks = 1,
 		.bank = (struct ab5500_i2c_ranges []) {
 			{
@@ -594,9 +594,9 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			},
 		},
 	},
-	[AB5500_DEVID_FUELGAUGE] = {
+	[AB5500_DEVID_FG] = {
 		.name = "ab5500-fuelgauge",
-		.id = AB5500_DEVID_FUELGAUGE,
+		.id = AB5500_DEVID_FG,
 		.num_resources = 6,
 		.resources = (struct resource[]) {
 			{
@@ -992,6 +992,74 @@ static struct mfd_cell ab5500_devs[AB5500_NUM_DEVICES] = {
 			},
 		},
 	},
+	[AB5500_DEVID_TEMPMON] = {
+		.name = "abx500-temp",
+		.id = AB5500_DEVID_TEMPMON,
+		.num_resources = 1,
+		.resources = (struct resource[]) {
+			{
+				.name   = "ABX500_TEMP_WARM",
+				.flags  = IORESOURCE_IRQ,
+				.start  = AB5500_IRQ(2, 2),
+				.end    = AB5500_IRQ(2, 2),
+			},
+		},
+	},
+	[AB5500_DEVID_ACCDET] = {
+		.name = "ab5500-acc-det",
+		.id = AB5500_DEVID_ACCDET,
+		.num_resources = 8,
+		.resources = (struct resource[]) {
+			{
+				.name	= "acc_detedt22db_rising",
+				.flags	= IORESOURCE_IRQ,
+				.start	= AB5500_IRQ(2, 7),
+				.end	= AB5500_IRQ(2, 7),
+			},
+				{
+				.name	= "acc_detedt21db_falling",
+				.flags	= IORESOURCE_IRQ,
+				.start	= AB5500_IRQ(2, 6),
+				.end	= AB5500_IRQ(2, 6),
+			},
+			{
+				.name	= "acc_detedt21db_rising",
+				.flags	= IORESOURCE_IRQ,
+				.start	= AB5500_IRQ(2, 5),
+				.end	= AB5500_IRQ(2, 5),
+			},
+			{
+				.name	= "acc_detedt3db_falling",
+				.flags	= IORESOURCE_IRQ,
+				.start	= AB5500_IRQ(3, 4),
+				.end	= AB5500_IRQ(3, 4),
+			},
+			{
+				.name	= "acc_detedt3db_rising",
+				.flags	= IORESOURCE_IRQ,
+				.start	= AB5500_IRQ(3, 3),
+				.end	= AB5500_IRQ(3, 3),
+			},
+			{
+				.name	= "acc_detedt1db_falling",
+				.flags	= IORESOURCE_IRQ,
+				.start	= AB5500_IRQ(3, 2),
+				.end	= AB5500_IRQ(3, 2),
+			},
+			{
+				.name	= "acc_detedt1db_rising",
+				.flags	= IORESOURCE_IRQ,
+				.start	= AB5500_IRQ(3, 1),
+				.end	= AB5500_IRQ(3, 1),
+			},
+			{
+				.name	= "acc_detedt22db_falling",
+				.flags	= IORESOURCE_IRQ,
+				.start	= AB5500_IRQ(3, 0),
+				.end	= AB5500_IRQ(3, 0),
+			},
+		},
+	},
 };
 
 /*
@@ -1301,6 +1369,10 @@ static const struct ab_family_id ids[] __initdata = {
 	{
 		.id = AB5500_1_1,
 		.name = "1.1"
+	},
+	{
+		.id = AB5500_2_0,
+		.name = "2.0"
 	},
 	/* Terminator */
 	{
