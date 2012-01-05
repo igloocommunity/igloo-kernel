@@ -22,4 +22,14 @@ struct ux500_musb_board_data {
 
 void ux500_add_usb(resource_size_t base, int irq, int *dma_rx_cfg,
 	int *dma_tx_cfg);
+
+struct abx500_usbgpio_platform_data {
+	int (*get)(struct device *device);
+	void (*enable)(void);
+	void (*disable)(void);
+	void (*put)(void);
+	int usb_cs;
+};
+
+void ux500_restore_context(void);
 #endif

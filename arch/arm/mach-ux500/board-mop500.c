@@ -78,6 +78,7 @@
 #include "board-mop500.h"
 #include "board-mop500-regulators.h"
 #include "board-mop500-bm.h"
+#include "board-ux500-usb.h"
 #if defined(CONFIG_CW1200) || defined(CONFIG_CW1200_MODULE)
 #include "board-mop500-wlan.h"
 #endif
@@ -276,6 +277,7 @@ static struct ab8500_platform_data ab8500_platdata = {
        .pm_power_off = true,
 #endif
 	.thermal_time_out = 20, /* seconds */
+	.usb		= &abx500_usbgpio_plat_data,
 };
 
 static struct resource ab8500_resources[] = {
