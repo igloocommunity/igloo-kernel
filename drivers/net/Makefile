@@ -66,3 +66,7 @@ obj-$(CONFIG_USB_USBNET)        += usb/
 obj-$(CONFIG_USB_ZD1201)        += usb/
 obj-$(CONFIG_USB_IPHETH)        += usb/
 obj-$(CONFIG_USB_CDC_PHONET)   += usb/
+
+ifdef CONFIG_PHONET
+obj-$(CONFIG_U8500_SHRM) += u8500_shrm.o
+endif
