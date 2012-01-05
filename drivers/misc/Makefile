@@ -49,5 +49,6 @@ obj-y				+= carma/
 obj-$(CONFIG_STM_TRACE) 	+= stm.o
 obj-$(CONFIG_HWMEM)             += hwmem/
 obj-$(CONFIG_DISPDEV)		+= dispdev/
+obj-$(CONFIG_STM_I2S)		+= i2s/
 obj-$(CONFIG_USB_SWITCH_FSA9480) += fsa9480.o
 obj-$(CONFIG_ALTERA_STAPL)	+=altera-stapl/
