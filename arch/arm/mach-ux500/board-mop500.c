@@ -875,7 +875,6 @@ static struct platform_device *mop500_platform_devs[] __initdata = {
 #ifdef CONFIG_U8500_SIM_DETECT
 	&u8500_sim_detect_device,
 #endif
-	&u8500_shrm_device,
 	&ste_ff_vibra_device,
 #ifdef CONFIG_U8500_MMIO
 	&ux500_mmio_device,
@@ -886,9 +885,6 @@ static struct platform_device *mop500_platform_devs[] __initdata = {
 #endif
 	&u8500_b2r2_device,
 	&u8500_thsens_device,
-#ifdef CONFIG_STE_TRACE_MODEM
-	&u8500_trace_modem,
-#endif
 #ifdef CONFIG_LEDS_PWM
 	&ux500_leds_device,
 #endif
@@ -901,9 +897,6 @@ static struct platform_device *mop500_platform_devs[] __initdata = {
 #endif
 #ifdef CONFIG_HSI
 	&u8500_hsi_device,
-#endif
-#ifdef CONFIG_MODEM_U8500
-	&u8500_modem_dev,
 #endif
 };
 
@@ -1153,6 +1146,13 @@ static void __init mop500_init_machine(void)
 	platform_add_devices(mop500_platform_devs,
 			ARRAY_SIZE(mop500_platform_devs));
 
+	platform_device_register(&u8500_shrm_device);
+#ifdef CONFIG_STE_TRACE_MODEM
+	platform_device_register(&u8500_trace_modem);
+#endif
+#ifdef CONFIG_MODEM_U8500
+	platform_device_register(&u8500_modem_dev);
+#endif
 	mop500_i2c_init();
 	mop500_sdi_init();
 	mop500_spi_init();
@@ -1252,6 +1252,16 @@ static void __init hrefv60_init_machine(void)
 
 	platform_add_devices(mop500_platform_devs,
 			ARRAY_SIZE(mop500_platform_devs));
+
+	if (!cpu_is_u9500()) {
+		platform_device_register(&u8500_shrm_device);
+#ifdef CONFIG_STE_TRACE_MODEM
+		platform_device_register(&u8500_trace_modem);
+#endif
+#ifdef CONFIG_MODEM_U8500
+		platform_device_register(&u8500_modem_dev);
+#endif
+	}
 
 	mop500_i2c_init();
 	hrefv60_sdi_init();
