@@ -155,14 +155,29 @@ static const struct battery_type bat_type[] = {
 		.name = POWER_SUPPLY_TECHNOLOGY_UNKNOWN,
 		.resis_high = 0,
 		.resis_low = 0,
+#ifdef CONFIG_AB8500_9100_LI_ION_BATTERY
+		.battery_resistance = 180,
+		.charge_full_design = 2600,
+#else
 		.battery_resistance = 300,
 		.charge_full_design = 612,
+#endif
 		.nominal_voltage = 3700,
+#ifdef CONFIG_AB8500_9100_LI_ION_BATTERY
+		.termination_vol = 4150,
+#else
 		.termination_vol = 4050,
+#endif
 		.termination_curr = 200,
+#ifdef CONFIG_AB8500_9100_LI_ION_BATTERY
+		.recharge_vol = 4130,
+		.normal_cur_lvl = 520,
+		.normal_vol_lvl = 4200,
+#else
 		.recharge_vol = 3990,
 		.normal_cur_lvl = 400,
 		.normal_vol_lvl = 4100,
+#endif
 		.maint_a_cur_lvl = 400,
 		.maint_a_vol_lvl = 4050,
 		.maint_a_chg_timer_h = 60,
@@ -399,13 +414,21 @@ struct ab8500_bm_data ab8500_bm_data = {
 	.usb_safety_tmr_h	= 4,
 	.bkup_bat_v		= BUP_VCH_SEL_2P6V,
 	.bkup_bat_i		= BUP_ICH_SEL_150UA,
+#ifdef CONFIG_AB8500_9100_LI_ION_BATTERY
+	.no_maintenance		= true,
+#else
 	.no_maintenance		= false,
+#endif
 #ifdef CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL
 	.adc_therm		= ADC_THERM_BATCTRL,
 #else
 	.adc_therm		= ADC_THERM_BATTEMP,
 #endif
+#ifdef CONFIG_AB8500_9100_LI_ION_BATTERY
+	.chg_unknown_bat	= true,
+#else
 	.chg_unknown_bat	= false,
+#endif
 	.enable_overshoot	= false,
 	.fg_res			= 10,
 	.cap_levels		= &cap_levels,
