@@ -1321,3 +1321,14 @@ MACHINE_START(SNOWBALL, "ST-Ericsson Snowball platform")
 	.init_machine	= snowball_init_machine,
 	.restart	= ux500_restart,
 MACHINE_END
+
+/* Tempoary reuse hrefv60 machine */
+MACHINE_START(U9540, "ST-Ericsson 9540 platform")
+	.atag_offset	= 0x100,
+	.map_io		= u8500_map_io,
+	.init_irq	= ux500_init_irq,
+	.timer		= &ux500_timer,
+	.handle_irq	= gic_handle_irq,
+	.init_machine	= hrefv60_init_machine,
+	.restart	= ux500_restart,
+MACHINE_END
