@@ -779,7 +779,6 @@ static struct led_pwm pwm_leds_data[] = {
 		.lth_brightness = 90,
 		.pwm_period_ns = 1023,
 	},
-#ifdef CONFIG_DISPLAY_GENERIC_DSI_SECONDARY
 	[1] = {
 		.name = "sec-lcd-backlight",
 		.pwm_id = 2,
@@ -787,15 +786,10 @@ static struct led_pwm pwm_leds_data[] = {
 		.lth_brightness = 90,
 		.pwm_period_ns = 1023,
 	},
-#endif
 };
 
 static struct led_pwm_platform_data u8500_leds_data = {
-#ifdef CONFIG_DISPLAY_GENERIC_DSI_SECONDARY
-	.num_leds = 2,
-#else
 	.num_leds = 1,
-#endif
 	.leds = pwm_leds_data,
 };
 
@@ -1336,6 +1330,8 @@ static void __init hrefv60_init_machine(void)
 	hsi_register_board_info(u8500_hsi_devices,
 				ARRAY_SIZE(u8500_hsi_devices));
 #endif
+	if (uib_is_stuib())
+		u8500_leds_data.num_leds = 2;
 
 	mop500_sensors1p_init();
 	platform_add_devices(mop500_platform_devs,
