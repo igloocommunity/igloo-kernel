@@ -274,32 +274,43 @@ static enum power_supply_property ab8500_charger_usb_props[] = {
  */
 static void ab8500_power_loss_handling(struct ab8500_charger *di)
 {
-	int loop;
-	u8 banksize = 0xF;
-	u8 regs[banksize];
+	u8 reg;
+	int ret;
 
-	for (loop = 0 ; loop < banksize; loop++)
-		(void) abx500_get_register_interruptible(di->dev,
-							0x15, loop,
-							&regs[loop]);
+	dev_dbg(di->dev, "Autopower : %d\n", di->autopower);
 
+	/* read the autopower register */
+	ret = abx500_get_register_interruptible(di->dev, 0x15, 0x00, &reg);
+	if (ret) {
+		dev_err(di->dev, "%d write failed\n", __LINE__);
+		return;
+	}
 
-	(void) abx500_set_register_interruptible(di->dev, 0x11, 0, 0x2);
-	(void) abx500_set_register_interruptible(di->dev, 0x14, 0xB1, 0x2);
-	regs[0xC] &= ~0x4;
-	dev_dbg(di->dev, "Autopower %s\n", di->autopower ? "on" : "off");
+	/* enable the OPT emulation registers */
+	ret = abx500_set_register_interruptible(di->dev, 0x11, 0x00, 0x2);
+	if (ret) {
+		dev_err(di->dev, "%d write failed\n", __LINE__);
+		return;
+	}
 
 	if (di->autopower)
-		regs[0x0] |= 0x8;
+		reg |= 0x8;
 	else
-		regs[0x0] &= ~0x8;
+		reg &= ~0x8;
 
-	for (loop = 0 ; loop < banksize; loop++)
-		(void) abx500_set_register_interruptible(di->dev, 0x15,
-							loop,
-							regs[loop]);
+	/* write back the changed value to autopower reg */
+	ret = abx500_set_register_interruptible(di->dev, 0x15, 0x00, reg);
+	if (ret) {
+		dev_err(di->dev, "%d write failed\n", __LINE__);
+		return;
+	}
 
-	(void) abx500_set_register_interruptible(di->dev, 0x14, 0xB1, 0x03);
+	/* disable the set OTP registers again */
+	ret = abx500_set_register_interruptible(di->dev, 0x11, 0x00, 0x0);
+	if (ret) {
+		dev_err(di->dev, "%d write failed\n", __LINE__);
+		return;
+	}
 }
 
 /**
