@@ -581,13 +581,19 @@ static void __init omap4_panda_map_io(void)
 	omap44xx_map_common_io();
 }
 
+static const char *omap4_panda_match[] = {
+	"ti,omap4-panda",
+	NULL,
+};
+
 MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
 	/* Maintainer: David Anders - Texas Instruments Inc */
-	.boot_params	= 0x80000100,
+	.atag_offset	= 0x100,
 	.reserve	= omap_reserve,
 	.map_io		= omap4_panda_map_io,
 	.init_early	= omap4_panda_init_early,
 	.init_irq	= gic_init_irq,
 	.init_machine	= omap4_panda_init,
 	.timer		= &omap4_timer,
+	.dt_compat	= omap4_panda_match,
 MACHINE_END

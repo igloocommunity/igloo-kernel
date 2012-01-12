@@ -560,12 +560,18 @@ static void __init overo_init(void)
 					"OVERO_GPIO_USBH_CPEN\n");
 }
 
+static const char *omap3_overo_dt_match[] = {
+	"gumstix,omap3-overo",
+	NULL
+};
+
 MACHINE_START(OVERO, "Gumstix Overo")
-	.boot_params	= 0x80000100,
+	.atag_offset	= 0x100,
 	.reserve	= omap_reserve,
 	.map_io		= omap3_map_io,
 	.init_early	= overo_init_early,
 	.init_irq	= omap3_init_irq,
 	.init_machine	= overo_init,
 	.timer		= &omap3_timer,
+	.dt_compat	= omap3_overo_dt_match,
 MACHINE_END

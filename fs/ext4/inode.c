@@ -2656,8 +2656,8 @@ out:
 	spin_unlock_irqrestore(&ei->i_completed_io_lock, flags);
 
 	/* queue the work to convert unwritten extents to written */
-	queue_work(wq, &io_end->work);
 	iocb->private = NULL;
+	queue_work(wq, &io_end->work);
 
 	/* XXX: probably should move into the real I/O completion handler */
 	inode_dio_done(inode);
@@ -4416,6 +4416,7 @@ retry_alloc:
 			  PAGE_CACHE_SIZE, NULL, do_journal_get_write_access)) {
 			unlock_page(page);
 			ret = VM_FAULT_SIGBUS;
+			ext4_journal_stop(handle);
 			goto out;
 		}
 		ext4_set_inode_state(inode, EXT4_STATE_JDATA);
