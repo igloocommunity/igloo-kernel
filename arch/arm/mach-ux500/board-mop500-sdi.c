@@ -150,21 +150,21 @@ static struct mmci_platform_data mop500_sdi1_data = {
 
 static void sdi0_sdi1_configure(void)
 {
-        int ret;
+	int ret;
 
-        ret = gpio_request(sdi0_en, "level shifter enable");
-        if (!ret)
-                ret = gpio_request(sdi0_vsel,
-                                   "level shifter 1v8-3v select");
+	ret = gpio_request(sdi0_en, "level shifter enable");
+	if (!ret)
+		ret = gpio_request(sdi0_vsel,
+				   "level shifter 1v8-3v select");
 
-        if (ret) {
-                pr_warning("unable to config sdi0 gpios for level shifter.\n");
-                return;
-        }
+	if (ret) {
+		pr_warning("unable to config sdi0 gpios for level shifter.\n");
+		return;
+	}
 
-        /* Select the default 2.9V and enable level shifter */
-        gpio_direction_output(sdi0_vsel, 0);
-        gpio_direction_output(sdi0_en, 1);
+	/* Select the default 2.9V and enable level shifter */
+	gpio_direction_output(sdi0_vsel, 0);
+	gpio_direction_output(sdi0_en, 1);
 
 	/* Add the device, force v2 to subrevision 1 */
 	db8500_add_sdi0(&mop500_sdi0_data, U8500_SDI_V2_PERIPHID);
