@@ -291,6 +291,7 @@ struct cyttsp {
 	bool to_timeout;
 	struct completion int_running;
 	bool bl_ready;
+	bool device_in_use;
 	u8 reg_id;
 	u8 ntch_count;
 };
@@ -1695,6 +1696,9 @@ static int cyttsp_resume(struct cyttsp *ts)
 	int retval = 0;
 	struct cyttsp_xydata xydata;
 
+	if (!ts->device_in_use)
+		return 0;
+
 	DBG(printk(KERN_INFO"%s: Enter\n", __func__);)
 	if (ts->platform_data->use_sleep && (ts->platform_data->power_state !=
 		CY_ACTIVE_STATE)) {
@@ -1726,6 +1730,9 @@ static int cyttsp_suspend(struct cyttsp *ts)
 	u8 sleep_mode = 0;
 	int retval = 0;
 
+	if (!ts->device_in_use)
+		return 0;
+
 	DBG(printk(KERN_INFO"%s: Enter\n", __func__);)
 	if (ts->platform_data->use_sleep &&
 			(ts->platform_data->power_state == CY_ACTIVE_STATE)) {
@@ -1749,6 +1756,9 @@ static void cyttsp_ts_early_suspend(struct early_suspend *h)
 {
 	struct cyttsp *ts = container_of(h, struct cyttsp, early_suspend);
 
+	if (!ts->device_in_use)
+		return;
+
 	DBG(printk(KERN_INFO"%s: Enter\n", __func__);)
 	LOCK(ts->mutex);
 	if (!ts->fw_loader_mode) {
@@ -1766,6 +1776,9 @@ static void cyttsp_ts_early_suspend(struct early_suspend *h)
 static void cyttsp_ts_late_resume(struct early_suspend *h)
 {
 	struct cyttsp *ts = container_of(h, struct cyttsp, early_suspend);
+
+	if (!ts->device_in_use)
+		return;
 
 	regulator_enable(ts->regulator);
 
@@ -2023,19 +2036,13 @@ static ssize_t attr_fwloader_store(struct device *dev,
 
 static void cyttsp_close(struct input_dev *dev)
 {
+	DBG(printk(KERN_INFO"%s: Enter\n", __func__);)
+
 	struct cyttsp *ts = dev_get_drvdata(&dev->dev);
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	unregister_early_suspend(&ts->early_suspend);
-#endif
-	del_timer_sync(&ts->timer);
 	cancel_work_sync(&ts->work);
 	free_irq(ts->irq, ts);
-	input_unregister_device(ts->input);
-	input_free_device(ts->input);
-	if (ts->platform_data->init)
-		ts->platform_data->init(0);
 	regulator_disable(ts->regulator);
-	kfree(ts);
+	ts->device_in_use = false;
 }
 
 static int cyttsp_open(struct input_dev *dev)
@@ -2044,16 +2051,9 @@ static int cyttsp_open(struct input_dev *dev)
 	int ret = 0;
 	DBG(printk(KERN_INFO"%s: Enter\n", __func__);)
 
-	ts->regulator = regulator_get(ts->pdev, "vcpin");
-	if (IS_ERR(ts->regulator)) {
-		printk(KERN_ERR "%s: Error, regulator_get failed\n", __func__);
-		ts->regulator = NULL;
-		ret = PTR_ERR(ts->regulator);
-		goto error_regulator_get;
-	}
 	ret = regulator_enable(ts->regulator);
 	if (ret < 0) {
-		printk(KERN_ERR "%s: regulator enable failed\n",__func__);
+		printk(KERN_ERR "%s: regulator enable failed\n", __func__);
 		goto error_regulator;
 	}
 	/* enable interrupts */
@@ -2075,19 +2075,21 @@ static int cyttsp_open(struct input_dev *dev)
 	DBG(printk(KERN_INFO "%s: call power_on\n", __func__);)
 
 	ret = cyttsp_power_on(ts);
-	if (ret < 0)
+	if (ret < 0) {
 		printk(KERN_ERR "%s: Error, power on failed!\n", __func__);
+		goto error_power_on;
+	}
+	ts->device_in_use = true;
 
 	return ret;
 
+error_power_on:
 error_reset:
 	if (ts->irq >= 0)
 		free_irq(ts->irq, ts);
 error_gpio_irq:
 	regulator_disable(ts->regulator);
 error_regulator:
-	regulator_put(ts->regulator);
-error_regulator_get:
 	return ret;
 }
 
@@ -2113,6 +2115,12 @@ void *cyttsp_core_init(struct cyttsp_bus_ops *bus_ops, struct device *pdev)
 	ts->bus_ops = bus_ops;
 	init_completion(&ts->int_running);
 
+	ts->regulator = regulator_get(ts->pdev, "vcpin");
+	if (IS_ERR(ts->regulator)) {
+		printk(KERN_ERR "%s: Error, regulator_get failed\n", __func__);
+		ts->regulator = NULL;
+		goto error_regulator_get;
+	}
 	if (ts->platform_data->init)
 		retval = ts->platform_data->init(1);
 	if (retval) {
@@ -2218,6 +2226,8 @@ error_input_allocate_device:
 	if (ts->platform_data->init)
 		ts->platform_data->init(0);
 error_init:
+	regulator_put(ts->regulator);
+error_regulator_get:
 	kfree(ts);
 error_alloc_data_failed:
 	return NULL;
