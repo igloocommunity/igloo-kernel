@@ -43,10 +43,6 @@
 
 /* MSP related board specific declaration************************/
 
-#define MSP_DATA_DELAY       MSP_DELAY_0
-#define MSP_TX_CLOCK_EDGE    MSP_FALLING_EDGE
-#define MSP_RX_CLOCK_EDGE    MSP_FALLING_EDGE
-
 #define MSP_0_CONTROLLER 1
 #define MSP_1_CONTROLLER 2
 #define MSP_2_CONTROLLER 3
