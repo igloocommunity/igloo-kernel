@@ -2011,13 +2011,25 @@ static int ab8500_fg_init_hw_registers(struct ab8500_fg *di)
 {
 	int ret;
 
-	/* Set up VBAT OVV register */
-	ret = abx500_set_register_interruptible(di->dev,
+	/* Set VBAT OVV threshold */
+	ret = abx500_mask_and_set_register_interruptible(di->dev,
 		AB8500_CHARGER,
 		AB8500_BATT_OVV,
-		(BATT_OVV_ENA | BATT_OVV_TH_4P75));
+		BATT_OVV_TH_4P75,
+		BATT_OVV_TH_4P75);
 	if (ret) {
 		dev_err(di->dev, "failed to set BATT_OVV\n");
+		goto out;
+	}
+
+	/* Enable VBAT OVV detection */
+	ret = abx500_mask_and_set_register_interruptible(di->dev,
+		AB8500_CHARGER,
+		AB8500_BATT_OVV,
+		BATT_OVV_ENA,
+		BATT_OVV_ENA);
+	if (ret) {
+		dev_err(di->dev, "failed to enable BATT_OVV\n");
 		goto out;
 	}
 
