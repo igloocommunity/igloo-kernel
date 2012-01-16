@@ -1945,6 +1945,9 @@ static int __devinit ab8500_chargalg_probe(struct platform_device *pdev)
 		goto free_psy;
 	}
 
+	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
+	ab8500_chargalg_state_to(di, STATE_HANDHELD);
+
 	/* Run the charging algorithm */
 	queue_delayed_work(di->chargalg_wq, &di->chargalg_periodic_work, 0);
 	return ret;
