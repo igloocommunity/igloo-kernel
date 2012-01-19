@@ -59,7 +59,7 @@ void __init ux500_init_irq(void)
 	if (cpu_is_u5500()) {
 		dist_base = __io_address(U5500_GIC_DIST_BASE);
 		cpu_base = __io_address(U5500_GIC_CPU_BASE);
-	} else if (cpu_is_u8500()) {
+	} else if (cpu_is_u8500() || cpu_is_u9540()) {
 		dist_base = __io_address(U8500_GIC_DIST_BASE);
 		cpu_base = __io_address(U8500_GIC_CPU_BASE);
 	} else
@@ -79,7 +79,7 @@ void __init ux500_init_irq(void)
 	 */
 	if (cpu_is_u5500())
 		db5500_prcmu_early_init();
-	if (cpu_is_u8500())
+	if (cpu_is_u8500() || cpu_is_u9540())
 		db8500_prcmu_early_init();
 
 	arm_pm_restart = ux500_restart;
