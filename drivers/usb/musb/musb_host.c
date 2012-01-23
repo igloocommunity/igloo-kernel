@@ -1917,6 +1917,7 @@ static int musb_schedule(
 				(USB_SPEED_HIGH == qh->dev->speed) ? 8 : 4;
 		goto success;
 	} else if (best_end < 0) {
+	printk(KERN_NOTICE " no happy ending!\n");
 		return -ENOSPC;
 	}
 

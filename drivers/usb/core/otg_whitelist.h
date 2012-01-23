@@ -16,6 +16,11 @@
  * YOU _SHOULD_ CHANGE THIS LIST TO MATCH YOUR PRODUCT AND ITS TESTING!
  */
 
+//ST-Ericsson begin
+#define CONFIG_USB_OTG_WHITELIST
+//ST-Ericsson end
+
+
 static struct usb_device_id whitelist_table [] = {
 
 /* hubs are optional in OTG, but very handy ... */
@@ -49,6 +54,8 @@ static struct usb_device_id whitelist_table [] = {
 static int is_targeted(struct usb_device *dev)
 {
 	struct usb_device_id	*id = whitelist_table;
+	unsigned char tier=0;
+	struct usb_device *root_hub;
 
 	/* possible in developer configs only! */
 	if (!dev->bus->otg_port)
@@ -92,7 +99,25 @@ static int is_targeted(struct usb_device *dev)
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_DEV_PROTOCOL) &&
 		    (id->bDeviceProtocol != dev->descriptor.bDeviceProtocol))
 			continue;
-
+		/*Hub is targeted device,so code execution should reach here */
+		if (USB_CLASS_HUB == dev->descriptor.bDeviceClass) {
+			/* count the tiers and if it is more than 6, return 0 */
+			tier = 0;
+	
+			root_hub = dev->bus->root_hub;
+			while((dev->parent != NULL) && /* root hub not count */
+				(dev->parent != root_hub) &&
+				(tier != 6))  {/* interal hub not count */
+				tier++;
+				dev = dev->parent;
+			}
+	
+			if (tier == 6) {
+				printk("5 tier of hubs reached, newly added hub will not be supported!\n");
+				hub_tier=1;
+				return 0;
+			}
+		}
 		return 1;
 	}
 

@@ -125,9 +125,9 @@ static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
 	.config_reg     = {0x0F, 0x9E, 0x80, 0x01, 0x78, 0x02, 0x00},
 
 	/* config_direction allows for the initial GPIO direction to
-	 * be set. For Snowball we set GPIO26 to output.
+	 * be set. For Snowball we set GPIO2, GPIO4, GPIO26, GPIO40 to output.
 	 */
-	.config_direction  = {0x00, 0x00, 0x00, 0x02, 0x00, 0x00},
+	.config_direction  = {0x0A, 0x00, 0x00, 0x02, 0x80, 0x00},
 
 	/*
 	 * config_pullups allows for the intial configuration of the
@@ -165,6 +165,7 @@ static struct gpio_keys_button snowball_key_array[] = {
 		.debounce_interval = 50,
 		.wakeup         = 1,
 	},
+/*
 	{
 		.gpio           = SNOWBALL_J1_PIN_8_GPIO,
 		.type           = EV_KEY,
@@ -192,6 +193,7 @@ static struct gpio_keys_button snowball_key_array[] = {
 		.debounce_interval = 50,
 		.wakeup         = 1,
 	},
+*/
 };
 
 static struct gpio_keys_platform_data snowball_key_data = {

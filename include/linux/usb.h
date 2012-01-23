@@ -351,6 +351,23 @@ struct usb_bus {
 #endif
 };
 
+/*stericsson starts*/
+extern int g_1763_enum_complete;
+extern int Unwanted_SecondReset;
+extern int HostComplianceTest;
+extern int HostTest;
+/*For Embedded Host Compliance */
+#define EMBD_HOST_COMPLIANCE	1
+extern int No_Data_Phase;
+extern int No_Status_Phase;
+/*this is otg decsriptor,from USB2.0 OTG speck, 6.4*/
+struct usb_device_otg_descriptor
+{
+	__u8 bLength;				/*length, must be 3 */
+	__u8 bDescriptorType;		/*otg type=9 */
+	__u8 bmAttributes;
+};
+/*stericsson ends*/
 /* ----------------------------------------------------------------------- */
 
 /* This is arbitrary.
@@ -364,6 +381,14 @@ struct usb_bus {
  */
 
 #ifdef CONFIG_ARCH_U8500
+//st-ericsson
+//#define   CONFIG_USB_OTG
+#define   USB_OTG_SUSPEND     	0x1
+#define   USB_OTG_ENUMERATE   	0x2
+#define   USB_OTG_DISCONNECT  	0x4
+#define   USB_OTG_RESUME      	0x8
+#define   USB_OTG_REMOTEWAKEUP  0x10
+#define   USB_OTG_WAKEUP_ALL	0x20
 /**
 * On U8500 platform we support 16 ports only
 */
@@ -420,6 +445,8 @@ struct usb_tt;
  * @quirks: quirks of the whole device
  * @urbnum: number of URBs submitted for the whole device
  * @active_duration: total time device is not suspended
+ * @last_busy: time of last use
+ * @autosuspend_delay: in jiffies
  * @connect_time: time device was first connected
  * @do_remote_wakeup:  remote wakeup should be enabled
  * @reset_resume: needs reset instead of resume
@@ -482,6 +509,18 @@ struct usb_device {
 #ifdef CONFIG_USB_DEVICEFS
 	struct dentry *usbfs_dentry;
 #endif
+	/*st-ericsson starts */
+	/*otg add ons */
+	struct usb_otg_descriptor otgdescriptor;	/*otg descriptor */
+	__u8 otgdevice;				/*device is otg type */
+	__u8 otgstate;				/*otg states from otg driver, suspend, enumerate, disconnect */
+	wait_queue_head_t suswait;
+	void *otgpriv;
+	void (*otg_notif) (void *otg_priv,
+					   unsigned long notif, unsigned long data);
+	void *hcd_priv;
+	void (*hcd_suspend) (void *hcd_priv);
+	/*stericsson ends*/
 
 	int maxchild;
 	struct usb_device *children[USB_MAXCHILDREN];
@@ -492,6 +531,8 @@ struct usb_device {
 	unsigned long active_duration;
 
 #ifdef CONFIG_PM
+	unsigned long last_busy;
+	int autosuspend_delay;
 	unsigned long connect_time;
 
 	unsigned do_remote_wakeup:1;
@@ -536,7 +577,8 @@ extern void usb_autopm_put_interface_no_suspend(struct usb_interface *intf);
 
 static inline void usb_mark_last_busy(struct usb_device *udev)
 {
-	pm_runtime_mark_last_busy(&udev->dev);
+//	pm_runtime_mark_last_busy(&udev->dev);
+	udev->last_busy = jiffies;
 }
 
 #else
@@ -1608,6 +1650,11 @@ do {									\
 
 #define err(format, arg...)					\
 	printk(KERN_ERR KBUILD_MODNAME ": " format "\n", ##arg)
+
+#define info(format, arg...) printk(KERN_INFO KBUILD_MODNAME ": " \
+	format "\n" , ## arg)
+#define warn(format, arg...) printk(KERN_WARNING KBUILD_MODNAME ": " \
+	format "\n" , ## arg)
 
 /* debugfs stuff */
 extern struct dentry *usb_debug_root;
