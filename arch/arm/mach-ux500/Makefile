@@ -56,7 +56,7 @@ ifdef CONFIG_SENSORS_LSM303DLH
 obj-$(CONFIG_MACH_U8500)	+= board-mop500-sensors.o
 endif
 obj-$(CONFIG_FB_MCDE)		+= board-mcde.o
-ifdef CONFIG_STM_MSP_I2S
+ifdef CONFIG_STM_MSP_SPI
 obj-$(CONFIG_MACH_U8500) 	+= board-mop500-msp.o
 endif
 ifdef CONFIG_CW1200
