@@ -187,6 +187,9 @@
 #define BATT_OVV_TH_3P7			0x00
 #define BATT_OVV_TH_4P75		0x01
 
+/* A value to indicate over voltage */
+#define BATT_OVV_VALUE			4750
+
 /* VBUS OVV constants */
 #define VBUS_OVV_SELECT_MASK		0x78
 #define VBUS_OVV_SELECT_5P6V		0x00

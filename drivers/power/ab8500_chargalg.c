@@ -1095,6 +1095,10 @@ static int ab8500_chargalg_get_ext_psy_data(struct device *dev, void *data)
 			switch (ext->type) {
 			case POWER_SUPPLY_TYPE_BATTERY:
 				di->batt_data.volt = ret.intval / 1000;
+				if (di->batt_data.volt >= BATT_OVV_VALUE)
+					di->events.batt_ovv = true;
+				else
+					di->events.batt_ovv = false;
 				break;
 			case POWER_SUPPLY_TYPE_MAINS:
 				di->chg_info.ac_volt = ret.intval / 1000;

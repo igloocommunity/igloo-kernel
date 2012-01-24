@@ -43,6 +43,9 @@
 #define BATT_OK_INCREMENT		50 /* mV */
 #define BATT_OK_MAX_NR_INCREMENTS	0xE
 
+/* FG constants */
+#define BATT_OVV			0x01
+
 #define interpolate(x, x1, y1, x2, y2) \
 	((y1) + ((((y2) - (y1)) * ((x) - (x1))) / ((x2) - (x1))));
 
@@ -171,6 +174,7 @@ struct inst_curr_result_list {
  * @fg_reinit_work	Work used to reset and reinitialise the FG algorithm
  * @fg_work:		Work to run the FG algorithm instantly
  * @fg_acc_cur_work:	Work to read the FG accumulator
+ * @fg_check_hw_failure_work:	Work for checking HW state
  * @cc_lock:		Mutex for locking the CC
  * @fg_kobject:		Structure of type kobject
  */
@@ -208,6 +212,7 @@ struct ab8500_fg {
 	struct delayed_work fg_reinit_work;
 	struct work_struct fg_work;
 	struct work_struct fg_acc_cur_work;
+	struct delayed_work fg_check_hw_failure_work;
 	struct mutex cc_lock;
 	struct kobject fg_kobject;
 };
@@ -1617,6 +1622,46 @@ static void ab8500_fg_periodic_work(struct work_struct *work)
 		queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
 	} else
 		ab8500_fg_algorithm(di);
+
+}
+
+/**
+ * ab8500_fg_check_hw_failure_work() - Check OVV_BAT condition
+ * @work:	pointer to the work_struct structure
+ *
+ * Work queue function for checking the OVV_BAT condition
+ */
+static void ab8500_fg_check_hw_failure_work(struct work_struct *work)
+{
+	int ret;
+	u8 reg_value;
+
+	struct ab8500_fg *di = container_of(work, struct ab8500_fg,
+		fg_check_hw_failure_work.work);
+
+	/*
+	 * If we have had a battery over-voltage situation,
+	 * check ovv-bit to see if it should be reset.
+	 */
+	if (di->flags.bat_ovv) {
+		ret = abx500_get_register_interruptible(di->dev,
+			AB8500_CHARGER, AB8500_CH_STAT_REG,
+			&reg_value);
+		if (ret < 0) {
+			dev_err(di->dev, "%s ab8500 read failed\n", __func__);
+			return;
+		}
+		if ((reg_value & BATT_OVV) != BATT_OVV) {
+			dev_dbg(di->dev, "Battery recovered from OVV\n");
+			di->flags.bat_ovv = false;
+			power_supply_changed(&di->fg_psy);
+			return;
+		}
+
+		/* Not yet recovered from ovv, reschedule this test */
+		queue_delayed_work(di->fg_wq, &di->fg_check_hw_failure_work,
+				   round_jiffies(HZ));
+	}
 }
 
 /**
@@ -1776,8 +1821,10 @@ static irqreturn_t ab8500_fg_batt_ovv_handler(int irq, void *_di)
 
 	dev_dbg(di->dev, "Battery OVV\n");
 	di->flags.bat_ovv = true;
-
 	power_supply_changed(&di->fg_psy);
+
+	/* Schedule a new HW failure check */
+	queue_delayed_work(di->fg_wq, &di->fg_check_hw_failure_work, 0);
 
 	return IRQ_HANDLED;
 }
@@ -1842,7 +1889,7 @@ static int ab8500_fg_get_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		if (di->flags.bat_ovv)
-			val->intval = 47500000;
+			val->intval = BATT_OVV_VALUE * 1000;
 		else
 			val->intval = di->vbat * 1000;
 		break;
@@ -2404,6 +2451,10 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 	/* Work to check low battery condition */
 	INIT_DELAYED_WORK_DEFERRABLE(&di->fg_low_bat_work,
 		ab8500_fg_low_bat_work);
+
+	/* Init work for HW failure check */
+	INIT_DELAYED_WORK_DEFERRABLE(&di->fg_check_hw_failure_work,
+		ab8500_fg_check_hw_failure_work);
 
 	/* Initialize OVV, and other registers */
 	ret = ab8500_fg_init_hw_registers(di);
