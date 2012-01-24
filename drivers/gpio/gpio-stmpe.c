@@ -365,9 +365,11 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
 	return 0;
 
 out_freeirq:
-	free_irq(irq, stmpe_gpio);
+	if (!stmpe->pdata->no_irq)
+		free_irq(irq, stmpe_gpio);
 out_removeirq:
-	stmpe_gpio_irq_remove(stmpe_gpio);
+	if (!stmpe->pdata->no_irq)
+		stmpe_gpio_irq_remove(stmpe_gpio);
 out_disable:
 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
 out_free:
@@ -395,8 +397,10 @@ static int __devexit stmpe_gpio_remove(struct platform_device *pdev)
 
 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
 
-	free_irq(irq, stmpe_gpio);
-	stmpe_gpio_irq_remove(stmpe_gpio);
+	if (!stmpe->pdata->no_irq) {
+		free_irq(irq, stmpe_gpio);
+		stmpe_gpio_irq_remove(stmpe_gpio);
+	}
 	platform_set_drvdata(pdev, NULL);
 	kfree(stmpe_gpio);
 
