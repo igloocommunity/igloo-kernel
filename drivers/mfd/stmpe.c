@@ -1006,27 +1006,31 @@ int __devinit stmpe_probe(struct stmpe_client_info *ci, int partnum)
 	if (ci->init)
 		ci->init(stmpe);
 
-	if (!pdata->no_irq && pdata->irq_over_gpio) {
-		ret = gpio_request_one(pdata->irq_gpio, GPIOF_DIR_IN, "stmpe");
-		if (ret) {
-			dev_err(stmpe->dev, "failed to request IRQ GPIO: %d\n",
-					ret);
-			goto out_free;
-		}
-
-		stmpe->irq = gpio_to_irq(pdata->irq_gpio);
+	if (pdata->no_irq) {
+		dev_info(stmpe->dev,
+			"board config says IRQs are not supported\n");
 	} else {
-		stmpe->irq = ci->irq;
+		if (pdata->irq_over_gpio) {
+			ret = gpio_request_one(pdata->irq_gpio, GPIOF_DIR_IN,
+						"stmpe");
+			if (ret) {
+				dev_err(stmpe->dev,
+					"failed to request IRQ GPIO: %d\n",
+					ret);
+				goto out_free;
+			}
+
+			stmpe->irq = gpio_to_irq(pdata->irq_gpio);
+		} else {
+			stmpe->irq = ci->irq;
+		}
 	}
 
 	ret = stmpe_chip_init(stmpe);
 	if (ret)
 		goto free_gpio;
 
-	if (pdata->no_irq) {
-		dev_info(stmpe->dev,
-			"board config says IRQs are not supported\n");
-	} else {
+	if (!pdata->no_irq) {
 		ret = stmpe_irq_init(stmpe);
 		if (ret)
 			goto free_gpio;
@@ -1050,11 +1054,13 @@ int __devinit stmpe_probe(struct stmpe_client_info *ci, int partnum)
 
 out_removedevs:
 	mfd_remove_devices(stmpe->dev);
-	free_irq(stmpe->irq, stmpe);
+	if (!pdata->no_irq)
+		free_irq(stmpe->irq, stmpe);
 out_removeirq:
-	stmpe_irq_remove(stmpe);
+	if (!pdata->no_irq)
+		stmpe_irq_remove(stmpe);
 free_gpio:
-	if (pdata->irq_over_gpio)
+	if (!pdata->no_irq && pdata->irq_over_gpio)
 		gpio_free(pdata->irq_gpio);
 out_free:
 	kfree(stmpe);
@@ -1065,11 +1071,13 @@ int stmpe_remove(struct stmpe *stmpe)
 {
 	mfd_remove_devices(stmpe->dev);
 
-	free_irq(stmpe->irq, stmpe);
-	stmpe_irq_remove(stmpe);
+	if (!stmpe->pdata->no_irq) {
+		free_irq(stmpe->irq, stmpe);
+		stmpe_irq_remove(stmpe);
 
-	if (stmpe->pdata->irq_over_gpio)
-		gpio_free(stmpe->pdata->irq_gpio);
+		if (stmpe->pdata->irq_over_gpio)
+			gpio_free(stmpe->pdata->irq_gpio);
+	}
 
 	kfree(stmpe);
 
@@ -1081,7 +1089,7 @@ static int stmpe_suspend(struct device *dev)
 {
 	struct stmpe *stmpe = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev))
+	if (!stmpe->pdata->no_irq && device_may_wakeup(dev))
 		enable_irq_wake(stmpe->irq);
 
 	return 0;
@@ -1091,7 +1099,7 @@ static int stmpe_resume(struct device *dev)
 {
 	struct stmpe *stmpe = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev))
+	if (!stmpe->pdata->no_irq && device_may_wakeup(dev))
 		disable_irq_wake(stmpe->irq);
 
 	return 0;
