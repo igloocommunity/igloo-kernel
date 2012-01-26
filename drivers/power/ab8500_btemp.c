@@ -68,7 +68,6 @@ struct ab8500_btemp_ranges {
  * struct ab8500_btemp - ab8500 BTEMP device information
  * @dev:		Pointer to the structure device
  * @node:		List of AB8500 BTEMPs, hence prepared for reentrance
- * @chip_id:		Chip-Id of the AB8500
  * @curr_source:	What current source we use, in uA
  * @bat_temp:		Battery temperature in degree Celcius
  * @prev_bat_temp	Last dispatched battery temperature
@@ -86,7 +85,6 @@ struct ab8500_btemp_ranges {
 struct ab8500_btemp {
 	struct device *dev;
 	struct list_head node;
-	u8 chip_id;
 	int curr_source;
 	int bat_temp;
 	int prev_bat_temp;
@@ -139,32 +137,28 @@ static int ab8500_btemp_batctrl_volt_to_res(struct ab8500_btemp *di,
 {
 	int rbs;
 
-	switch (di->chip_id) {
-	case AB8500_CUT1P0:
-	case AB8500_CUT1P1:
+	if (is_ab8500_1p1_or_earlier(di->parent)) {
 		/*
 		 * For ABB cut1.0 and 1.1 BAT_CTRL is internally
 		 * connected to 1.8V through a 450k resistor
 		 */
-		rbs = (450000 * (v_batctrl)) / (1800 - v_batctrl);
-		break;
-	default:
-		if (di->bat->adc_therm == ADC_THERM_BATCTRL) {
-			/*
-			 * If the battery has internal NTC, we use the current
-			 * source to calculate the resistance, 7uA or 20uA
-			 */
-			rbs = (v_batctrl * 1000
-			       - di->bat->gnd_lift_resistance * inst_curr)
-			      / di->curr_source;
-		} else {
-			/*
-			 * BAT_CTRL is internally
-			 * connected to 1.8V through a 80k resistor
-			 */
-			rbs = (80000 * (v_batctrl)) / (1800 - v_batctrl);
-		}
-		break;
+		return (450000 * (v_batctrl)) / (1800 - v_batctrl);
+	}
+
+	if (di->bat->adc_therm == ADC_THERM_BATCTRL) {
+		/*
+		 * If the battery has internal NTC, we use the current
+		 * source to calculate the resistance, 7uA or 20uA
+		 */
+		rbs = (v_batctrl * 1000
+		       - di->bat->gnd_lift_resistance * inst_curr)
+		      / di->curr_source;
+	} else {
+		/*
+		 * BAT_CTRL is internally
+		 * connected to 1.8V through a 80k resistor
+		 */
+		rbs = (80000 * (v_batctrl)) / (1800 - v_batctrl);
 	}
 
 	return rbs;
@@ -209,7 +203,7 @@ static int ab8500_btemp_curr_source_enable(struct ab8500_btemp *di,
 	 * BATCTRL current sources are included on AB8500 cut2.0
 	 * and future versions
 	 */
-	if (di->chip_id == AB8500_CUT1P0 || di->chip_id == AB8500_CUT1P1)
+	if (is_ab8500_1p1_or_earlier(di->parent))
 		return 0;
 
 	/* Only do this for batteries with internal NTC */
@@ -618,15 +612,11 @@ static irqreturn_t ab8500_btemp_batctrlindb_handler(int irq, void *_di)
 static irqreturn_t ab8500_btemp_templow_handler(int irq, void *_di)
 {
 	struct ab8500_btemp *di = _di;
-	switch (di->chip_id) {
-	case AB8500_CUT1P0:
-	case AB8500_CUT1P1:
-	case AB8500_CUT2P0:
+
+	if (is_ab8500_2p0_or_earlier(di->parent)) {
 		dev_dbg(di->dev, "Ignore false btemp low irq"
 			" for ABB cut 1.0, 1.1 and 2.0\n");
-
-		break;
-	default:
+	} else {
 		dev_crit(di->dev, "Battery temperature lower than -10deg c\n");
 
 		di->events.btemp_low = true;
@@ -634,8 +624,6 @@ static irqreturn_t ab8500_btemp_templow_handler(int irq, void *_di)
 		di->events.btemp_medhigh = false;
 		di->events.btemp_lowmed = false;
 		power_supply_changed(&di->btemp_psy);
-
-		break;
 	}
 
 	return IRQ_HANDLED;
@@ -744,14 +732,9 @@ static int ab8500_btemp_get_temp(struct ab8500_btemp *di)
 	 * The BTEMP events are not reliabe on AB8500 cut2.0
 	 * and prior versions
 	 */
-	switch (di->chip_id) {
-	case AB8500_CUT1P0:
-	case AB8500_CUT1P1:
-	case AB8500_CUT2P0:
+	if (is_ab8500_2p0_or_earlier(di->parent)) {
 		temp = di->bat_temp * 10;
-
-		break;
-	default:
+	} else {
 		if (di->events.btemp_low) {
 			if (temp > di->btemp_ranges.btemp_low_limit)
 				temp = di->btemp_ranges.btemp_low_limit;
@@ -774,8 +757,6 @@ static int ab8500_btemp_get_temp(struct ab8500_btemp *di)
 				temp = di->bat_temp * 10;
 		} else
 			temp = di->bat_temp * 10;
-
-		break;
 	}
 	return temp;
 }
@@ -1033,16 +1014,6 @@ static int __devinit ab8500_btemp_probe(struct platform_device *pdev)
 	/* Init work for measuring temperature periodically */
 	INIT_DELAYED_WORK_DEFERRABLE(&di->btemp_periodic_work,
 		ab8500_btemp_periodic_work);
-
-	/* Get Chip ID of the ABB ASIC  */
-	ret = abx500_get_chip_id(di->dev);
-	if (ret < 0) {
-		dev_err(di->dev, "failed to get chip ID\n");
-		goto free_btemp_wq;
-	}
-	di->chip_id = ret;
-	dev_dbg(di->dev, "AB8500 CID is: 0x%02x\n",
-		di->chip_id);
 
 	/* Identify the battery */
 	if (ab8500_btemp_id(di) < 0)
