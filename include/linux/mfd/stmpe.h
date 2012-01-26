@@ -26,6 +26,7 @@ enum stmpe_partnum {
 	STMPE1601,
 	STMPE2401,
 	STMPE2403,
+	STMPE_NBR_PARTS
 };
 
 /*
@@ -188,7 +189,6 @@ struct stmpe_ts_platform_data {
  * @irq_invert_polarity: IRQ line is connected with reversed polarity
  * @autosleep: bool to enable/disable stmpe autosleep
  * @autosleep_timeout: inactivity timeout in milliseconds for autosleep
- * @no_irq: IRQs are not supported on this board
  * @irq_base: base IRQ number.  %STMPE_NR_IRQS irqs will be used, or
  *	      %STMPE_NR_INTERNAL_IRQS if the GPIO driver is not used.
  * @irq_over_gpio: true if gpio is used to get irq
@@ -201,7 +201,6 @@ struct stmpe_ts_platform_data {
 struct stmpe_platform_data {
 	int id;
 	unsigned int blocks;
-	bool no_irq;
 	int irq_base;
 	unsigned int irq_trigger;
 	bool irq_invert_polarity;
