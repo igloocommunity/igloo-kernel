@@ -311,11 +311,7 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
 
 	pdata = stmpe->pdata->gpio;
 
-	if (!stmpe->pdata->no_irq) {
-		irq = platform_get_irq(pdev, 0);
-		if (irq < 0)
-			return irq;
-	}
+	irq = platform_get_irq(pdev, 0);
 
 	stmpe_gpio = kzalloc(sizeof(struct stmpe_gpio), GFP_KERNEL);
 	if (!stmpe_gpio)
@@ -332,13 +328,18 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
 	stmpe_gpio->chip.dev = &pdev->dev;
 	stmpe_gpio->chip.base = pdata ? pdata->gpio_base : -1;
 
-	stmpe_gpio->irq_base = stmpe->irq_base + STMPE_INT_GPIO(0);
+	if (irq >= 0)
+		stmpe_gpio->irq_base = stmpe->irq_base + STMPE_INT_GPIO(0);
+	else
+		dev_info(&pdev->dev,
+			"device configured in no-irq mode; "
+			"irqs are not available\n");
 
 	ret = stmpe_enable(stmpe, STMPE_BLOCK_GPIO);
 	if (ret)
 		goto out_free;
 
-	if (!stmpe->pdata->no_irq) {
+	if (irq >= 0) {
 		ret = stmpe_gpio_irq_init(stmpe_gpio);
 		if (ret)
 			goto out_disable;
@@ -365,10 +366,10 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
 	return 0;
 
 out_freeirq:
-	if (!stmpe->pdata->no_irq)
+	if (irq >= 0)
 		free_irq(irq, stmpe_gpio);
 out_removeirq:
-	if (!stmpe->pdata->no_irq)
+	if (irq >= 0)
 		stmpe_gpio_irq_remove(stmpe_gpio);
 out_disable:
 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
@@ -397,7 +398,7 @@ static int __devexit stmpe_gpio_remove(struct platform_device *pdev)
 
 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
 
-	if (!stmpe->pdata->no_irq) {
+	if (irq >= 0) {
 		free_irq(irq, stmpe_gpio);
 		stmpe_gpio_irq_remove(stmpe_gpio);
 	}
