@@ -168,7 +168,6 @@ struct ab8500_charger_usb_state {
 /**
  * struct ab8500_charger - ab8500 Charger device information
  * @dev:		Pointer to the structure device
- * @chip_id:		Chip-Id of the AB8500
  * @max_usb_in_curr:	Max USB charger input current
  * @vbus_detected:	VBUS detected
  * @vbus_detected_start:
@@ -209,7 +208,6 @@ struct ab8500_charger_usb_state {
  */
 struct ab8500_charger {
 	struct device *dev;
-	u8 chip_id;
 	int max_usb_in_curr;
 	bool vbus_detected;
 	bool vbus_detected_start;
@@ -1124,10 +1122,7 @@ static int ab8500_charger_ac_en(struct ux500_charger *charger,
 		di->ac.charger_online = 1;
 	} else {
 		/* Disable AC charging */
-
-		switch (di->chip_id) {
-		case AB8500_CUT1P0:
-		case AB8500_CUT1P1:
+		if (is_ab8500_1p1_or_earlier(di->parent)) {
 			/*
 			 * For ABB revision 1.0 and 1.1 there is a bug in the
 			 * watchdog logic. That means we have to continously
@@ -1168,10 +1163,7 @@ static int ab8500_charger_ac_en(struct ux500_charger *charger,
 					"%s write failed\n", __func__);
 				return ret;
 			}
-			break;
-
-		case AB8500_CUT2P0:
-		default:
+		} else {
 			ret = abx500_set_register_interruptible(di->dev,
 				AB8500_CHARGER,
 				AB8500_MCH_CTRL1, 0);
@@ -1180,7 +1172,6 @@ static int ab8500_charger_ac_en(struct ux500_charger *charger,
 					"%s write failed\n", __func__);
 				return ret;
 			}
-			break;
 		}
 
 		ret = ab8500_charger_led_en(di, false);
@@ -1647,19 +1638,14 @@ void ab8500_charger_detect_usb_type_work(struct work_struct *work)
 	} else {
 		di->vbus_detected = 1;
 
-		switch (di->chip_id) {
-		case AB8500_CUT1P0:
-		case AB8500_CUT1P1:
+		if (is_ab8500_1p1_or_earlier(di->parent)) {
 			ret = ab8500_charger_detect_usb_type(di);
 			if (!ret) {
 				ab8500_charger_set_usb_connected(di, true);
 				ab8500_power_supply_changed(di,
 							    &di->usb_chg.psy);
 			}
-			break;
-
-		case AB8500_CUT2P0:
-		default:
+		} else {
 			/* For ABB cut2.0 and onwards we have an IRQ,
 			 * USB_LINK_STATUS that will be triggered when the USB
 			 * link status changes. The exception is USB connected
@@ -1676,7 +1662,6 @@ void ab8500_charger_detect_usb_type_work(struct work_struct *work)
 						&di->usb_chg.psy);
 				}
 			}
-			break;
 		}
 	}
 }
@@ -2285,12 +2270,7 @@ static int ab8500_charger_init_hw_registers(struct ab8500_charger *di)
 	int ret = 0;
 
 	/* Setup maximum charger current and voltage for ABB cut2.0 */
-	switch (di->chip_id) {
-	case AB8500_CUT1P0:
-	case AB8500_CUT1P1:
-		break;
-	case AB8500_CUT2P0:
-	default:
+	if (!is_ab8500_1p1_or_earlier(di->parent)) {
 		ret = abx500_set_register_interruptible(di->dev,
 			AB8500_CHARGER,
 			AB8500_CH_VOLT_LVL_MAX_REG, CH_VOL_LVL_4P6);
@@ -2308,8 +2288,6 @@ static int ab8500_charger_init_hw_registers(struct ab8500_charger *di)
 				"failed to set CH_OPT_CRNTLVL_MAX_REG\n");
 			goto out;
 		}
-
-		break;
 	}
 
 	/* VBUS OVV set to 6.3V and enable automatic current limitiation */
@@ -2479,8 +2457,7 @@ static int ab8500_charger_resume(struct platform_device *pdev)
 	 * watchdog have to be kicked by the charger driver
 	 * when the AC charger is disabled
 	 */
-	if (di->ac_conn && (di->chip_id == AB8500_CUT1P0 ||
-		di->chip_id == AB8500_CUT1P1)) {
+	if (di->ac_conn && is_ab8500_1p1_or_earlier(di->parent)) {
 		ret = abx500_set_register_interruptible(di->dev, AB8500_CHARGER,
 			AB8500_CHARG_WD_CTRL, CHARG_WD_KICK);
 		if (ret)
@@ -2678,15 +2655,6 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
 		ab8500_charger_check_main_thermal_prot_work);
 	INIT_WORK(&di->check_usb_thermal_prot_work,
 		ab8500_charger_check_usb_thermal_prot_work);
-
-	/* Get Chip ID of the ABB ASIC  */
-	ret = abx500_get_chip_id(di->dev);
-	if (ret < 0) {
-		dev_err(di->dev, "failed to get chip ID\n");
-		goto free_charger_wq;
-	}
-	di->chip_id = ret;
-	dev_dbg(di->dev, "AB8500 CID is: 0x%02x\n", di->chip_id);
 
 	/*
 	 * VDD ADC supply needs to be enabled from this driver when there
