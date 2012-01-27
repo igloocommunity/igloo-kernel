@@ -215,4 +215,10 @@ struct ab8500_platform_data {
 extern int __devinit ab8500_init(struct ab8500 *ab8500);
 extern int __devexit ab8500_exit(struct ab8500 *ab8500);
 
+#ifdef CONFIG_AB8500_DEBUG
+void ab8500_dump_all_banks(struct device *dev);
+#else
+static inline void ab8500_dump_all_banks(struct device *dev) {}
+#endif
+
 #endif /* MFD_AB8500_H */
