@@ -563,7 +563,7 @@ static int ab8500_charger_max_usb_curr(struct ab8500_charger *di,
 	case USB_STAT_STD_HOST_C_S:
 		dev_dbg(di->dev, "USB Type - Standard host is "
 			"detected through USB driver\n");
-		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P09
+		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P09;
 		break;
 	case USB_STAT_HOST_CHG_HS_CHIRP:
 		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P5;
