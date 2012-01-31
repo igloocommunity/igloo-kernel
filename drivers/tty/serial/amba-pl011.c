@@ -1297,7 +1297,7 @@ static void pl011_clock_on(struct uart_port *port)
 		}
 		/* fallthrough */
 	case PL011_CLK_REQUEST_OFF:
-		cancel_delayed_work(&uap->clk_off_work);
+		__cancel_delayed_work(&uap->clk_off_work);
 		uap->clk_state = PL011_CLK_ON;
 		break;
 	default:
@@ -1312,7 +1312,7 @@ static void pl011_clock_check(struct uart_amba_port *uap)
 	/* Reshedule work during off request  */
 	if (uap->clk_state == PL011_CLK_REQUEST_OFF)
 		/* New TX - restart work */
-		if (cancel_delayed_work(&uap->clk_off_work))
+		if (__cancel_delayed_work(&uap->clk_off_work))
 			schedule_delayed_work(&uap->clk_off_work,
 						uap->clk_off_delay);
 }
