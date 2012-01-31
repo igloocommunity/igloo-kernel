@@ -522,7 +522,8 @@ EXPORT_SYMBOL(hci_get_route);
  * Device _must_ be locked */
 struct hci_conn *hci_connect(struct hci_dev *hdev, int type,
 					__u16 pkt_type, bdaddr_t *dst,
-					__u8 sec_level, __u8 auth_type)
+					__u8 sec_level, __u8 auth_type,
+					struct bt_sco_parameters *sco_parameters)
 {
 	struct hci_conn *acl;
 	struct hci_conn *sco;

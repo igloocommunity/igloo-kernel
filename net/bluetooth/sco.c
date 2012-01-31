@@ -179,6 +179,7 @@ static int sco_connect(struct sock *sk)
 	bdaddr_t *src = &bt_sk(sk)->src;
 	bdaddr_t *dst = &bt_sk(sk)->dst;
 	__u16 pkt_type = sco_pi(sk)->pkt_type;
+	struct bt_sco_parameters *param = &sco_pi(sk)->param;
 	struct sco_conn *conn;
 	struct hci_conn *hcon;
 	struct hci_dev  *hdev;
@@ -199,7 +200,7 @@ static int sco_connect(struct sock *sk)
 		pkt_type &= SCO_ESCO_MASK;
 	}
 
-	hcon = hci_connect(hdev, type, pkt_type, dst, BT_SECURITY_LOW, HCI_AT_NO_BONDING);
+	hcon = hci_connect(hdev, type, pkt_type, dst, BT_SECURITY_LOW, HCI_AT_NO_BONDING, param);
 	if (IS_ERR(hcon)) {
 		err = PTR_ERR(hcon);
 		goto done;
