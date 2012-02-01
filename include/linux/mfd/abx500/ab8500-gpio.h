@@ -12,12 +12,14 @@
 
 /*
  * Platform data to register a block: only the initial gpio/irq number.
+ * Array sizes are large enough to contain all AB8500 and AB9540 GPIO
+ * registers.
  */
 
 struct ab8500_gpio_platform_data {
 	int gpio_base;
 	u32 irq_base;
-	u8  config_reg[7];
+	u8  config_reg[8];
 	u8  config_direction[6];
 	u8  config_pullups[6];
 };
