@@ -2024,9 +2024,7 @@ static int musb_gadget_stop(struct usb_gadget *g,
 
 	spin_lock_irqsave(&musb->lock, flags);
 
-#ifdef	CONFIG_USB_MUSB_OTG
 	musb_hnp_stop(musb);
-#endif
 
 	(void) musb_gadget_vbus_draw(&musb->g, 0);
 
@@ -2140,7 +2138,6 @@ void musb_g_disconnect(struct musb *musb)
 
 	switch (musb->xceiv->state) {
 	default:
-#ifdef	CONFIG_USB_MUSB_OTG
 		dev_dbg(musb->controller, "Unhandled disconnect %s, setting a_idle\n",
 			otg_state_string(musb->xceiv->state));
 		musb->xceiv->state = OTG_STATE_A_IDLE;
@@ -2152,7 +2149,6 @@ void musb_g_disconnect(struct musb *musb)
 		break;
 	case OTG_STATE_B_WAIT_ACON:
 	case OTG_STATE_B_HOST:
-#endif
 	case OTG_STATE_B_PERIPHERAL:
 	case OTG_STATE_B_IDLE:
 		musb->xceiv->state = OTG_STATE_B_IDLE;
