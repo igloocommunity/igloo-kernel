@@ -921,7 +921,8 @@ static pin_cfg_t mop500_pins_common_power_save_bank8[] = {
 
 static void mop500_pins_suspend_force(void)
 {
-	if (machine_is_hrefv60() || machine_is_u9540())
+	if (machine_is_hrefv60() || machine_is_u8520() ||
+	    machine_is_u9540())
 		sleep_pins_config_pm(mop500_pins_common_power_save_bank0_href60,
 			ARRAY_SIZE(mop500_pins_common_power_save_bank0_href60));
 	else
@@ -931,7 +932,8 @@ static void mop500_pins_suspend_force(void)
 	sleep_pins_config_pm(mop500_pins_common_power_save_bank1,
 		ARRAY_SIZE(mop500_pins_common_power_save_bank1));
 
-	if (machine_is_hrefv60() || machine_is_u9540())
+	if (machine_is_hrefv60() || machine_is_u8520() ||
+	    machine_is_u9540())
 		sleep_pins_config_pm(mop500_pins_common_power_save_bank2_href60,
 			ARRAY_SIZE(mop500_pins_common_power_save_bank2_href60));
 	else
@@ -949,7 +951,8 @@ static void mop500_pins_suspend_force(void)
 		sleep_pins_config_pm(mop500_pins_common_power_save_bank4,
 			ARRAY_SIZE(mop500_pins_common_power_save_bank4));
 
-	if (machine_is_hrefv60() || machine_is_u9540())
+	if (machine_is_hrefv60() || machine_is_u8520() ||
+	    machine_is_u9540())
 		sleep_pins_config_pm(mop500_pins_common_power_save_bank5_href60,
 			ARRAY_SIZE(mop500_pins_common_power_save_bank5_href60));
 	else
@@ -959,7 +962,8 @@ static void mop500_pins_suspend_force(void)
 	if (pins_for_u9500())
 		sleep_pins_config_pm(mop500_pins_common_power_save_bank6_u9500,
 			ARRAY_SIZE(mop500_pins_common_power_save_bank6_u9500));
-	else if (machine_is_hrefv60() || machine_is_u9540())
+	else if (machine_is_hrefv60() || machine_is_u8520() ||
+		 machine_is_u9540())
 		sleep_pins_config_pm(mop500_pins_common_power_save_bank6_href60,
 			ARRAY_SIZE(mop500_pins_common_power_save_bank6_href60));
 	else
@@ -969,7 +973,8 @@ static void mop500_pins_suspend_force(void)
 	if (pins_for_u9500())
 		sleep_pins_config_pm(mop500_pins_common_power_save_bank7_u9500,
 			ARRAY_SIZE(mop500_pins_common_power_save_bank7_u9500));
-	else if (machine_is_hrefv60() || machine_is_u9540())
+	else if (machine_is_hrefv60() || machine_is_u8520() ||
+		 machine_is_u9540())
 		sleep_pins_config_pm(mop500_pins_common_power_save_bank7_href60,
 			ARRAY_SIZE(mop500_pins_common_power_save_bank7_href60));
 	else
@@ -1121,7 +1126,7 @@ void __init hrefv60_pins_init(void)
 
 static int __init mop500_offchip_gpio_init(void)
 {
-	if (machine_is_hrefv60() || machine_is_u9540())
+	if (machine_is_hrefv60() || machine_is_u8520() || machine_is_u9540())
 		ux500_offchip_gpio_init(&mop500_offchip_gpio_cfg);
 
 	return 0;
