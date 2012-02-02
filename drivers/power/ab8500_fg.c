@@ -1368,11 +1368,9 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
 		}
 
 		di->init_cnt += sleep_time;
-		if (di->init_cnt >
-			di->bat->fg_params->init_total_time)
-			di->fg_samples = SEC_TO_SAMPLE(
-			di->bat->fg_params->accu_high_curr);
-			ab8500_fg_coulomb_counter(di, true);
+		if (di->init_cnt > di->bat->fg_params->init_total_time)
+			ab8500_fg_discharge_state_to(di,
+				AB8500_FG_DISCHARGE_READOUT_INIT);
 
 		break;
 
