@@ -2018,8 +2018,22 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
 		case POWER_SUPPLY_PROP_TECHNOLOGY:
 			switch (ext->type) {
 			case POWER_SUPPLY_TYPE_BATTERY:
-				if (!di->flags.batt_id_received)
+				if (!di->flags.batt_id_received) {
+					const struct battery_type *b;
+					b = &(di->bat->bat_type[di->bat->batt_id]);
+
 					di->flags.batt_id_received = true;
+
+					di->bat_cap.max_mah_design =
+						MILLI_TO_MICRO *
+						b->charge_full_design;
+
+					di->bat_cap.max_mah =
+						di->bat_cap.max_mah_design;
+
+					di->vbat_nom = b->nominal_voltage;
+				}
+
 				if (ret.intval)
 					di->flags.batt_unknown = false;
 				else
