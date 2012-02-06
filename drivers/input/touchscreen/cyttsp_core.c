@@ -1725,6 +1725,7 @@ static int cyttsp_resume(struct cyttsp *ts)
 	return retval;
 }
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
 static int cyttsp_suspend(struct cyttsp *ts)
 {
 	u8 sleep_mode = 0;
@@ -1751,7 +1752,6 @@ static int cyttsp_suspend(struct cyttsp *ts)
 	return retval;
 }
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
 static void cyttsp_ts_early_suspend(struct early_suspend *h)
 {
 	struct cyttsp *ts = container_of(h, struct cyttsp, early_suspend);
