@@ -419,13 +419,16 @@ static struct ux500_pin_lookup mop500_pins[] = {
 	PIN_LOOKUP("nmk-i2c.1", &mop500_pins_i2c1),
 	PIN_LOOKUP("nmk-i2c.2", &mop500_pins_i2c2),
 	PIN_LOOKUP("nmk-i2c.3", &mop500_pins_i2c3),
-	PIN_LOOKUP("ske", &mop500_pins_ske),
 	PIN_LOOKUP("sdi0", &mop500_pins_sdi0),
 	PIN_LOOKUP("sdi1", &mop500_pins_sdi1),
 	PIN_LOOKUP("sdi2", &mop500_pins_sdi2),
 	PIN_LOOKUP("sdi4", &mop500_pins_sdi4),
 	PIN_LOOKUP("ab8500-usb.0", &mop500_pins_usb),
 	PIN_LOOKUP("spi2", &mop500_pins_spi2),
+};
+
+static struct ux500_pin_lookup mop500_ske_pins[] = {
+	PIN_LOOKUP("ske", &mop500_pins_ske),
 };
 
 /*
@@ -930,6 +933,7 @@ void __init mop500_pins_init(void)
 			ARRAY_SIZE(mop500_pins_common));
 
 	ux500_pins_add(mop500_pins, ARRAY_SIZE(mop500_pins));
+	ux500_pins_add(mop500_ske_pins, ARRAY_SIZE(mop500_ske_pins));
 
 	switch (pinsfor) {
 	case PINS_FOR_U9500:
@@ -971,6 +975,7 @@ void __init hrefv60_pins_init(void)
 			ARRAY_SIZE(mop500_pins_common));
 
 	ux500_pins_add(mop500_pins, ARRAY_SIZE(mop500_pins));
+	ux500_pins_add(mop500_ske_pins, ARRAY_SIZE(mop500_ske_pins));
 
 	nmk_config_pins(hrefv60_pins,
 			ARRAY_SIZE(hrefv60_pins));
