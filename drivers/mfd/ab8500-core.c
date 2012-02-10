@@ -681,6 +681,12 @@ static struct resource __devinitdata ab8500_fg_resources[] = {
 		.end = AB8500_INT_CC_INT_CALIB,
 		.flags = IORESOURCE_IRQ,
 	},
+	{
+		.name = "CCEOC",
+		.start = AB8500_INT_CCEOC,
+		.end = AB8500_INT_CCEOC,
+		.flags = IORESOURCE_IRQ,
+	},
 };
 
 static struct resource __devinitdata ab8500_chargalg_resources[] = {};

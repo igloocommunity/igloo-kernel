@@ -351,7 +351,6 @@ static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
 	int res;
 	int inst_curr;
 	int i;
-	unsigned long stop_time;
 
 	/*
 	 * BATCTRL current sources are included on AB8500 cut2.0
@@ -384,13 +383,13 @@ static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
 	 * since the ab8500_btemp_read_batctrl_voltage call can block and
 	 * take an unknown amount of time to complete.
 	 */
-	stop_time = jiffies + msecs_to_jiffies(250);
 	i = 0;
+
 	do {
 		batctrl += ab8500_btemp_read_batctrl_voltage(di);
 		i++;
-		msleep(25);
-	} while (time_after(stop_time, jiffies));
+		msleep(20);
+	} while (!ab8500_fg_inst_curr_done(di->fg));
 	batctrl /= i;
 
 	ret = ab8500_fg_inst_curr_finalize(di->fg, &inst_curr);
@@ -407,8 +406,8 @@ static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
 		return ret;
 	}
 
-	dev_dbg(di->dev, "%s batctrl: %d res: %d inst_curr: %d\n",
-		__func__, batctrl, res, inst_curr);
+	dev_dbg(di->dev, "%s batctrl: %d res: %d inst_curr: %d samples: %d\n",
+		__func__, batctrl, res, inst_curr, i);
 
 	return res;
 }

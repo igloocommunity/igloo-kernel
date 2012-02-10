@@ -27,10 +27,12 @@
 #include <linux/mfd/abx500/ab8500-gpadc.h>
 #include <linux/mfd/abx500.h>
 #include <linux/time.h>
+#include <linux/completion.h>
 
 #define MILLI_TO_MICRO			1000
 #define FG_LSB_IN_MA			1627
 #define QLSB_NANO_AMP_HOURS_X10		1129
+#define INS_CURR_TIMEOUT		(3 * HZ)
 
 #define SEC_TO_SAMPLE(S)		(S * 4)
 
@@ -143,6 +145,7 @@ struct inst_curr_result_list {
  * struct ab8500_fg - ab8500 FG device information
  * @dev:		Pointer to the structure device
  * @node:		a list of AB8500 FGs, hence prepared for reentrance
+ * @irq			holds the CCEOC interrupt number
  * @vbat:		Battery voltage in mV
  * @vbat_nom:		Nominal battery voltage in mV
  * @inst_curr:		Instantenous battery current in mA
@@ -160,6 +163,7 @@ struct inst_curr_result_list {
  * @calib_state		State during offset calibration
  * @discharge_state:	Current discharge state
  * @charge_state:	Current charge state
+ * @ab8500_fg_complete	Completion struct used for the instant current reading
  * @flags:		Structure for information about events triggered
  * @bat_cap:		Structure for battery capacity specific parameters
  * @avg_cap:		Average capacity filter
@@ -181,6 +185,7 @@ struct inst_curr_result_list {
 struct ab8500_fg {
 	struct device *dev;
 	struct list_head node;
+	int irq;
 	int vbat;
 	int vbat_nom;
 	int inst_curr;
@@ -198,6 +203,7 @@ struct ab8500_fg {
 	enum ab8500_fg_calibration_state calib_state;
 	enum ab8500_fg_discharge_state discharge_state;
 	enum ab8500_fg_charge_state charge_state;
+	struct completion ab8500_fg_complete;
 	struct ab8500_fg_flags flags;
 	struct ab8500_fg_battery_capacity bat_cap;
 	struct ab8500_fg_avg_cap avg_cap;
@@ -515,7 +521,7 @@ cc_err:
  * Note: This is part "one" and has to be called before
  * ab8500_fg_inst_curr_finalize()
  */
-int ab8500_fg_inst_curr_start(struct ab8500_fg *di)
+ int ab8500_fg_inst_curr_start(struct ab8500_fg *di)
 {
 	u8 reg_val;
 	int ret;
@@ -548,17 +554,26 @@ int ab8500_fg_inst_curr_start(struct ab8500_fg *di)
 		di->turn_off_fg = false;
 	}
 
-	/* Reset counter and Read request */
-	ret = abx500_set_register_interruptible(di->dev, AB8500_GAS_GAUGE,
-		AB8500_GASG_CC_CTRL_REG, (RESET_ACCU | READ_REQ));
-	if (ret)
-		goto fail;
+	/* Return and WFI */
+	INIT_COMPLETION(di->ab8500_fg_complete);
+	enable_irq(di->irq);
 
 	/* Note: cc_lock is still locked */
 	return 0;
 fail:
 	mutex_unlock(&di->cc_lock);
 	return ret;
+}
+
+/**
+ * ab8500_fg_inst_curr_done() - check if fg conversion is done
+ * @di:         pointer to the ab8500_fg structure
+ *
+ * Returns 1 if conversion done, 0 if still waiting
+ */
+int ab8500_fg_inst_curr_done(struct ab8500_fg *di)
+{
+	return completion_done(&di->ab8500_fg_complete);
 }
 
 /**
@@ -575,6 +590,30 @@ int ab8500_fg_inst_curr_finalize(struct ab8500_fg *di, int *res)
 	u8 low, high;
 	int val;
 	int ret;
+	int timeout;
+
+	if (!completion_done(&di->ab8500_fg_complete)) {
+		timeout = wait_for_completion_timeout(&di->ab8500_fg_complete,
+			INS_CURR_TIMEOUT);
+		dev_dbg(di->dev, "Finalize time: %d ms\n",
+			((INS_CURR_TIMEOUT - timeout) * 1000) / HZ);
+		if (!timeout) {
+			ret = -ETIME;
+			disable_irq(di->irq);
+			dev_err(di->dev, "completion timed out [%d]\n",
+				__LINE__);
+			goto fail;
+		}
+	}
+
+	disable_irq(di->irq);
+
+	ret = abx500_mask_and_set_register_interruptible(di->dev,
+			AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
+			READ_REQ, READ_REQ);
+
+	/* 100uS between read request and read is needed */
+	usleep_range(100, 100);
 
 	/* Read CC Sample conversion value Low and high */
 	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
@@ -649,14 +688,6 @@ int ab8500_fg_inst_curr_blocking(struct ab8500_fg *di)
 		dev_err(di->dev, "Failed to initialize fg_inst\n");
 		return 0;
 	}
-
-	/*
-	 * Since there is no interrupt for this wait for 253ms to be
-	 * on the safe side.
-	 *
-	 * one sample conversion takes 250 ms at 32.768 Khz RTC clock
-	 */
-	msleep(253);
 
 	ret = ab8500_fg_inst_curr_finalize(di, &res);
 	if (ret) {
@@ -1776,6 +1807,20 @@ static void ab8500_fg_instant_work(struct work_struct *work)
 }
 
 /**
+ * ab8500_fg_cc_data_end_handler() - isr to get battery avg current.
+ * @irq:       interrupt number
+ * @_di:       pointer to the ab8500_fg structure
+ *
+ * Returns IRQ status(IRQ_HANDLED)
+ */
+static irqreturn_t ab8500_fg_cc_data_end_handler(int irq, void *_di)
+{
+	struct ab8500_fg *di = _di;
+	complete(&di->ab8500_fg_complete);
+	return IRQ_HANDLED;
+}
+
+/**
  * ab8500_fg_cc_convend_handler() - isr to get battery avg current.
  * @irq:       interrupt number
  * @_di:       pointer to the ab8500_fg structure
@@ -2380,6 +2425,7 @@ static struct ab8500_fg_interrupts ab8500_fg_irq[] = {
 	{"BATT_OVV", ab8500_fg_batt_ovv_handler},
 	{"LOW_BAT_F", ab8500_fg_lowbatf_handler},
 	{"CC_INT_CALIB", ab8500_fg_cc_int_calib_handler},
+	{"CCEOC", ab8500_fg_cc_data_end_handler},
 };
 
 static int __devinit ab8500_fg_probe(struct platform_device *pdev)
@@ -2489,6 +2535,9 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 	di->fg_samples = SEC_TO_SAMPLE(di->bat->fg_params->init_timer);
 	ab8500_fg_coulomb_counter(di, true);
 
+	/* Initialize completion used to notify completion of inst current */
+	init_completion(&di->ab8500_fg_complete);
+
 	/* Register interrupts */
 	for (i = 0; i < ARRAY_SIZE(ab8500_fg_irq); i++) {
 		irq = platform_get_irq_byname(pdev, ab8500_fg_irq[i].name);
@@ -2504,6 +2553,8 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 		dev_dbg(di->dev, "Requested %s IRQ %d: %d\n",
 			ab8500_fg_irq[i].name, irq, ret);
 	}
+	di->irq = platform_get_irq_byname(pdev, "CCEOC");
+	disable_irq(di->irq);
 
 	platform_set_drvdata(pdev, di);
 
