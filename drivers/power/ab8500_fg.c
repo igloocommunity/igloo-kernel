@@ -905,18 +905,28 @@ static int ab8500_fg_battery_resistance(struct ab8500_fg *di)
 static int ab8500_fg_load_comp_volt_to_capacity(struct ab8500_fg *di)
 {
 	int vbat_comp, res;
+	int i = 0;
+	int vbat = 0;
 
-	di->inst_curr = ab8500_fg_inst_curr_blocking(di);
-	di->vbat = ab8500_fg_bat_voltage(di);
+	ab8500_fg_inst_curr_start(di);
 
+	do {
+		vbat += ab8500_fg_bat_voltage(di);
+		i++;
+		msleep(5);
+	} while (!ab8500_fg_inst_curr_done(di));
+
+	ab8500_fg_inst_curr_finalize(di, &di->inst_curr);
+
+	di->vbat = vbat / i;
 	res = ab8500_fg_battery_resistance(di);
 
 	/* Use Ohms law to get the load compensated voltage */
 	vbat_comp = di->vbat - (di->inst_curr * res) / 1000;
 
 	dev_dbg(di->dev, "%s Measured Vbat: %dmV,Compensated Vbat %dmV, "
-		"R: %dmOhm, Current: %dmA\n",
-		__func__, di->vbat, vbat_comp, res, di->inst_curr);
+		"R: %dmOhm, Current: %dmA Vbat Samples: %d\n",
+		__func__, di->vbat, vbat_comp, res, di->inst_curr, i);
 
 	return ab8500_fg_volt_to_capacity(di, vbat_comp);
 }
