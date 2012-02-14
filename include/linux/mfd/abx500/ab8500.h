@@ -309,16 +309,28 @@ static inline int is_ab8540(struct ab8500 *ab)
 	return ab->version == AB8500_VERSION_AB8540;
 }
 
-/* include also ab8505, ab9540... */
+/* exclude also ab8505, ab9540... */
+static inline int is_ab8500_1p0_or_earlier(struct ab8500 *ab)
+{
+	return (is_ab8500(ab) && (ab->chip_id <= AB8500_CUT1P0));
+}
+
+/* exclude also ab8505, ab9540... */
 static inline int is_ab8500_1p1_or_earlier(struct ab8500 *ab)
 {
 	return (is_ab8500(ab) && (ab->chip_id <= AB8500_CUT1P1));
 }
 
-/* include also ab8505, ab9540... */
+/* exclude also ab8505, ab9540... */
 static inline int is_ab8500_2p0_or_earlier(struct ab8500 *ab)
 {
 	return (is_ab8500(ab) && (ab->chip_id <= AB8500_CUT2P0));
+}
+
+/* exclude also ab8505, ab9540... */
+static inline int is_ab8500_2p0(struct ab8500 *ab)
+{
+	return (is_ab8500(ab) && (ab->chip_id == AB8500_CUT2P0));
 }
 
 #ifdef CONFIG_AB8500_DEBUG
