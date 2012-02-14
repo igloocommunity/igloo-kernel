@@ -198,6 +198,7 @@ enum ab8500_version {
  * which is larger.
  */
 #define AB8500_NR_IRQS			112
+#define AB8505_NR_IRQS			128
 #define AB9540_NR_IRQS			128
 /* This is set to the roof of any AB8500 chip variant IRQ counts */
 #define AB8500_MAX_NR_IRQS		AB9540_NR_IRQS
@@ -335,8 +336,10 @@ static inline int is_ab8500_2p0(struct ab8500 *ab)
 
 #ifdef CONFIG_AB8500_DEBUG
 void ab8500_dump_all_banks(struct device *dev);
+void ab8500_debug_register_interrupt(int line);
 #else
 static inline void ab8500_dump_all_banks(struct device *dev) {}
+static inline void ab8500_debug_register_interrupt(int line) {}
 #endif
 
 #endif /* MFD_AB8500_H */
