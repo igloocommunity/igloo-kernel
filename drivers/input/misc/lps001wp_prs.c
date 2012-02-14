@@ -66,7 +66,7 @@
 
 
 #define	OUTDATA_REG	0x28
-#define	INDATA_REG	0X30
+#define	REF_PRESS_REG	0X30
 
 #define	WHOAMI_LPS001WP_PRS	0xBA	/*	Expctd content for WAI	*/
 
@@ -81,7 +81,7 @@
 #define PRESS_OUT_L	OUTDATA_REG
 
 
-#define	REF_P_L		INDATA_REG	/*	pressure reference	*/
+#define	REF_P_L		REF_PRESS_REG	/*	pressure reference	*/
 #define	REF_P_H		0x31		/*	pressure reference	*/
 #define	THS_P_L		0x32		/*	pressure threshold	*/
 #define	THS_P_H		0x33		/*	pressure threshold	*/
@@ -142,6 +142,24 @@ static const struct {
 		{1000,	LPS001WP_PRS_ODR_7_1 },
 };
 
+/**
+ * struct lps001wp_prs_data - data structure used by lps001wp_prs driver
+ * @client: i2c client
+ * @pdata: lsm303dlh platform data
+ * @lock: mutex lock for sysfs operations
+ * @input_work: work queue to read sensor data
+ * @input_dev: input device
+ * @regulator: regulator
+ * @early_suspend: early suspend structure
+ * @hw_initialized: saves hw initialisation status
+ * @hw_working: saves hw status
+ * @diff_enabled: store value of diff enable
+ * @lpowmode_enabled: flag to set lowpower mode
+ * @enabled: to store mode of device
+ * @on_before_suspend: to store status of device during suspend
+ * @resume_state:store regester values
+ * @reg_addr: stores reg address to debug
+ */
 struct lps001wp_prs_data {
 	struct i2c_client *client;
 	struct lps001wp_prs_platform_data *pdata;
@@ -151,6 +169,7 @@ struct lps001wp_prs_data {
 	struct delayed_work input_work;
 	struct input_dev *input_dev;
 #endif
+	struct regulator *regulator;
 	struct early_suspend early_suspend;
 
 	int hw_initialized;
@@ -253,7 +272,7 @@ static int lps001wp_prs_i2c_write(struct lps001wp_prs_data *prs,
 static int lps001wp_prs_register_write(struct lps001wp_prs_data *prs, u8 *buf,
 		u8 reg_address, u8 new_value)
 {
-	int err = -1;
+	int err = -EINVAL;
 
 	/* Sets configuration register at reg_address
 	 *  NOTE: this is a straight overwrite  */
@@ -269,7 +288,7 @@ static int lps001wp_prs_register_read(struct lps001wp_prs_data *prs, u8 *buf,
 		u8 reg_address)
 {
 
-	int err = -1;
+	int err = -EINVAL;
 	buf[0] = (reg_address);
 	err = lps001wp_prs_i2c_read(prs, buf, 1);
 
@@ -279,7 +298,7 @@ static int lps001wp_prs_register_read(struct lps001wp_prs_data *prs, u8 *buf,
 static int lps001wp_prs_register_update(struct lps001wp_prs_data *prs, u8 *buf,
 		u8 reg_address, u8 mask, u8 new_bit_values)
 {
-	int err = -1;
+	int err = -EINVAL;
 	u8 init_val;
 	u8 updated_val;
 	err = lps001wp_prs_register_read(prs, buf, reg_address);
@@ -297,10 +316,11 @@ static int lps001wp_prs_register_update(struct lps001wp_prs_data *prs, u8 *buf,
 
 static int lps001wp_prs_hw_init(struct lps001wp_prs_data *prs)
 {
-	int err = -1;
+	int err = -EINVAL;
 	u8 buf[6];
 
-	printk(KERN_DEBUG "%s: hw init start\n", LPS001WP_PRS_DEV_NAME);
+	dev_dbg(&prs->client->dev, "%s: hw init start\n",
+					LPS001WP_PRS_DEV_NAME);
 
 	buf[0] = WHO_AM_I;
 	err = lps001wp_prs_i2c_read(prs, buf, 1);
@@ -309,12 +329,12 @@ static int lps001wp_prs_hw_init(struct lps001wp_prs_data *prs)
 	else
 		prs->hw_working = 1;
 	if (buf[0] != WHOAMI_LPS001WP_PRS) {
-		err = -1; /* TODO:choose the right coded error */
+		err = -EINVAL; /* TODO:choose the right coded error */
 		goto error_unknown_device;
 	}
 
 
-	buf[0] = (I2C_AUTO_INCREMENT | INDATA_REG);
+	buf[0] = (I2C_AUTO_INCREMENT | REF_PRESS_REG);
 	buf[1] = prs->resume_state[RES_REF_P_L];
 	buf[2] = prs->resume_state[RES_REF_P_H];
 	buf[3] = prs->resume_state[RES_THS_P_L];
@@ -339,7 +359,7 @@ static int lps001wp_prs_hw_init(struct lps001wp_prs_data *prs)
 
 
 	prs->hw_initialized = 1;
-	printk(KERN_DEBUG "%s: hw init done\n", LPS001WP_PRS_DEV_NAME);
+	dev_dbg(&prs->client->dev, "%s: hw init done\n", LPS001WP_PRS_DEV_NAME);
 	return 0;
 
 error_firstread:
@@ -382,7 +402,7 @@ static void lps001wp_prs_device_power_off(struct lps001wp_prs_data *prs)
 
 static int lps001wp_prs_device_power_on(struct lps001wp_prs_data *prs)
 {
-	int err = -1;
+	int err = -EINVAL;
 
 	/* get the regulator the first time */
 	if (!prs->regulator) {
@@ -416,7 +436,7 @@ static int lps001wp_prs_device_power_on(struct lps001wp_prs_data *prs)
 
 int lps001wp_prs_update_odr(struct lps001wp_prs_data *prs, int poll_interval_ms)
 {
-	int err = -1;
+	int err = -EINVAL;
 	int i;
 
 	u8 buf[2];
@@ -467,12 +487,17 @@ error:
 static int lps001wp_prs_set_press_reference(struct lps001wp_prs_data *prs,
 				u16 new_reference)
 {
-	int err = -1;
+	int err = -EINVAL;
 	u8 const reg_addressL = REF_P_L;
 	u8 const reg_addressH = REF_P_H;
 	u8 bit_valuesL, bit_valuesH;
 	u8 buf[2];
-
+	/*
+	 * We need to set new configurations, only if device
+	 * is currently enabled
+	 */
+	if (!atomic_read(&prs->enabled))
+		return err;
 	bit_valuesL = (u8) (new_reference & 0x00FF);
 	bit_valuesH = (u8)((new_reference & 0xFF00) >> 8);
 
@@ -495,12 +520,17 @@ static int lps001wp_prs_set_press_reference(struct lps001wp_prs_data *prs,
 static int lps001wp_prs_get_press_reference(struct lps001wp_prs_data *prs,
 		u16 *buf16)
 {
-	int err = -1;
+	int err = -EINVAL;
 
 	u8 bit_valuesL, bit_valuesH;
 	u8 buf[2] = {0};
 	u16 temp = 0;
-
+	/*
+	 * We need to read configurations, only if device
+	 * is currently enabled
+	 */
+	if (!atomic_read(&prs->enabled))
+		return err;
 	err = lps001wp_prs_register_read(prs, buf, REF_P_L);
 	if (err < 0)
 		return err;
@@ -518,11 +548,17 @@ static int lps001wp_prs_get_press_reference(struct lps001wp_prs_data *prs,
 
 static int lps001wp_prs_lpow_manage(struct lps001wp_prs_data *prs, u8 control)
 {
-	int err = -1;
+	int err = -EINVAL;
 	u8 buf[2] = {0x00, 0x00};
 	u8 const mask = LPS001WP_PRS_LPOW_MASK;
 	u8 bit_values = LPS001WP_PRS_LPOW_OFF;
 
+	/*
+	 * We need to set new configurations, only if device
+	 * is currently enabled
+	 */
+	if (!atomic_read(&prs->enabled))
+		return err;
 	if (control >= LPS001WP_PRS_LPOWER_EN) {
 		bit_values = LPS001WP_PRS_LPOW_ON;
 	}
@@ -543,11 +579,17 @@ static int lps001wp_prs_lpow_manage(struct lps001wp_prs_data *prs, u8 control)
 
 static int lps001wp_prs_diffen_manage(struct lps001wp_prs_data *prs, u8 control)
 {
-	int err = -1;
+	int err = -EINVAL;
 	u8 buf[2] = {0x00, 0x00};
 	u8 const mask = LPS001WP_PRS_DIFF_MASK;
 	u8 bit_values = LPS001WP_PRS_DIFF_OFF;
 
+	/*
+	 * We need to set new configurations, only if device
+	 * is currently enabled
+	 */
+	if (!atomic_read(&prs->enabled))
+		return err;
 	if (control >= LPS001WP_PRS_DIFF_ENABLE) {
 		bit_values = LPS001WP_PRS_DIFF_ON;
 	}
@@ -570,7 +612,7 @@ static int lps001wp_prs_diffen_manage(struct lps001wp_prs_data *prs, u8 control)
 static int lps001wp_prs_get_presstemp_data(struct lps001wp_prs_data *prs,
 						struct outputdata *out)
 {
-	int err = -1;
+	int err = -EINVAL;
 	/* Data bytes from hardware	PRESS_OUT_L, PRESS_OUT_H,
 	 *				TEMP_OUT_L, TEMP_OUT_H,
 	 *				DELTA_L, DELTA_H */
@@ -593,8 +635,8 @@ static int lps001wp_prs_get_presstemp_data(struct lps001wp_prs_data *prs,
 	abspr = ((((u16) prs_data[1] << 8) | ((u16) prs_data[0])));
 	temperature = ((s16) (((u16) prs_data[3] << 8) | ((u16)prs_data[2])));
 
-	out->abspress = abspr;
-	out->temperature = temperature;
+	out->abspress = (abspr >> SENSITIVITY_P_SHIFT);
+	out->temperature = (temperature >> SENSITIVITY_T_SHIFT);
 
 	deltapr = ((s16) (((u16) prs_data[5] << 8) | ((u16)prs_data[4])));
 	out->deltapress = deltapr;
@@ -618,6 +660,8 @@ static int lps001wp_prs_enable(struct lps001wp_prs_data *prs)
 	int err;
 
 	if (!atomic_cmpxchg(&prs->enabled, 0, 1)) {
+		if (prs->regulator)
+			regulator_enable(prs->regulator);
 		err = lps001wp_prs_device_power_on(prs);
 		if (err < 0) {
 			atomic_set(&prs->enabled, 0);
@@ -639,6 +683,8 @@ static int lps001wp_prs_disable(struct lps001wp_prs_data *prs)
 		cancel_delayed_work_sync(&prs->input_work);
 #endif
 		lps001wp_prs_device_power_off(prs);
+		if (prs->regulator)
+			regulator_disable(prs->regulator);
 	}
 
 	return 0;
@@ -662,6 +708,7 @@ static ssize_t attr_set_polling_rate(struct device *dev,
 {
 	struct lps001wp_prs_data *prs = dev_get_drvdata(dev);
 	unsigned long interval_ms;
+	int err = -EINVAL;
 
 	if (strict_strtoul(buf, 10, &interval_ms))
 		return -EINVAL;
@@ -669,7 +716,12 @@ static ssize_t attr_set_polling_rate(struct device *dev,
 		return -EINVAL;
 	mutex_lock(&prs->lock);
 	prs->pdata->poll_interval = interval_ms;
-	lps001wp_prs_update_odr(prs, interval_ms);
+	err = lps001wp_prs_update_odr(prs, interval_ms);
+	if (err < 0) {
+		dev_err(&prs->client->dev, "failed to update odr %ld\n",
+								interval_ms);
+		size = err;
+	}
 	mutex_unlock(&prs->lock);
 	return size;
 }
@@ -692,12 +744,18 @@ static ssize_t attr_set_diff_enable(struct device *dev,
 {
 	struct lps001wp_prs_data *prs = dev_get_drvdata(dev);
 	unsigned long val;
+	int err = -EINVAL;
 
 	if (strict_strtoul(buf, 10, &val))
 		return -EINVAL;
 
 	mutex_lock(&prs->lock);
-	lps001wp_prs_diffen_manage(prs, (u8) val);
+	err = lps001wp_prs_diffen_manage(prs, (u8) val);
+	if (err < 0) {
+		dev_err(&prs->client->dev, "failed to diff enable %ld\n", val);
+		mutex_unlock(&prs->lock);
+		return err;
+	}
 	mutex_unlock(&prs->lock);
 	return size;
 }
@@ -731,15 +789,17 @@ static ssize_t attr_set_enable(struct device *dev,
 static ssize_t attr_get_press_ref(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
-	int err = -1;
+	int err = -EINVAL;
 	struct lps001wp_prs_data *prs = dev_get_drvdata(dev);
 	u16 val = 0;
 
 	mutex_lock(&prs->lock);
 	err = lps001wp_prs_get_press_reference(prs, &val);
 	mutex_unlock(&prs->lock);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&prs->client->dev, "failed to get ref press\n");
 		return err;
+	}
 
 	return sprintf(buf, "%d\n", val);
 }
@@ -748,7 +808,7 @@ static ssize_t attr_set_press_ref(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t size)
 {
-	int err = -1;
+	int err = -EINVAL;
 	struct lps001wp_prs_data *prs = dev_get_drvdata(dev);
 	unsigned long val = 0;
 
@@ -761,8 +821,11 @@ static ssize_t attr_set_press_ref(struct device *dev,
 	mutex_lock(&prs->lock);
 	err = lps001wp_prs_set_press_reference(prs, val);
 	mutex_unlock(&prs->lock);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&prs->client->dev, "failed to set ref press %ld\n",
+								val);
 		return err;
+	}
 	return size;
 }
 
@@ -782,7 +845,7 @@ static ssize_t attr_set_lowpowmode(struct device *dev,
 				   struct device_attribute *attr,
 				   const char *buf, size_t size)
 {
-	int err = -1;
+	int err = -EINVAL;
 	struct lps001wp_prs_data *prs = dev_get_drvdata(dev);
 	unsigned long val;
 
@@ -792,12 +855,86 @@ static ssize_t attr_set_lowpowmode(struct device *dev,
 	mutex_lock(&prs->lock);
 	err = lps001wp_prs_lpow_manage(prs, (u8) val);
 	mutex_unlock(&prs->lock);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&prs->client->dev, "failed to set low powermode\n");
 		return err;
+	}
 	return size;
 }
+static ssize_t lps001wp_prs_get_press_data(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct lps001wp_prs_data *prs = dev_get_drvdata(dev);
+	struct outputdata out;
+	int err = -EINVAL;
+	mutex_lock(&prs->lock);
+	/*
+	 * If device is currently enabled, we need to read
+	 *  data from it.
+	 */
+	if (!atomic_read(&prs->enabled))
+		goto out;
+	err = lps001wp_prs_get_presstemp_data(prs, &out);
+	if (err < 0) {
+		dev_err(&prs->client->dev, "get_pressure_data failed\n");
+		goto out;
+	}
+	mutex_unlock(&prs->lock);
+	return sprintf(buf, "%d", out.abspress);
+out:
+	mutex_unlock(&prs->lock);
+	return err;
+}
 
+static ssize_t lps001wp_prs_get_deltapr_data(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct lps001wp_prs_data *prs = dev_get_drvdata(dev);
+	struct outputdata out;
+	int err = -EINVAL;
+	mutex_lock(&prs->lock);
+	/*
+	 * If device is currently enabled, we need to read
+	 *  data from it.
+	 */
+	if (!atomic_read(&prs->enabled)) {
+		mutex_unlock(&prs->lock);
+		return err;
+	}
+	err = lps001wp_prs_get_presstemp_data(prs, &out);
+	if (err < 0) {
+		dev_err(&prs->client->dev, "get_deltapress_data failed\n");
+		mutex_unlock(&prs->lock);
+		return err;
+	}
+	mutex_unlock(&prs->lock);
+	return sprintf(buf, "%d", out.deltapress);
+}
 
+static ssize_t lps001wp_prs_get_temp_data(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct lps001wp_prs_data *prs = dev_get_drvdata(dev);
+	struct outputdata out;
+	int err = -EINVAL;
+	mutex_lock(&prs->lock);
+	/*
+	 * If device is currently enabled, we need to read
+	 *  data from it.
+	 */
+	if (!atomic_read(&prs->enabled)) {
+		mutex_unlock(&prs->lock);
+		return err;
+	}
+	err = lps001wp_prs_get_presstemp_data(prs, &out);
+	if (err < 0) {
+		dev_err(&prs->client->dev, "get_temperature_data failed\n");
+		mutex_unlock(&prs->lock);
+		return err;
+	}
+	mutex_unlock(&prs->lock);
+	return sprintf(buf, "%d", out.temperature);
+}
 #ifdef DEBUG
 static ssize_t attr_reg_set(struct device *dev, struct device_attribute *attr,
 				const char *buf, size_t size)
@@ -852,14 +989,21 @@ static ssize_t attr_addr_set(struct device *dev, struct device_attribute *attr,
 
 
 static struct device_attribute attributes[] = {
-	__ATTR(pollrate_ms, 0664, attr_get_polling_rate, attr_set_polling_rate),
-	__ATTR(enable, 0664, attr_get_enable, attr_set_enable),
-	__ATTR(diff_enable, 0664, attr_get_diff_enable, attr_set_diff_enable),
-	__ATTR(press_reference, 0664, attr_get_press_ref, attr_set_press_ref),
-	__ATTR(lowpow_enable, 0664, attr_get_lowpowmode, attr_set_lowpowmode),
+	__ATTR(pollrate_ms, S_IWUSR | S_IRUGO, attr_get_polling_rate,
+		attr_set_polling_rate),
+	__ATTR(enable, S_IWUSR | S_IRUGO, attr_get_enable, attr_set_enable),
+	__ATTR(diff_enable, S_IWUSR | S_IRUGO, attr_get_diff_enable,
+		attr_set_diff_enable),
+	__ATTR(press_reference, S_IWUSR | S_IRUGO, attr_get_press_ref,
+		attr_set_press_ref),
+	__ATTR(lowpow_enable, S_IWUSR | S_IRUGO, attr_get_lowpowmode,
+		attr_set_lowpowmode),
+	__ATTR(press_data, S_IRUGO, lps001wp_prs_get_press_data, NULL),
+	__ATTR(temp_data, S_IRUGO, lps001wp_prs_get_temp_data, NULL),
+	__ATTR(deltapr_data, S_IRUGO, lps001wp_prs_get_deltapr_data, NULL),
 #ifdef DEBUG
-	__ATTR(reg_value, 0664, attr_reg_get, attr_reg_set),
-	__ATTR(reg_addr, 0220, NULL, attr_addr_set),
+	__ATTR(reg_value, S_IWUSR | S_IRUGO, attr_reg_get, attr_reg_set),
+	__ATTR(reg_addr, S_IWUSR, NULL, attr_addr_set),
 #endif
 };
 
@@ -996,7 +1140,7 @@ static int lps001wp_prs_probe(struct i2c_client *client,
 					const struct i2c_device_id *id)
 {
 	struct lps001wp_prs_data *prs;
-	int err = -1;
+	int err = -EINVAL;
 	int tempvalue;
 
 	pr_info("%s: probe start.\n", LPS001WP_PRS_DEV_NAME);
@@ -1046,23 +1190,31 @@ static int lps001wp_prs_probe(struct i2c_client *client,
 	prs->client = client;
 	i2c_set_clientdata(client, prs);
 
+	prs->regulator = regulator_get(&client->dev, "vdd");
+	if (IS_ERR(prs->regulator)) {
+		dev_err(&client->dev, "failed to get regulator\n");
+		err = PTR_ERR(prs->regulator);
+		prs->regulator = NULL;
+	}
+	if (prs->regulator)
+		regulator_enable(prs->regulator);
 
 	if (i2c_smbus_read_byte(client) < 0) {
-		printk(KERN_ERR "i2c_smbus_read_byte error!!\n");
+		dev_err(&client->dev, "i2c_smbus_read_byte error!!\n");
 		goto err_mutexunlockfreedata;
 	} else {
-		printk(KERN_DEBUG "%s Device detected!\n",
+		dev_dbg(&client->dev, "%s Device detected!\n",
 							LPS001WP_PRS_DEV_NAME);
 	}
 
 	/* read chip id */
 	tempvalue = i2c_smbus_read_word_data(client, WHO_AM_I);
 	if ((tempvalue & 0x00FF) == WHOAMI_LPS001WP_PRS) {
-		printk(KERN_DEBUG "%s I2C driver registered!\n",
+		dev_dbg(&client->dev, "%s I2C driver registered!\n",
 							LPS001WP_PRS_DEV_NAME);
 	} else {
 		prs->client = NULL;
-		printk(KERN_DEBUG "I2C driver not registered!"
+		dev_dbg(&client->dev, "I2C driver not registered!"
 				" Device unknown\n");
 		goto err_mutexunlockfreedata;
 	}
@@ -1146,6 +1298,9 @@ static int lps001wp_prs_probe(struct i2c_client *client,
 
 	lps001wp_prs_device_power_off(prs);
 
+	if (prs->regulator)
+		regulator_disable(prs->regulator);
+
 	/* As default, do not report information */
 	atomic_set(&prs->enabled, 0);
 
@@ -1175,9 +1330,14 @@ exit_kfree_pdata:
 err_mutexunlockfreedata:
 	mutex_unlock(&prs->lock);
 	kfree(prs);
+	if (prs->regulator) {
+		regulator_disable(prs->regulator);
+		regulator_put(prs->regulator);
+	}
 exit_alloc_data_failed:
 exit_check_functionality_failed:
-	printk(KERN_ERR "%s: Driver Init failed\n", LPS001WP_PRS_DEV_NAME);
+	dev_err(&client->dev, "%s: Driver Init failed\n",
+					LPS001WP_PRS_DEV_NAME);
 	return err;
 }
 
@@ -1190,6 +1350,12 @@ static int __devexit lps001wp_prs_remove(struct i2c_client *client)
 #endif
 	lps001wp_prs_device_power_off(prs);
 	remove_sysfs_interfaces(&client->dev);
+	if (prs->regulator) {
+		/* Disable the regulator if device is enabled. */
+		if (atomic_read(&prs->enabled))
+			regulator_disable(prs->regulator);
+		regulator_put(prs->regulator);
+	}
 
 	if (prs->pdata->exit)
 		prs->pdata->exit();
