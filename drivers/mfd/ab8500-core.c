@@ -1055,7 +1055,7 @@ int __devinit ab8500_init(struct ab8500 *ab8500, enum ab8500_version version)
 			ab8500->chip_id & 0x0F);
 
 	/* Configure AB8500 or AB9540 IRQ */
-	if (is_ab9540(ab8500)) {
+	if (is_ab9540(ab8500) || is_ab8505(ab8500)) {
 		ab8500->mask_size = AB9540_NUM_IRQ_REGS;
 		ab8500->irq_reg_offset = ab9540_irq_regoffset;
 	} else {
