@@ -39,6 +39,9 @@
 
 #include <linux/lsm303dlh.h>
 #include <linux/regulator/consumer.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
 #include <linux/kernel.h>
 
 /* lsm303dlh magnetometer registers */
@@ -130,6 +133,9 @@
 #define DEVICE_ON 1
 #define DEVICE_SUSPENDED 2
 
+/* device CHIP ID defines */
+#define LSM303DLHC_CHIP_ID 51
+
 /**
  * struct lsm303dlh_m_data - data structure used by lsm303dlh_m driver
  * @client: i2c client
@@ -161,6 +167,9 @@ struct lsm303dlh_m_data {
 	unsigned char mode;
 	unsigned char rate;
 	unsigned char range;
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend early_suspend;
+#endif
 	int device_status;
 };
 
@@ -334,16 +343,16 @@ static int lsm303dlh_m_xyz_read(struct lsm303dlh_m_data *ddata)
 	ddata->data[2] = (short)
 		(((xyz_data[4]) << 8) | xyz_data[5]);
 
-#ifdef SENSORS_LSM303DLHC
-	/*
-	 * the out registers are in x, z and y order
-	 * so swap y and z values
-	 */
-	temp = ddata->data[1];
-	ddata->data[1] = ddata->data[2];
-	ddata->data[2] = temp;
-#endif
-
+	/* check if chip is DHLC */
+	if (ddata->pdata.chip_id == LSM303DLHC_CHIP_ID) {
+		/*
+		 * the out registers are in x, z and y order
+		 * so swap y and z values
+		 */
+		temp = ddata->data[1];
+		ddata->data[1] = ddata->data[2];
+		ddata->data[2] = temp;
+	}
 	/* taking orientation of x,y,z axis into account*/
 
 	ddata->data[ddata->pdata.axis_map_x] = ddata->pdata.negative_x ?
@@ -516,6 +525,7 @@ static ssize_t lsm303dlh_m_store_range(struct device *dev,
 		z_gain = Z_GAIN_8_1;
 		break;
 	default:
+		mutex_unlock(&ddata->lock);
 		return -EINVAL;
 	}
 
@@ -690,6 +700,12 @@ static int __devinit lsm303dlh_m_probe(struct i2c_client *client,
 	}
 
 	if (ddata->regulator) {
+		/*
+		 * 0.83 milliamps typical with magnetic sensor setting ODR =
+		 * 7.5 Hz, Accelerometer sensor ODR = 50 Hz.  Double for
+		 * safety.
+		 */
+		regulator_set_optimum_mode(ddata->regulator, 830 * 2);
 		regulator_enable(ddata->regulator);
 		ddata->device_status = DEVICE_ON;
 	}
@@ -884,9 +900,9 @@ static struct i2c_driver lsm303dlh_m_driver = {
 	.id_table	= lsm303dlh_m_id,
 	.driver = {
 		.name = "lsm303dlh_m",
-	#if (!defined(CONFIG_HAS_EARLYSUSPEND) && defined(CONFIG_PM))
+#if (!defined(CONFIG_HAS_EARLYSUSPEND) && defined(CONFIG_PM))
 		.pm = &lsm303dlh_m_dev_pm_ops,
-	#endif
+#endif
 	},
 };
 

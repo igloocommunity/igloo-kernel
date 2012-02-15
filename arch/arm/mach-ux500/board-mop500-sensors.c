@@ -80,7 +80,7 @@ static struct i2c_board_info __initdata mop500_2_i2c2_devices[] = {
 static struct i2c_board_info __initdata snowball_i2c2_devices[] = {
 	{
 		/* LSM303DLH Accelerometer */
-		I2C_BOARD_INFO("lsm303dlh_a", 0x19),
+		I2C_BOARD_INFO("lsm303dlhc_a", 0x19),
 		.platform_data = &lsm303dlh_pdata,
 	},
 };
@@ -121,6 +121,7 @@ void mop500_sensors_i2c_add(int busnum, struct i2c_board_info const *info,
 void mop500_sensors_probe_add_lsm303dlh_a(void)
 {
 	static const int busnum = 2;
+	int status;
 	struct i2c_adapter *adap;
 	struct i2c_client *client;
 	static const unsigned short i2c_addr_list[] = {
@@ -130,6 +131,7 @@ void mop500_sensors_probe_add_lsm303dlh_a(void)
 			I2C_BOARD_INFO("lsm303dlh_a", 0),
 			.platform_data = &lsm303dlh_pdata,
 	};
+	union i2c_smbus_data data;
 
 	adap = i2c_get_adapter(busnum);
 	if (!adap) {
@@ -143,6 +145,23 @@ void mop500_sensors_probe_add_lsm303dlh_a(void)
 		pr_err(__FILE__ ": failed to register %s to i2c%d\n",
 				i2c_info.type,
 				busnum);
+	/* driver is different for LSM3030DLH(0x18) and LSM303DLHC(0x19)*/
+	if (i2c_info.addr == 0x19) {
+		snprintf(i2c_info.type, sizeof(i2c_info.type), "lsm303dlhc_a");
+	}
+	/*
+	 * From the i2c_new_probed_device() function we will come to know
+	 * the adress of the device, so read 0x0F register to get chipID.
+	 * This chipID is used in magnetometer driver to invet co-ordinates.
+	 */
+	status = i2c_smbus_xfer(adap, i2c_info.addr , 0 ,
+			I2C_SMBUS_READ, 0x0F ,
+			I2C_SMBUS_BYTE_DATA, &data);
+	if (status < 0) {
+		pr_err(__FILE__ ": failed to read 0x0F register\n");
+	}
+	else
+		lsm303dlh_pdata.chip_id = data.byte;
 	i2c_put_adapter(adap);
 }
 
@@ -166,20 +185,24 @@ static int __init mop500_sensors_init(void)
 		lsm303dlh_pdata.irq_m = GPIO_MAGNET_DRDY;
 	}
 
-	mop500_sensors_i2c_add(2, mop500_i2c2_devices,
-			ARRAY_SIZE(mop500_i2c2_devices));
-
 	if (machine_is_snowball()) {
 		if (cpu_is_u8500v21())
 			/* This is ugly but we cant know what address
 			 * to use */
 			mop500_sensors_probe_add_lsm303dlh_a();
-		else /* Add the accelerometer with new addr */
+		else {
+			/* Add the accelerometer with new addr */
 			mop500_sensors_i2c_add(2, snowball_i2c2_devices,
 					ARRAY_SIZE(snowball_i2c2_devices));
+			/* For 0x19 accelerometer chip_id is 51*/
+			lsm303dlh_pdata.chip_id = 51;
+		}
 	} else /* none snowball have the old addr */
 		mop500_sensors_i2c_add(2, mop500_2_i2c2_devices,
 				ARRAY_SIZE(mop500_2_i2c2_devices));
+
+	mop500_sensors_i2c_add(2, mop500_i2c2_devices,
+			ARRAY_SIZE(mop500_i2c2_devices));
 	return 0;
 }
 
