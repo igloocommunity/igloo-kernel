@@ -37,6 +37,7 @@
 #endif
 
 #include <linux/lsm303dlh.h>
+#include <linux/earlysuspend.h>
 #include <linux/regulator/consumer.h>
 
  /* lsm303dlh accelerometer registers */
@@ -197,6 +198,7 @@ struct lsm303dlh_a_data {
 	unsigned char interrupt_configure[2];
 	unsigned char interrupt_duration[2];
 	unsigned char interrupt_threshold[2];
+	struct early_suspend early_suspend;
 	int device_status;
 	int id;
 };
@@ -287,6 +289,7 @@ static int lsm303dlh_a_restore(struct lsm303dlh_a_data *ddata)
 
 	if (ddata->regulator)
 		regulator_enable(ddata->regulator);
+
 	/* BDU should be enabled by default/recommened */
 	reg = ddata->range;
 	reg |= LSM303DLH_A_CR4_BDU_MASK;
@@ -761,6 +764,7 @@ static ssize_t lsm303dlh_a_store_range(struct device *dev,
 		ddata->shift_adjust = SHIFT_ADJ_8G;
 		break;
 	default:
+		mutex_unlock(&ddata->lock);
 		return -EINVAL;
 	}
 
@@ -834,10 +838,15 @@ static ssize_t lsm303dlh_a_store_mode(struct device *dev,
 
 	data = lsm303dlh_a_read(ddata, CTRL_REG1, "CTRL_REG1");
 
+	/*
+	 * If chip doesn't get reset during suspend/resume,
+	 * x,y and z axis bits are getting cleared,so set
+	 * these bits to get x,y,z axis data.
+	 */
+	data |= LSM303DLH_A_CR1_AXIS_ENABLE;
 	data &= ~LSM303DLH_A_CR1_PM_MASK;
 
 	ddata->mode = val;
-
 	data |= ((val << LSM303DLH_A_CR1_PM_BIT) & LSM303DLH_A_CR1_PM_MASK);
 
 	error = lsm303dlh_a_write(ddata, CTRL_REG1, data, "CTRL_REG1");
@@ -1093,6 +1102,12 @@ static int __devinit lsm303dlh_a_probe(struct i2c_client *client,
 	}
 
 	if (ddata->regulator) {
+		/*
+		 * 0.83 milliamps typical with magnetic sensor setting ODR =
+		 * 7.5 Hz, Accelerometer sensor ODR = 50 Hz.  Double for
+		 * safety.
+		 */
+		regulator_set_optimum_mode(ddata->regulator, 830 * 2);
 		regulator_enable(ddata->regulator);
 		ddata->device_status = DEVICE_ON;
 	}

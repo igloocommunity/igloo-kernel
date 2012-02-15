@@ -51,7 +51,6 @@
 #include <mach/hardware.h>
 #include <mach/setup.h>
 #include <mach/devices.h>
-#include <mach/sensors1p.h>
 #ifdef CONFIG_INPUT_AB8500_ACCDET
 #include <mach/abx500-accdet.h>
 #endif
@@ -648,42 +647,6 @@ static void __init mop500_i2c_init(void)
 	db8500_add_i2c3(&u8500_i2c3_data);
 }
 
-static struct gpio_keys_button mop500_gpio_keys[] = {
-	{
-		.desc			= "SFH7741 Proximity Sensor",
-		.type			= EV_SW,
-		.code			= SW_FRONT_PROXIMITY,
-		.active_low		= 0,
-		.can_disable		= 1,
-	},
-	{
-		.desc			= "HED54XXU11 Hall Effect Sensor",
-		.type			= EV_SW,
-		.code			= SW_LID, /* FIXME arbitrary usage */
-		.active_low		= 0,
-		.can_disable		= 1,
-	}
-};
-
-static struct regulator *sensors1p_regulator;
-static int mop500_sensors1p_activate(struct device *dev);
-static void mop500_sensors1p_deactivate(struct device *dev);
-
-static struct gpio_keys_platform_data mop500_gpio_keys_data = {
-	.buttons	= mop500_gpio_keys,
-	.nbuttons	= ARRAY_SIZE(mop500_gpio_keys),
-	.enable		= mop500_sensors1p_activate,
-	.disable	= mop500_sensors1p_deactivate,
-};
-
-static struct platform_device mop500_gpio_keys_device = {
-	.name	= "gpio-keys",
-	.id	= 0,
-	.dev	= {
-		.platform_data	= &mop500_gpio_keys_data,
-	},
-};
-
 #ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
 static struct platform_device snowball_gpio_wlan_vbat_regulator_device = {
 	.name	= "reg-fixed-voltage",
@@ -701,24 +664,6 @@ static struct platform_device snowball_gpio_en_3v3_regulator_device = {
 	},
 };
 #endif
-
-static int mop500_sensors1p_activate(struct device *dev)
-{
-	sensors1p_regulator = regulator_get(&mop500_gpio_keys_device.dev,
-						"vcc");
-	if (IS_ERR(sensors1p_regulator)) {
-		dev_err(&mop500_gpio_keys_device.dev, "no regulator\n");
-		return PTR_ERR(sensors1p_regulator);
-	}
-	regulator_enable(sensors1p_regulator);
-	return 0;
-}
-
-static void mop500_sensors1p_deactivate(struct device *dev)
-{
-	regulator_disable(sensors1p_regulator);
-	regulator_put(sensors1p_regulator);
-}
 
 #ifdef CONFIG_LEDS_PWM
 static struct led_pwm pwm_leds_data[] = {
@@ -867,30 +812,6 @@ struct platform_device u8500_sim_detect_device = {
 };
 #endif
 
-#ifdef CONFIG_SENSORS1P_MOP
-static struct sensors1p_config sensors1p_config = {
-      /* SFH7741 */
-       .proximity = {
-               .pin = EGPIO_PIN_7,
-               .startup_time = 120, /* ms */
-               .regulator = "v-proximity",
-       },
-       /* HED54XXU11 */
-       .hal = {
-               .pin = EGPIO_PIN_8,
-               .startup_time = 100, /* Actually, I have no clue. */
-               .regulator = "v-hal",
-       },
-};
-
-struct platform_device sensors1p_device = {
-       .name = "sensors1p",
-       .dev = {
-               .platform_data = (void *)&sensors1p_config,
-       },
-};
-#endif
-
 #ifdef CONFIG_CRYPTO_DEV_UX500
 static struct cryp_platform_data u8500_cryp1_platform_data = {
 	.mem_to_engine = {
@@ -931,9 +852,6 @@ static struct hash_platform_data u8500_hash1_platform_data = {
 
 /* add any platform devices here - TODO */
 static struct platform_device *mop500_platform_devs[] __initdata = {
-#ifdef CONFIG_SENSORS1P_MOP
-       &sensors1p_device,
-#endif
 #ifdef CONFIG_U8500_SIM_DETECT
 	&u8500_sim_detect_device,
 #endif
@@ -951,7 +869,6 @@ static struct platform_device *mop500_platform_devs[] __initdata = {
 #ifdef CONFIG_STE_TRACE_MODEM
 	&u8500_trace_modem,
 #endif
-	&mop500_gpio_keys_device,
 #ifdef CONFIG_LEDS_PWM
 	&ux500_leds_device,
 #endif
@@ -1219,20 +1136,6 @@ static void accessory_detect_config(void)
 
 static void __init mop500_init_machine(void)
 {
-	/*
-	 * The HREFv60 board removed a GPIO expander and routed
-	 * all these GPIO pins to the internal GPIO controller
-	 * instead.
-	 */
-	if (!machine_is_snowball()) {
-		if (machine_is_hrefv60()) {
-			mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
-			mop500_gpio_keys[1].gpio = HREFV60_HAL_SW_GPIO;
-		} else {
-			mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
-			mop500_gpio_keys[1].gpio = GPIO_HAL_SENSOR;
-		}
-	}
 
 	accessory_detect_config();
 
@@ -1249,12 +1152,13 @@ static void __init mop500_init_machine(void)
 				ARRAY_SIZE(u8500_hsi_devices));
 #endif
 
-	if (machine_is_snowball())
+	if (machine_is_snowball()) {
 		platform_add_devices(snowball_platform_devs,
 					ARRAY_SIZE(snowball_platform_devs));
-	else
+	} else {
 		platform_add_devices(mop500_platform_devs,
 					ARRAY_SIZE(mop500_platform_devs));
+	}
 
 	mop500_i2c_init();
 	mop500_sdi_init();

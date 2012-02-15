@@ -314,8 +314,10 @@ static ssize_t lsm303dlhc_a_store_range(struct device *dev,
 
 	error = lsm303dlhc_a_write(ddata, CTRL_REG4, ddata->range,
 	"CTRL_REG4");
-	if (error < 0)
+	if (error < 0) {
+		mutex_unlock(&ddata->lock);
 		return error;
+	}
 
 	switch (val) {
 	case LSM303DLHC_A_RANGE_2G:
@@ -331,6 +333,7 @@ static ssize_t lsm303dlhc_a_store_range(struct device *dev,
 		ddata->shift_adjust = SHIFT_ADJ_16G;
 		break;
 	default:
+		mutex_unlock(&ddata->lock);
 		return -EINVAL;
 	}
 
@@ -399,6 +402,13 @@ static ssize_t lsm303dlhc_a_store_mode(struct device *dev,
 	}
 
 	data = lsm303dlhc_a_read(ddata, CTRL_REG1, "CTRL_REG1");
+
+	/*
+	 * If chip doesn't get reset during suspend/resume,
+	 * x,y and z axis bits are getting cleared,so set
+	 * these bits to get x,y,z data.
+	 */
+	data |= LSM303DLHC_A_CR1_AXIS_ENABLE;
 
 	data &= ~LSM303DLHC_A_CR1_MODE_MASK;
 
@@ -518,6 +528,11 @@ static int __devinit lsm303dlhc_a_probe(struct i2c_client *client,
 	}
 
 	if (adata->regulator) {
+		/*
+		 * 130 microamps typical with magnetic sensor setting ODR = 7.5
+		 * Hz, Accelerometer sensor ODR = 50 Hz.  Double for safety.
+		 */
+		regulator_set_optimum_mode(adata->regulator, 130 * 2);
 		regulator_enable(adata->regulator);
 		adata->device_status = DEVICE_ON;
 	}
