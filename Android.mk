@@ -114,6 +114,12 @@ ifeq ($(shell [ -f kernel/net/compat-wireless-openmac/Makefile ] && echo "OK"), 
 endif
 endif
 
+ifeq ($(AVI_DAUGHTERBOARD_PRESENT),true)
+	kernel/scripts/config --file $(KERNEL_OUTPUT)/.config \
+		--module USB_ISP1763_HAL \
+		--module USB_ISP1763_HCD
+endif
+
 	$(MAKE) $(PRIVATE_KERNEL_ARGS) uImage
 ifeq ($(KERNEL_NO_MODULES),)
 	$(MAKE) $(PRIVATE_KERNEL_ARGS) modules
