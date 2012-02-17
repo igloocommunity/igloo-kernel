@@ -575,6 +575,7 @@ static void do_dbs_timer(struct work_struct *work)
 		s64 delta_us;
 
 		dbs_info = &per_cpu(od_cpu_dbs_info, 0);
+		mutex_lock(&dbs_info->timer_mutex);
 
 		time_now = ktime_get();
 		delta_us = ktime_us_delta(time_now, time_stamp);
@@ -584,12 +585,12 @@ static void do_dbs_timer(struct work_struct *work)
 			sample = false;
 		else
 			time_stamp = time_now;
-	} else
+	} else {
 		dbs_info = &per_cpu(od_cpu_dbs_info, cpu);
+		mutex_lock(&dbs_info->timer_mutex);
+	}
 
 	sample_type = dbs_info->sample_type;
-
-	mutex_lock(&dbs_info->timer_mutex);
 
 	/* Common NORMAL_SAMPLE setup */
 	dbs_info->sample_type = DBS_NORMAL_SAMPLE;
@@ -631,14 +632,18 @@ static inline void dbs_timer_init(struct cpu_dbs_info_s *dbs_info, int cpu)
 		delay -= jiffies % delay;
 
 	dbs_info->sample_type = DBS_NORMAL_SAMPLE;
-	INIT_DELAYED_WORK_DEFERRABLE(&per_cpu(ondemand_work, cpu),
-				     do_dbs_timer);
+	cancel_delayed_work_sync(&per_cpu(ondemand_work, cpu));
 	schedule_delayed_work_on(cpu, &per_cpu(ondemand_work, cpu), delay);
 }
 
 static inline void dbs_timer_exit(int cpu)
 {
 	cancel_delayed_work_sync(&per_cpu(ondemand_work, cpu));
+}
+
+static void dbs_timer_exit_per_cpu(struct work_struct *dummy)
+{
+	dbs_timer_exit(smp_processor_id());
 }
 
 /*
@@ -729,6 +734,9 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				j_dbs_info->prev_cpu_nice =
 						kcpustat_cpu(j).cpustat[CPUTIME_NICE];
 			mutex_init(&j_dbs_info->timer_mutex);
+			INIT_DELAYED_WORK_DEFERRABLE(&per_cpu(ondemand_work, j),
+						     do_dbs_timer);
+
 			j_dbs_info->rate_mult = 1;
 		}
 
@@ -782,6 +790,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		break;
 
 	case CPUFREQ_GOV_STOP:
+
 		dbs_timer_exit(cpu);
 
 		mutex_lock(&dbs_mutex);
@@ -792,8 +801,14 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &dbs_attr_group);
 
-			if (dbs_sw_coordinated_cpus())
+			if (dbs_sw_coordinated_cpus()) {
+				/*
+				 * Make sure all pending timers/works are
+				 * stopped.
+				 */
+				schedule_on_each_cpu(dbs_timer_exit_per_cpu);
 				unregister_hotcpu_notifier(&ondemand_cpu_notifier);
+			}
 		}
 		break;
 
