@@ -269,6 +269,28 @@ config USB_ISP1362_HCD
 	  To compile this driver as a module, choose M here: the
 	  module will be called isp1362-hcd.
 
+config USB_ISP1763_HAL
+	tristate "ISP1763 HAL driver"
+	depends on USB
+	default N
+	---help---
+	  ISP1763 Hardware Abstraction Layer driver.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called isp1763-hal.
+
+config USB_ISP1763_HCD
+	tristate "ISP1763 Host Controller"
+	depends on USB && USB_ISP1763_HAL
+	default N
+	---help---
+	  Supports for the ISP1763 chip as a host controller
+
+	  This driver does not support isochronous transfers well.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called isp1763-hcd.
+
 config USB_OHCI_HCD
 	tristate "OHCI HCD support"
 	depends on USB && USB_ARCH_HAS_OHCI
