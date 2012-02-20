@@ -561,12 +561,6 @@ static struct resource __devinitdata ab8500_charger_resources[] = {
 		.flags = IORESOURCE_IRQ,
 	},
 	{
-		.name = "USB_CHARGE_DET_DONE",
-		.start = AB8500_INT_USB_CHG_DET_DONE,
-		.end = AB8500_INT_USB_CHG_DET_DONE,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
 		.name = "VBUS_OVV",
 		.start = AB8500_INT_VBUS_OVV,
 		.end = AB8500_INT_VBUS_OVV,
@@ -604,14 +598,8 @@ static struct resource __devinitdata ab8500_charger_resources[] = {
 	},
 	{
 		.name = "USB_CHARGER_NOT_OKR",
-		.start = AB8500_INT_USB_CHARGER_NOT_OK,
-		.end = AB8500_INT_USB_CHARGER_NOT_OK,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "USB_CHARGER_NOT_OKF",
-		.start = AB8500_INT_USB_CHARGER_NOT_OKF,
-		.end = AB8500_INT_USB_CHARGER_NOT_OKF,
+		.start = AB8500_INT_USB_CHARGER_NOT_OKR,
+		.end = AB8500_INT_USB_CHARGER_NOT_OKR,
 		.flags = IORESOURCE_IRQ,
 	},
 	{
@@ -706,8 +694,8 @@ static struct resource __devinitdata ab8500_debug_resources[] = {
 	},
 	{
 		.name	= "IRQ_LAST",
-		.start	= AB8500_INT_USB_CHARGER_NOT_OKF,
-		.end	= AB8500_INT_USB_CHARGER_NOT_OKF,
+		.start	= AB8500_INT_XTAL32K_KO,
+		.end	= AB8500_INT_XTAL32K_KO,
 		.flags	= IORESOURCE_IRQ,
 	},
 };

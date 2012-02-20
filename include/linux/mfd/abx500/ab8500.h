@@ -74,8 +74,6 @@ enum ab8500_version {
 #define AB8500_INT_BATT_OVV		8
 #define AB8500_INT_MAIN_CH_UNPLUG_DET	10 /* not 8505 */
 #define AB8500_INT_MAIN_CH_PLUG_DET	11 /* not 8505 */
-#define AB8500_INT_USB_ID_DET_F		12
-#define AB8500_INT_USB_ID_DET_R		13
 #define AB8500_INT_VBUS_DET_F		14
 #define AB8500_INT_VBUS_DET_R		15
 /* ab8500_irq_regoffset[2] -> IT[Source|Latch|Mask]3 */
@@ -154,7 +152,8 @@ enum ab8500_version {
 #define AB8500_INT_BTEMP_MEDIUM_HIGH	82
 #define AB8500_INT_BTEMP_HIGH		83
 /* ab8500_irq_regoffset[11] -> IT[Source|Latch|Mask]20 */
-#define AB8500_INT_USB_CHARGER_NOT_OK	89
+#define AB8500_INT_SRP_DETECT		88
+#define AB8500_INT_USB_CHARGER_NOT_OKR	89
 #define AB8500_INT_ID_WAKEUP_R		90
 #define AB8500_INT_ID_DET_R1R		92
 #define AB8500_INT_ID_DET_R2R		93
@@ -166,13 +165,16 @@ enum ab8500_version {
 #define AB8500_INT_ID_DET_R2F		99
 #define AB8500_INT_ID_DET_R3F		100
 #define AB8500_INT_ID_DET_R4F		101
-#define AB8500_INT_USB_CHG_DET_DONE	102
+#define AB8500_INT_CHAUTORESTARTAFTSEC  102
+#define AB8500_INT_CHSTOPBYSEC		103
 /* ab8500_irq_regoffset[13] -> IT[Source|Latch|Mask]22 */
 #define AB8500_INT_USB_CH_TH_PROT_F	104
 #define AB8500_INT_USB_CH_TH_PROT_R    105
 #define AB8500_INT_MAIN_CH_TH_PROT_F	106 /* not 8505/9540 */
 #define AB8500_INT_MAIN_CH_TH_PROT_R	107 /* not 8505/9540 */
-#define AB8500_INT_USB_CHARGER_NOT_OKF	111
+#define AB8500_INT_CHCURLIMNOHSCHIRP	109
+#define AB8500_INT_CHCURLIMHSCHIRP	110
+#define AB8500_INT_XTAL32K_KO		111
 
 /* Definitions for AB9540 */
 /* ab8500_irq_regoffset[14] -> IT[Source|Latch|Mask]13 */
