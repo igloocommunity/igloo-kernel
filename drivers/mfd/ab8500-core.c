@@ -371,6 +371,8 @@ static int ab8500_irq_init(struct ab8500 *ab8500)
 
 	if (is_ab9540(ab8500))
 		num_irqs = AB9540_NR_IRQS;
+	else if (is_ab8505(ab8500))
+		num_irqs = AB8505_NR_IRQS;
 	else
 		num_irqs = AB8500_NR_IRQS;
 
@@ -397,6 +399,8 @@ static void ab8500_irq_remove(struct ab8500 *ab8500)
 
 	if (is_ab9540(ab8500))
 		num_irqs = AB9540_NR_IRQS;
+	else if (is_ab8505(ab8500))
+		num_irqs = AB8505_NR_IRQS;
 	else
 		num_irqs = AB8500_NR_IRQS;
 
