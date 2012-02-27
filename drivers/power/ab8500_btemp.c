@@ -81,6 +81,7 @@ struct ab8500_btemp_ranges {
  * @btemp_ranges:	Battery temperature range structure
  * @btemp_wq:		Work queue for measuring the temperature periodically
  * @btemp_periodic_work:	Work for measuring the temperature periodically
+ * @initialized:	True if battery id read.
  */
 struct ab8500_btemp {
 	struct device *dev;
@@ -98,6 +99,7 @@ struct ab8500_btemp {
 	struct ab8500_btemp_ranges btemp_ranges;
 	struct workqueue_struct *btemp_wq;
 	struct delayed_work btemp_periodic_work;
+	bool initialized;
 };
 
 /* BTEMP power supply properties */
@@ -566,6 +568,13 @@ static void ab8500_btemp_periodic_work(struct work_struct *work)
 	struct ab8500_btemp *di = container_of(work,
 		struct ab8500_btemp, btemp_periodic_work.work);
 
+	if (!di->initialized) {
+		di->initialized = true;
+		/* Identify the battery */
+		if (ab8500_btemp_id(di) < 0)
+			dev_warn(di->dev, "failed to identify the battery\n");
+	}
+
 	di->bat_temp = ab8500_btemp_measure_temp(di);
 
 	if (di->bat_temp != di->prev_bat_temp) {
@@ -973,6 +982,8 @@ static int __devinit ab8500_btemp_probe(struct platform_device *pdev)
 	di->parent = dev_get_drvdata(pdev->dev.parent);
 	di->gpadc = ab8500_gpadc_get();
 
+	di->initialized = false;
+
 	plat = dev_get_platdata(di->parent->dev);
 
 	/* get btemp specific platform data */
@@ -1014,10 +1025,6 @@ static int __devinit ab8500_btemp_probe(struct platform_device *pdev)
 	/* Init work for measuring temperature periodically */
 	INIT_DELAYED_WORK_DEFERRABLE(&di->btemp_periodic_work,
 		ab8500_btemp_periodic_work);
-
-	/* Identify the battery */
-	if (ab8500_btemp_id(di) < 0)
-		dev_warn(di->dev, "failed to identify the battery\n");
 
 	/* Set BTEMP thermal limits. Low and Med are fixed */
 	di->btemp_ranges.btemp_low_limit = BTEMP_THERMAL_LOW_LIMIT;
