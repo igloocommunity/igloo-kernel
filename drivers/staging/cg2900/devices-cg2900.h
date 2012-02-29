@@ -37,10 +37,6 @@ extern void dcg2900_u5500_enable_chip(struct cg2900_chip_dev *dev);
 extern void dcg2900_u5500_disable_chip(struct cg2900_chip_dev *dev);
 extern int dcg2900_u5500_setup(struct cg2900_chip_dev *dev,
 				struct dcg2900_info *info);
-extern void dcg2900_u5500_enable_chip(struct cg2900_chip_dev *dev);
-extern void dcg2900_u5500_disable_chip(struct cg2900_chip_dev *dev);
-extern int dcg2900_u5500_setup(struct cg2900_chip_dev *dev,
-				struct dcg2900_info *info);
 
 /**
  * enum cg2900_gpio_pull_sleep - GPIO pull setting in sleep.

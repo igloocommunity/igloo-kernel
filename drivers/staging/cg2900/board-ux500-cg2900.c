@@ -175,6 +175,12 @@ static struct resource cg2900_uart_resources_snowball[] = {
 		.name = "pmu_en",
 	},
 	{
+		.start = CG2900_BT_ENABLE_GPIO,
+		.end = CG2900_BT_ENABLE_GPIO,
+		.flags = IORESOURCE_IO,
+		.name = "bt_enable",
+	},
+	{
 		.start = CG2900_UX500_BT_CTS_GPIO,
 		.end = CG2900_UX500_BT_CTS_GPIO,
 		.flags = IORESOURCE_IO,

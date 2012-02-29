@@ -428,7 +428,7 @@ static struct ux500_pin_lookup mop500_pins[] = {
 	PIN_LOOKUP("nmk-i2c.1", &mop500_pins_i2c1),
 	PIN_LOOKUP("nmk-i2c.2", &mop500_pins_i2c2),
 	PIN_LOOKUP("nmk-i2c.3", &mop500_pins_i2c3),
-	PIN_LOOKUP("ske", &mop500_pins_ske),
+//	PIN_LOOKUP("ske", &mop500_pins_ske),
 	PIN_LOOKUP("sdi0", &mop500_pins_sdi0),
 	PIN_LOOKUP("sdi1", &mop500_pins_sdi1),
 	PIN_LOOKUP("sdi2", &mop500_pins_sdi2),
