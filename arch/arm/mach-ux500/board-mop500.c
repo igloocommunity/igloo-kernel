@@ -42,6 +42,9 @@
 #include <linux/gpio/nomadik.h>
 #include <linux/leds.h>
 #include <linux/mfd/abx500/ab8500-sysctrl.h>
+#ifdef CONFIG_INPUT_AB8500_ACCDET
+#include <linux/input/abx500-accdet.h>
+#endif
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -54,9 +57,6 @@
 #include <mach/hardware.h>
 #include <mach/setup.h>
 #include <mach/devices.h>
-#ifdef CONFIG_INPUT_AB8500_ACCDET
-#include <mach/abx500-accdet.h>
-#endif
 #include <mach/irqs.h>
 #include <mach/ste-dma40-db8500.h>
 #ifdef CONFIG_U8500_SIM_DETECT
