@@ -181,7 +181,7 @@ static struct ab8500_gpio_platform_data ab8505_gpio_pdata = {
 	 * as GPIO then this register selectes the alternate functions
 	 * GpioSel7 = 0x22 => Pins GPIO50 to GPIO52 are configured as GPIO.
 	 */
-	.config_reg     = {0x0F, 0x9E, 0x80, 0x01, 0x78, 0x02, 0x22},
+	.config_reg     = {0x0F, 0x9E, 0x80, 0x01, 0x7A, 0x02, 0x22},
 
 	/*
 	 * config_direction allows for the initial GPIO direction to
@@ -1294,6 +1294,11 @@ static void __init hrefv60_init_machine(void)
 	 *  button press/release are inverted.
 	 */
 	ab8500_accdet_pdata.is_detection_inverted = true;
+
+	if (machine_is_u8520()) {
+		ab8500_accdet_pdata.video_ctrl_gpio = AB8500_PIN_GPIO10;
+		ab8500_accdet_pdata.mic_ctrl = AB8500_PIN_GPIO34;
+	}
 #endif
 
 	u8500_init_devices();
