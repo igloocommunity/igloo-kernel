@@ -11,7 +11,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/mfd/abx500/ab8500.h>
-#include <linux/mfd/db8500-prcmu.h>
+#include <linux/mfd/dbx500-prcmu.h>
 
 
 static int ab8500_i2c_write(struct ab8500 *ab8500, u16 addr, u8 data)
