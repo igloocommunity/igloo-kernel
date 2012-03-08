@@ -681,7 +681,7 @@ static int __cpuinit cpu_callback(struct notifier_block *nfb,
 	else
 		dbs_info = &per_cpu(od_cpu_dbs_info, cpu);
 
-	sys_dev = get_cpu_sysdev(cpu);
+	sys_dev = get_cpu_device(cpu);
 	if (sys_dev) {
 		switch (action) {
 		case CPU_ONLINE:
