@@ -673,7 +673,10 @@ static void __init hrefv60_init_machine(void)
 			ARRAY_SIZE(mop500_platform_devs));
 
 	mop500_i2c_init();
-	hrefv60_sdi_init();
+	if (machine_is_u8520())
+		mach_u8520_sdi_init();
+	else
+		hrefv60_sdi_init();
 	mop500_spi_init();
 	mop500_uart_init();
 
