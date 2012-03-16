@@ -484,6 +484,25 @@ static unsigned ab8500_eyediagram_workaroud(struct ab8500_usb *ab, unsigned mA)
 	return mA;
 }
 
+#ifdef CONFIG_USB_OTG_20
+static int ab8500_usb_start_srp(struct otg_transceiver *otg, unsigned mA)
+{
+	struct ab8500_usb *ab;
+	if (!otg)
+		return -ENODEV;
+
+	ab = xceiv_to_ab(otg);
+
+	atomic_notifier_call_chain(&ab->otg.notifier,
+				   USB_EVENT_PREPARE,
+				   &ab->vbus_draw);
+
+	ab8500_usb_peri_phy_en(ab);
+
+	return 0;
+}
+#endif
+
 static int ab8500_usb_set_power(struct otg_transceiver *otg, unsigned mA)
 {
 	struct ab8500_usb *ab;
@@ -825,6 +844,9 @@ static int __devinit ab8500_usb_probe(struct platform_device *pdev)
 	ab->otg.set_peripheral	= ab8500_usb_set_peripheral;
 	ab->otg.set_suspend	= ab8500_usb_set_suspend;
 	ab->otg.set_power	= ab8500_usb_set_power;
+#ifdef CONFIG_USB_OTG_20
+	ab->otg.start_srp	= ab8500_usb_start_srp;
+#endif
 	ab->sysfs_flag = true;
 
 	platform_set_drvdata(pdev, ab);
