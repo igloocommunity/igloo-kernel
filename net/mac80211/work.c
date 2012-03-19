@@ -454,6 +454,30 @@ ieee80211_authenticate(struct ieee80211_work *wk)
 	struct ieee80211_sub_if_data *sdata = wk->sdata;
 	struct ieee80211_local *local = sdata->local;
 
+	/* HACK!!! cw1200 device requires SSID to be available at AUTH stage.
+	 * cfg80211 beacon cache is designed to handle multi-SSID BSSes, so
+	 * bss struct returned by cfg80211_get_bss() has random SSID if BSS
+	 * just changed SSID before authentication (typical for p2p).
+	 * This is a firmware design fault, however as a workaround cfg80211
+	 * beacon cache is purged to make sure target BSS is searchable
+	 * in rb-tree at the AUTH stage.
+	 */
+	struct cfg80211_bss *bss;
+	while (true) {
+		bss = cfg80211_get_bss(local->hw.wiphy,
+				wk->probe_auth.bss->channel,
+				wk->probe_auth.bss->bssid,
+				NULL, 0, 0, 0);
+		if (WARN_ON(!bss))
+			break;
+		if (bss == wk->probe_auth.bss) {
+			cfg80211_put_bss(bss);
+			break;
+		}
+		cfg80211_unlink_bss(local->hw.wiphy, bss);
+	}
+	/* End of the hack */
+
 	if (!wk->probe_auth.synced) {
 		int ret = drv_tx_sync(local, sdata, wk->filter_ta,
 				      IEEE80211_TX_SYNC_AUTH);
