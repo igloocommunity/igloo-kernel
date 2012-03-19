@@ -157,7 +157,6 @@ struct ab8500 {
 	struct device	*dev;
 	struct mutex	lock;
 	struct mutex	irq_lock;
-
 	int		irq_base;
 	int		irq;
 	u8		chip_id;
@@ -172,27 +171,45 @@ struct ab8500 {
 	u8 oldmask[AB8500_NUM_IRQ_REGS];
 };
 
-struct regulator_reg_init;
-struct regulator_init_data;
+struct ab8500_regulator_platform_data;
+struct ab8500_accdet_platform_data;
+struct ab8500_denc_platform_data;
+struct ab8500_audio_platform_data;
 struct ab8500_gpio_platform_data;
+struct ab8500_sysctrl_platform_data;
 
 /**
  * struct ab8500_platform_data - AB8500 platform data
+ * @pm_power_off: Should machine pm power off hook be registered or not
+ * @thermal_power_off_pending: Set if there was a thermal alarm
+ * @thermal_set_time_sec: Time of the thermal alarm
+ * @thermal_time_out: Time out before the thermal alarm should be ignored
  * @irq_base: start of AB8500 IRQs, AB8500_NR_IRQS will be used
  * @init: board-specific initialization after detection of ab8500
- * @num_regulator_reg_init: number of regulator init registers
- * @regulator_reg_init: regulator init registers
- * @num_regulator: number of regulators
  * @regulator: machine-specific constraints for regulators
+ * @accdet: machine-specific Accessory detection data
+ * @battery: machine-specific battery management data
+ * @charger: machine-specific charger data
+ * @btemp: machine-specific battery temp data
  */
 struct ab8500_platform_data {
 	int irq_base;
+	bool pm_power_off;
+	bool thermal_power_off_pending;
+	long thermal_set_time_sec;
+	long thermal_time_out;
 	void (*init) (struct ab8500 *);
-	int num_regulator_reg_init;
-	struct ab8500_regulator_reg_init *regulator_reg_init;
-	int num_regulator;
-	struct regulator_init_data *regulator;
+	struct ab8500_regulator_platform_data *regulator;
+	struct abx500_accdet_platform_data *accdet;
+	struct ab8500_bm_data *battery;
+	struct ab8500_denc_platform_data *denc;
+	struct ab8500_audio_platform_data *audio;
+	struct ab8500_charger_platform_data *charger;
+	struct ab8500_btemp_platform_data *btemp;
+	struct ab8500_fg_platform_data *fg;
+	struct ab8500_chargalg_platform_data *chargalg;
 	struct ab8500_gpio_platform_data *gpio;
+	struct ab8500_sysctrl_platform_data *sysctrl;
 };
 
 extern int __devinit ab8500_init(struct ab8500 *ab8500);

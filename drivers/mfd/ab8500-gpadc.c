@@ -130,16 +130,12 @@ static LIST_HEAD(ab8500_gpadc_list);
  * ab8500_gpadc_get() - returns a reference to the primary AB8500 GPADC
  * (i.e. the first GPADC in the instance list)
  */
-struct ab8500_gpadc *ab8500_gpadc_get(char *name)
+struct ab8500_gpadc *ab8500_gpadc_get(void)
 {
 	struct ab8500_gpadc *gpadc;
+	gpadc = list_first_entry(&ab8500_gpadc_list, struct ab8500_gpadc, node);
 
-	list_for_each_entry(gpadc, &ab8500_gpadc_list, node) {
-		if (!strcmp(name, dev_name(gpadc->dev)))
-		    return gpadc;
-	}
-
-	return ERR_PTR(-ENOENT);
+	return gpadc;
 }
 EXPORT_SYMBOL(ab8500_gpadc_get);
 
@@ -344,7 +340,7 @@ int ab8500_gpadc_read_raw(struct ab8500_gpadc *gpadc, u8 channel)
 		  * Delay might be needed for ABB8500 cut 3.0, if not, remove
 		  * when hardware will be availible
 		  */
-			msleep(1);
+			mdelay(1);
 			break;
 		}
 		/* Intentional fallthrough */
