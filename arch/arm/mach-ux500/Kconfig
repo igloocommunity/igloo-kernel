@@ -172,4 +172,6 @@ config UX500_DB_DUMP
 
 source "arch/arm/mach-ux500/pm/Kconfig"
 
+source "arch/arm/mach-ux500/Kconfig-arch"
+
 endif
