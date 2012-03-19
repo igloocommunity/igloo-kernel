@@ -18,9 +18,9 @@
 #include <linux/gpio.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
-#include <linux/mfd/ab8500.h>
 #include <linux/mfd/abx500.h>
-#include <linux/mfd/ab8500/gpio.h>
+#include <linux/mfd/abx500/ab8500-gpio.h>
+
 
 /*
  * GPIO registers offset
@@ -60,7 +60,7 @@
 #define AB8500_GPIO_IN4_REG	0x43
 #define AB8500_GPIO_IN5_REG	0x44
 #define AB8500_GPIO_IN6_REG	0x45
-#define AB8500_GPIO_ALTFUN_REG	0x45
+#define AB8500_GPIO_ALTFUN_REG	0x50
 #define ALTFUN_REG_INDEX	6
 #define AB8500_NUM_GPIO		42
 #define AB8500_NUM_VIR_GPIO_IRQ	16
@@ -115,7 +115,7 @@ static int ab8500_gpio_get(struct gpio_chip *chip, unsigned offset)
 {
 	struct ab8500_gpio *ab8500_gpio = to_ab8500_gpio(chip);
 	u8 mask = 1 << (offset % 8);
-	u8 reg = AB8500_GPIO_OUT1_REG + (offset / 8);
+	u8 reg = AB8500_GPIO_IN1_REG + (offset / 8);
 	int ret;
 	u8 data;
 	ret = abx500_get_register_interruptible(ab8500_gpio->dev, AB8500_MISC,
@@ -132,7 +132,7 @@ static void ab8500_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
 	struct ab8500_gpio *ab8500_gpio = to_ab8500_gpio(chip);
 	int ret;
 	/* Write the data */
-	ret = ab8500_gpio_set_bits(chip, AB8500_GPIO_OUT1_REG, offset, 1);
+	ret = ab8500_gpio_set_bits(chip, AB8500_GPIO_OUT1_REG, offset, val);
 	if (ret < 0)
 		dev_err(ab8500_gpio->dev, "%s write failed\n", __func__);
 }
@@ -174,9 +174,9 @@ static int ab8500_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
 		int start;
 		int end;
 	} clusters[] = {
-		{.start = 6,  .end = 13},
-		{.start = 24, .end = 25},
-		{.start = 36, .end = 41},
+		{.start = 5,  .end = 12}, /* GPIO numbers start from 1 */
+		{.start = 23, .end = 24},
+		{.start = 35, .end = 40},
 	};
 	struct ab8500_gpio *ab8500_gpio = to_ab8500_gpio(chip);
 	int base = ab8500_gpio->irq_base;
@@ -207,7 +207,7 @@ static struct gpio_chip ab8500gpio_chip = {
 
 static unsigned int irq_to_rising(unsigned int irq)
 {
-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+	struct ab8500_gpio *ab8500_gpio = irq_get_chip_data(irq);
 	int offset = irq - ab8500_gpio->irq_base;
 	int new_irq = offset +  AB8500_INT_GPIO6R
 			+ ab8500_gpio->parent->irq_base;
@@ -216,7 +216,7 @@ static unsigned int irq_to_rising(unsigned int irq)
 
 static unsigned int irq_to_falling(unsigned int irq)
 {
-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+	struct ab8500_gpio *ab8500_gpio = irq_get_chip_data(irq);
 	int offset = irq - ab8500_gpio->irq_base;
 	int new_irq = offset +  AB8500_INT_GPIO6F
 			+  ab8500_gpio->parent->irq_base;
@@ -261,15 +261,16 @@ static irqreturn_t handle_falling(int irq, void *dev)
 	return IRQ_HANDLED;
 }
 
-static void ab8500_gpio_irq_lock(unsigned int irq)
+static void ab8500_gpio_irq_lock(struct irq_data *data)
 {
-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+	struct ab8500_gpio *ab8500_gpio = irq_data_get_irq_chip_data(data);
 	mutex_lock(&ab8500_gpio->lock);
 }
 
-static void ab8500_gpio_irq_sync_unlock(unsigned int irq)
+static void ab8500_gpio_irq_sync_unlock(struct irq_data *data)
 {
-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+	struct ab8500_gpio *ab8500_gpio = irq_data_get_irq_chip_data(data);
+	unsigned int irq = data->irq;
 	int offset = irq - ab8500_gpio->irq_base;
 	bool rising = ab8500_gpio->rising & BIT(offset);
 	bool falling = ab8500_gpio->falling & BIT(offset);
@@ -316,21 +317,22 @@ static void ab8500_gpio_irq_sync_unlock(unsigned int irq)
 }
 
 
-static void ab8500_gpio_irq_mask(unsigned int irq)
+static void ab8500_gpio_irq_mask(struct irq_data *data)
 {
-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+	struct ab8500_gpio *ab8500_gpio = irq_data_get_irq_chip_data(data);
 	ab8500_gpio->irq_action = MASK;
 }
 
-static void ab8500_gpio_irq_unmask(unsigned int irq)
+static void ab8500_gpio_irq_unmask(struct irq_data *data)
 {
-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+	struct ab8500_gpio *ab8500_gpio =  irq_data_get_irq_chip_data(data);
 	ab8500_gpio->irq_action = UNMASK;
 }
 
-static int ab8500_gpio_irq_set_type(unsigned int irq, unsigned int type)
+static int ab8500_gpio_irq_set_type(struct irq_data *data, unsigned int type)
 {
-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+	struct ab8500_gpio *ab8500_gpio = irq_data_get_irq_chip_data(data);
+	unsigned int irq = data->irq;
 	int offset = irq - ab8500_gpio->irq_base;
 
 	if (type == IRQ_TYPE_EDGE_BOTH) {
@@ -344,28 +346,28 @@ static int ab8500_gpio_irq_set_type(unsigned int irq, unsigned int type)
 	return 0;
 }
 
-unsigned int ab8500_gpio_irq_startup(unsigned int irq)
+unsigned int ab8500_gpio_irq_startup(struct irq_data *data)
 {
-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+	struct ab8500_gpio *ab8500_gpio = irq_data_get_irq_chip_data(data);
 	ab8500_gpio->irq_action = STARTUP;
 	return 0;
 }
 
-void ab8500_gpio_irq_shutdown(unsigned int irq)
+void ab8500_gpio_irq_shutdown(struct irq_data *data)
 {
-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+	struct ab8500_gpio *ab8500_gpio = irq_data_get_irq_chip_data(data);
 	ab8500_gpio->irq_action = SHUTDOWN;
 }
 
 static struct irq_chip ab8500_gpio_irq_chip = {
 	.name			= "ab8500-gpio",
-	.startup		= ab8500_gpio_irq_startup,
-	.shutdown		= ab8500_gpio_irq_shutdown,
-	.bus_lock		= ab8500_gpio_irq_lock,
-	.bus_sync_unlock	= ab8500_gpio_irq_sync_unlock,
-	.mask			= ab8500_gpio_irq_mask,
-	.unmask			= ab8500_gpio_irq_unmask,
-	.set_type		= ab8500_gpio_irq_set_type,
+	.irq_startup		= ab8500_gpio_irq_startup,
+	.irq_shutdown		= ab8500_gpio_irq_shutdown,
+	.irq_bus_lock		= ab8500_gpio_irq_lock,
+	.irq_bus_sync_unlock	= ab8500_gpio_irq_sync_unlock,
+	.irq_mask		= ab8500_gpio_irq_mask,
+	.irq_unmask		= ab8500_gpio_irq_unmask,
+	.irq_set_type		= ab8500_gpio_irq_set_type,
 };
 
 static int ab8500_gpio_irq_init(struct ab8500_gpio *ab8500_gpio)
@@ -374,14 +376,14 @@ static int ab8500_gpio_irq_init(struct ab8500_gpio *ab8500_gpio)
 	int irq;
 
 	for (irq = base; irq < base + AB8500_NUM_VIR_GPIO_IRQ ; irq++) {
-		set_irq_chip_data(irq, ab8500_gpio);
-		set_irq_chip_and_handler(irq, &ab8500_gpio_irq_chip,
+		irq_set_chip_data(irq, ab8500_gpio);
+		irq_set_chip_and_handler(irq, &ab8500_gpio_irq_chip,
 				handle_simple_irq);
-		set_irq_nested_thread(irq, 1);
+		irq_set_nested_thread(irq, 1);
 #ifdef CONFIG_ARM
 		set_irq_flags(irq, IRQF_VALID);
 #else
-		set_irq_noprobe(irq);
+		irq_set_noprobe(irq);
 #endif
 	}
 
@@ -397,8 +399,8 @@ static void ab8500_gpio_irq_remove(struct ab8500_gpio *ab8500_gpio)
 #ifdef CONFIG_ARM
 		set_irq_flags(irq, 0);
 #endif
-		set_irq_chip_and_handler(irq, NULL, NULL);
-		set_irq_chip_data(irq, NULL);
+		irq_set_chip_and_handler(irq, NULL, NULL);
+		irq_set_chip_data(irq, NULL);
 	}
 }
 
@@ -441,6 +443,18 @@ static int __devinit ab8500_gpio_probe(struct platform_device *pdev)
 		ret = abx500_set_register_interruptible(ab8500_gpio->dev,
 				AB8500_MISC, i,
 				pdata->config_reg[i]);
+		if (ret < 0)
+			goto out_free;
+
+		ret = abx500_set_register_interruptible(ab8500_gpio->dev,
+				AB8500_MISC, i + AB8500_GPIO_DIR1_REG,
+				pdata->config_direction[i]);
+		if (ret < 0)
+			goto out_free;
+
+		ret = abx500_set_register_interruptible(ab8500_gpio->dev,
+				AB8500_MISC, i + AB8500_GPIO_PUD1_REG,
+				pdata->config_pullups[i]);
 		if (ret < 0)
 			goto out_free;
 	}
@@ -489,6 +503,86 @@ static int __devexit ab8500_gpio_remove(struct platform_device *pdev)
 	platform_set_drvdata(pdev, NULL);
 	mutex_destroy(&ab8500_gpio->lock);
 	kfree(ab8500_gpio);
+
+	return 0;
+}
+
+int ab8500_config_pulldown(struct device *dev,
+				enum ab8500_pin gpio, bool enable)
+{
+	u8 offset =  gpio - AB8500_PIN_GPIO1;
+	u8 pos = offset % 8;
+	u8 val = enable ? 0 : 1;
+	u8 reg = AB8500_GPIO_PUD1_REG + (offset / 8);
+	int ret;
+
+	ret = abx500_mask_and_set_register_interruptible(dev,
+				AB8500_MISC, reg, 1 << pos, val << pos);
+	if (ret < 0)
+		dev_err(dev, "%s write failed\n", __func__);
+	return ret;
+}
+EXPORT_SYMBOL(ab8500_config_pulldown);
+
+/*
+ * ab8500_gpio_config_select()
+ *
+ * Configure functionality of pin, either specific use or GPIO.
+ * @dev: device pointer
+ * @gpio: gpio number
+ * @gpio_select: true if the pin should be used as GPIO
+ */
+int ab8500_gpio_config_select(struct device *dev,
+				enum ab8500_pin gpio, bool gpio_select)
+{
+	u8 offset = gpio - AB8500_PIN_GPIO1;
+	u8 reg = AB8500_GPIO_SEL1_REG + (offset / 8);
+	u8 pos = offset % 8;
+	u8 val = gpio_select ? 1 : 0;
+	int ret;
+
+	ret = abx500_mask_and_set_register_interruptible(dev,
+		AB8500_MISC, reg, 1 << pos, val << pos);
+	if (ret < 0)
+		dev_err(dev, "%s write failed\n", __func__);
+
+	dev_vdbg(dev, "%s (bank, addr, mask, value): 0x%x, 0x%x, 0x%x, 0x%x\n",
+		__func__, AB8500_MISC, reg, 1 << pos, val << pos);
+
+	return ret;
+}
+
+/*
+ * ab8500_gpio_config_get_select()
+ *
+ * Read currently configured functionality, either specific use or GPIO.
+ * @dev: device pointer
+ * @gpio: gpio number
+ * @gpio_select: pointer to pin selection status
+ */
+int ab8500_gpio_config_get_select(struct device *dev,
+					enum ab8500_pin gpio, bool *gpio_select)
+{
+	u8 offset =  gpio - AB8500_PIN_GPIO1;
+	u8 reg = AB8500_GPIO_SEL1_REG + (offset / 8);
+	u8 pos = offset % 8;
+	u8 val;
+	int ret;
+
+	ret = abx500_get_register_interruptible(dev,
+				AB8500_MISC, reg, &val);
+	if (ret < 0) {
+		dev_err(dev, "%s read failed\n", __func__);
+		return ret;
+	}
+
+	if (val & (1 << pos))
+		*gpio_select = true;
+	else
+		*gpio_select = false;
+
+	dev_vdbg(dev, "%s (bank, addr, mask, value): 0x%x, 0x%x, 0x%x, 0x%x\n",
+		__func__, AB8500_MISC, reg, 1 << pos, val);
 
 	return 0;
 }
