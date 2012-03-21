@@ -196,7 +196,6 @@ struct uart_amba_port {
 	unsigned int		ifls;		/* vendor-specific */
 	unsigned int		lcrh_tx;	/* vendor-specific */
 	unsigned int		lcrh_rx;	/* vendor-specific */
-	unsigned int		old_cr;		/* state during shutdown */
 	bool			autorts;
 #ifdef CONFIG_SERIAL_AMBA_PL011_CLOCK_CONTROL
 	enum pl011_clk_states	clk_state;	/* actual clock state */
@@ -1111,10 +1110,6 @@ static void pl011_lockup_wa(unsigned long data)
 	int buf_empty_retries = 200;
 	int loop;
 
-	/* Exit early if there is no tty */
-	if (!tty)
-		return;
-
 	/* Stop HCI layer from submitting data for tx */
 	tty->hw_stopped = 1;
 	while (!uart_circ_empty(xmit)) {
@@ -1683,16 +1678,12 @@ static int pl011_startup(struct uart_port *port)
 	unsigned int cr;
 	int retval;
 
-	retval = clk_prepare(uap->clk);
-	if (retval)
-		goto out;
-
 	/*
 	 * Try to enable the clock producer and the regulator.
 	 */
 	retval = pl011_power_startup(uap);
 	if (retval)
-		goto clk_unprep;
+		goto out;
 
 	uap->port.uartclk = clk_get_rate(uap->clk);
 
@@ -1705,9 +1696,7 @@ static int pl011_startup(struct uart_port *port)
 
 	__pl011_startup(uap);
 
-	/* restore RTS and DTR */
-	cr = uap->old_cr & (UART011_CR_RTS | UART011_CR_DTR);
-	cr |= UART01x_CR_UARTEN | UART011_CR_RXE | UART011_CR_TXE;
+	cr = UART01x_CR_UARTEN | UART011_CR_RXE | UART011_CR_TXE;
 	writew(cr, uap->port.membase + UART011_CR);
 
 	/* Clear pending error interrupts */
@@ -1747,8 +1736,6 @@ static int pl011_startup(struct uart_port *port)
 
  clk_dis:
 	pl011_power_shutdown(uap);
- clk_unprep:
-	clk_unprepare(uap->clk);
  out:
 	return retval;
 }
@@ -1786,16 +1773,10 @@ static void pl011_shutdown(struct uart_port *port)
 
 	/*
 	 * disable the port
-	 * disable the port. It should not disable RTS and DTR.
-	 * Also RTS and DTR state should be preserved to restore
-	 * it during startup().
 	 */
 	uap->autorts = false;
-	cr = readw(uap->port.membase + UART011_CR);
-	uap->old_cr = cr;
-	cr &= UART011_CR_RTS | UART011_CR_DTR;
-	cr |= UART01x_CR_UARTEN | UART011_CR_TXE;
-	writew(cr, uap->port.membase + UART011_CR);
+	writew(UART01x_CR_UARTEN | UART011_CR_TXE,
+		uap->port.membase + UART011_CR);
 
 	/*
 	 * disable break condition and fifos
@@ -1816,7 +1797,7 @@ static void pl011_shutdown(struct uart_port *port)
 	 * Shut down the clock producer and the producer
 	 */
 	pl011_power_shutdown(uap);
-	clk_unprepare(uap->clk);
+
 
 	if (uap->port.dev->platform_data) {
 		struct amba_pl011_data *plat;
@@ -1974,7 +1955,7 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
 
 	/*
 	 * ----------v----------v----------v----------v-----
-	 * NOTE: MUST BE WRITTEN AFTER UARTLCR_M & UARTLCR_L
+	 * NOTE: lcrh_tx and lcrh_rx MUST BE WRITTEN AFTER
 	 * ----------^----------^----------^----------^-----
 	 */
 	writew(lcr_h, port->membase + uap->lcrh_rx);
@@ -2164,7 +2145,6 @@ static int __init pl011_console_setup(struct console *co, char *options)
 	int bits = 8;
 	int parity = 'n';
 	int flow = 'n';
-	int ret;
 
 	/*
 	 * Check whether an invalid uart number has been specified, and
@@ -2176,10 +2156,6 @@ static int __init pl011_console_setup(struct console *co, char *options)
 	uap = amba_ports[co->index];
 	if (!uap)
 		return -ENODEV;
-
-	ret = clk_prepare(uap->clk);
-	if (ret)
-		return ret;
 
 	if (uap->port.dev->platform_data) {
 		struct amba_pl011_data *plat;
@@ -2275,7 +2251,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 	uap->ifls = vendor->ifls;
 	uap->lcrh_rx = vendor->lcrh_rx;
 	uap->lcrh_tx = vendor->lcrh_tx;
-	uap->old_cr = 0;
 	uap->fifosize = vendor->fifosize;
 	uap->interrupt_may_hang = vendor->interrupt_may_hang;
 	uap->port.dev = &dev->dev;
