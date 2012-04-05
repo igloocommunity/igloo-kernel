@@ -118,7 +118,7 @@ int __init ux500_idle_init(void)
 	int ret, cpu;
 	struct cpuidle_device *device;
 
-	if (machine_is_u5500()) {
+	if (cpu_is_u5500()) {
 		printk(KERN_WARNING "cpuidle: u5500 not supported\n");
 		return -ENOSYS;
 	}
