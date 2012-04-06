@@ -111,6 +111,8 @@ extern void cpu_init(void);
 void soft_restart(unsigned long);
 extern void (*arm_pm_restart)(char str, const char *cmd);
 
+void cpu_idle_wait(void);
+
 #define UDBG_UNDEFINED	(1 << 0)
 #define UDBG_SYSCALL	(1 << 1)
 #define UDBG_BADABORT	(1 << 2)

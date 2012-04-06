@@ -31,6 +31,9 @@ void __iomem *twd_base;
 static struct clk *twd_clk;
 static unsigned long twd_timer_rate;
 
+static DEFINE_PER_CPU(u32, twd_ctrl);
+static DEFINE_PER_CPU(u32, twd_load);
+
 static struct clock_event_device __percpu **twd_evt;
 
 static void twd_set_mode(enum clock_event_mode mode,
@@ -115,10 +118,14 @@ static int twd_cpufreq_transition(struct notifier_block *nb,
 	 * The twd clock events must be reprogrammed to account for the new
 	 * frequency.  The timer is local to a cpu, so cross-call to the
 	 * changing cpu.
+	 *
+	 * Only wait for it to finish, if the cpu is active to avoid
+	 * deadlock when cpu1 is spinning on while(!cpu_active(cpu1)) during
+	 * booting of that cpu.
 	 */
 	if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
 		smp_call_function_single(freqs->cpu, twd_update_frequency,
-			NULL, 1);
+					 NULL, cpu_active(freqs->cpu));
 
 	return NOTIFY_OK;
 }
@@ -268,3 +275,24 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
 					0xf, 0xffffffff);
 	enable_percpu_irq(clk->irq, 0);
 }
+
+#if defined(CONFIG_HOTPLUG) || defined(CONFIG_CPU_IDLE)
+void twd_save(void)
+{
+	int this_cpu = smp_processor_id();
+
+	per_cpu(twd_ctrl, this_cpu) = __raw_readl(twd_base + TWD_TIMER_CONTROL);
+	per_cpu(twd_load, this_cpu) = __raw_readl(twd_base + TWD_TIMER_LOAD);
+
+}
+
+void twd_restore(void)
+{
+	int this_cpu = smp_processor_id();
+
+	__raw_writel(per_cpu(twd_ctrl, this_cpu),
+		     twd_base + TWD_TIMER_CONTROL);
+	__raw_writel(per_cpu(twd_load, this_cpu),
+		     twd_base + TWD_TIMER_LOAD);
+}
+#endif
