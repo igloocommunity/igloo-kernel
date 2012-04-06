@@ -1198,10 +1198,10 @@ int l2cap_chan_connect(struct l2cap_chan *chan, __le16 psm, u16 cid, bdaddr_t *d
 
 	if (chan->dcid == L2CAP_CID_LE_DATA)
 		hcon = hci_connect(hdev, LE_LINK, dst,
-					chan->sec_level, auth_type);
+					chan->sec_level, auth_type, NULL);
 	else
 		hcon = hci_connect(hdev, ACL_LINK, dst,
-					chan->sec_level, auth_type);
+					chan->sec_level, auth_type, NULL);
 
 	if (IS_ERR(hcon)) {
 		err = PTR_ERR(hcon);
@@ -1478,7 +1478,7 @@ static int l2cap_retransmit_frames(struct l2cap_chan *chan)
 	return ret;
 }
 
-static void l2cap_send_ack(struct l2cap_chan *chan)
+static void __l2cap_send_ack(struct l2cap_chan *chan)
 {
 	u32 control = 0;
 
@@ -1496,6 +1496,12 @@ static void l2cap_send_ack(struct l2cap_chan *chan)
 
 	control |= __set_ctrl_super(chan, L2CAP_SUPER_RR);
 	l2cap_send_sframe(chan, control);
+}
+
+static void l2cap_send_ack(struct l2cap_chan *chan)
+{
+	__clear_ack_timer(chan);
+	__l2cap_send_ack(chan);
 }
 
 static void l2cap_send_srejtail(struct l2cap_chan *chan)
@@ -1988,7 +1994,7 @@ static void l2cap_ack_timeout(struct work_struct *work)
 	BT_DBG("chan %p", chan);
 
 	lock_sock(chan->sk);
-	l2cap_send_ack(chan);
+	__l2cap_send_ack(chan);
 	release_sock(chan->sk);
 }
 
@@ -3713,19 +3719,11 @@ static int l2cap_reassemble_sdu(struct l2cap_chan *chan, struct sk_buff *skb, u3
 
 static void l2cap_ertm_enter_local_busy(struct l2cap_chan *chan)
 {
-	u32 control;
-
 	BT_DBG("chan %p, Enter local busy", chan);
 
 	set_bit(CONN_LOCAL_BUSY, &chan->conn_state);
 
-	control = __set_reqseq(chan, chan->buffer_seq);
-	control |= __set_ctrl_super(chan, L2CAP_SUPER_RNR);
-	l2cap_send_sframe(chan, control);
-
-	set_bit(CONN_RNR_SENT, &chan->conn_state);
-
-	__clear_ack_timer(chan);
+	__set_ack_timer(chan);
 }
 
 static void l2cap_ertm_exit_local_busy(struct l2cap_chan *chan)
@@ -3865,8 +3863,11 @@ static inline int l2cap_data_channel_iframe(struct l2cap_chan *chan, u32 rx_cont
 		goto drop;
 	}
 
-	if (test_bit(CONN_LOCAL_BUSY, &chan->conn_state))
+	if (test_bit(CONN_LOCAL_BUSY, &chan->conn_state)) {
+		if (!test_bit(CONN_RNR_SENT, &chan->conn_state))
+			l2cap_send_ack(chan);
 		goto drop;
+	}
 
 	if (tx_seq == chan->expected_tx_seq)
 		goto expected;
