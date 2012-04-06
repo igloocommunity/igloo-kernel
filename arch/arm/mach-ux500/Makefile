@@ -68,3 +68,4 @@ ifdef CONFIG_TOUCHSCREEN_CYTTSP_SPI
 obj-$(CONFIG_MACH_U8500) 	+= board-mop500-cyttsp.o
 obj-$(CONFIG_MACH_U5500)	+= board-u5500-cyttsp.o
 endif
+obj-$(CONFIG_CPU_IDLE)          += cpuidle.o

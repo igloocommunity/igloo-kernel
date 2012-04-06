@@ -266,8 +266,7 @@ static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 		bool keep_ap_pll)
 {
 	if (cpu_is_u5500())
-		return db5500_prcmu_set_power_state(state, keep_ulp_clk,
-			keep_ap_pll);
+		return -EINVAL;
 	else
 		return db8500_prcmu_set_power_state(state, keep_ulp_clk,
 			keep_ap_pll);
@@ -281,10 +280,58 @@ static inline u8 prcmu_get_power_state_result(void)
 		return db8500_prcmu_get_power_state_result();
 }
 
+static inline int prcmu_gic_decouple(void)
+{
+	if (cpu_is_u5500())
+		return -EINVAL;
+	else
+		return db8500_prcmu_gic_decouple();
+}
+
+static inline int prcmu_gic_recouple(void)
+{
+	if (cpu_is_u5500())
+		return -EINVAL;
+	else
+		return db8500_prcmu_gic_recouple();
+}
+
+static inline bool prcmu_gic_pending_irq(void)
+{
+	if (cpu_is_u5500())
+		return -EINVAL;
+	else
+		return db8500_prcmu_gic_pending_irq();
+}
+
+static inline bool prcmu_pending_irq(void)
+{
+	if (cpu_is_u5500())
+		return -EINVAL;
+	else
+		return db8500_prcmu_pending_irq();
+}
+
+static inline bool prcmu_is_cpu_in_wfi(int cpu)
+{
+	if (cpu_is_u5500())
+		return -EINVAL;
+	else
+		return db8500_prcmu_is_cpu_in_wfi(cpu);
+}
+
+static inline int prcmu_copy_gic_settings(void)
+{
+	if (cpu_is_u5500())
+		return -EINVAL;
+	else
+		return db8500_prcmu_copy_gic_settings();
+}
+
 static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
 {
 	if (cpu_is_u5500())
-		return db5500_prcmu_set_epod(epod_id, epod_state);
+		return -EINVAL;
 	else
 		return db8500_prcmu_set_epod(epod_id, epod_state);
 }
@@ -292,7 +339,7 @@ static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
 static inline void prcmu_enable_wakeups(u32 wakeups)
 {
 	if (cpu_is_u5500())
-		db5500_prcmu_enable_wakeups(wakeups);
+		return;
 	else
 		db8500_prcmu_enable_wakeups(wakeups);
 }
