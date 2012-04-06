@@ -1,0 +1,5 @@
+linux-ux500 (3.3.0-1000.0) oneiric; urgency=low
+
+  * Initial release.
+
+ -- Lee Jones <lee.jones@linaro.org>  Fri, 06 Apr 2012 13:18:19 +0200
