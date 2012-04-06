@@ -2502,6 +2502,7 @@ int ieee80211_mgd_auth(struct ieee80211_sub_if_data *sdata,
 
 	wk->probe_auth.algorithm = auth_alg;
 	wk->probe_auth.privacy = req->bss->capability & WLAN_CAPABILITY_PRIVACY;
+	wk->probe_auth.bss = req->bss;
 
 	/* if we already have a probe, don't probe again */
 	if (req->bss->proberesp_ies)
