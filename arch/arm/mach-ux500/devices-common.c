@@ -6,16 +6,19 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/export.h>
 #include <linux/dma-mapping.h>
 #include <linux/err.h>
 #include <linux/irq.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/amba/bus.h>
-
-#include <plat/gpio-nomadik.h>
+#include <linux/pm.h>
+#include <linux/gpio.h>
+#include <linux/gpio/nomadik.h>
 
 #include <mach/hardware.h>
+#include <mach/pm.h>
 
 #include "devices-common.h"
 
@@ -38,6 +41,7 @@ dbx500_add_amba_device(const char *name, resource_size_t base,
 
 	dev->dma_mask = DMA_BIT_MASK(32);
 	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+	dev->dev.pm_domain = &ux500_amba_dev_power_domain;
 
 	dev->irq[0] = irq;
 	dev->irq[1] = NO_IRQ;
@@ -68,6 +72,7 @@ dbx500_add_platform_device(const char *name, int id, void *pdata,
 
 	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
 	dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
+	dev->dev.pm_domain = &ux500_dev_power_domain;
 
 	ret = platform_device_add_resources(dev, res, resnum);
 	if (ret)
@@ -108,6 +113,22 @@ dbx500_add_platform_device_4k1irq(const char *name, int id,
 					  ARRAY_SIZE(resources));
 }
 
+struct platform_device *
+dbx500_add_platform_device_noirq(const char *name, int id,
+				  resource_size_t base, void *pdata)
+{
+	struct resource resources[] = {
+		[0] = {
+			.start  = base,
+			.end    = base + SZ_4K - 1,
+			.flags  = IORESOURCE_MEM,
+		}
+	};
+
+	return dbx500_add_platform_device(name, id, pdata, resources,
+					  ARRAY_SIZE(resources));
+}
+
 static struct platform_device *
 dbx500_add_gpio(int id, resource_size_t addr, int irq,
 		struct nmk_gpio_platform_data *pdata)
@@ -140,7 +161,6 @@ void dbx500_add_gpios(resource_size_t *base, int num, int irq,
 		pdata->first_gpio = first;
 		pdata->first_irq = NOMADIK_GPIO_TO_IRQ(first);
 		pdata->num_gpio = 32;
-
 		dbx500_add_gpio(i, base[i], irq, pdata);
 	}
 }
