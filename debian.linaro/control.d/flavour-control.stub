@@ -26,7 +26,7 @@ Architecture: ARCH
 Section: admin
 Priority: optional
 Pre-Depends: dpkg (>= 1.10.24)
-#Provides: linux-image, linux-image-2.6, fuse-module, =PROVIDES=
+Provides: gator-module, gator-module-in-tree
 Depends: ${misc:Depends}, ${shlibs:Depends}, initramfs-tools (>= 0.36ubuntu6), coreutils | fileutils (>= 4.0), module-init-tools (>= 3.3-pre11-4ubuntu3), wireless-crda
 Conflicts: hotplug (<< 0.0.20040105-1)
 Recommends: BOOTLOADER

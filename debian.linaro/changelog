@@ -3,3 +3,8 @@ linux-ux500 (3.3.0-1000.0) oneiric; urgency=low
   * Initial release.
 
  -- Lee Jones <lee.jones@linaro.org>  Thu, 16 Feb 2012 17:34:08 +0100
+
+  * Update to Linux 3.3
+  * Build Gator module and "Provides: gator-module, gator-module-in-tree"
+
+ -- Jon Medhurst (Tixy) <jon.medhurst@linaro.org>  Mon, 19 Mar 2012 09:57:00 +0000
