@@ -200,6 +200,9 @@ static pin_cfg_t snowball_pins[] = {
 	/* MMC0: MicroSD card */
 	GPIO21_MC0_DAT31DIR     | PIN_OUTPUT_HIGH,
 
+	/* USER PB pin */
+	GPIO32_GPIO             | PIN_INPUT_PULLUP,
+
 	/* MMC2: LAN */
 	GPIO86_SM_ADQ0,
 	GPIO87_SM_ADQ1,
@@ -527,6 +530,15 @@ static pin_cfg_t mop500_pins_common_power_save_bank1[] = {
 	GPIO36_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 };
 
+static pin_cfg_t mop500_pins_common_power_save_bank1_snowball[] = {
+	/*GPIO32 is used as USER_PB input in snowball*/
+	GPIO32_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_PDIS_ENABLED,
+	GPIO33_GPIO | PIN_SLPM_OUTPUT_LOW | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+	GPIO34_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+	GPIO35_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+	GPIO36_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+};
+
 static pin_cfg_t mop500_pins_common_power_save_bank2[] = {
 	GPIO64_GPIO | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO65_GPIO | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
@@ -678,7 +690,7 @@ static pin_cfg_t mop500_pins_common_power_save_bank4_snowball[] = {
 	GPIO138_MC2_DAT7 | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO139_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 
-	GPIO140_GPIO | PIN_SLPM_DIR_INPUT | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+	GPIO140_GPIO | PIN_SLPM_DIR_INPUT,
 	/* 141 - (RSTn_LAN) Keep this high to avoid smsc reset at suspend */
 	GPIO141_GPIO | PIN_SLPM_OUTPUT_HIGH | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
 	GPIO142_GPIO | PIN_SLPM_OUTPUT_LOW | PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
@@ -976,8 +988,12 @@ static void mop500_pins_suspend_force(void)
 		sleep_pins_config_pm(mop500_pins_common_power_save_bank0,
 			ARRAY_SIZE(mop500_pins_common_power_save_bank0));
 
-	sleep_pins_config_pm(mop500_pins_common_power_save_bank1,
-		ARRAY_SIZE(mop500_pins_common_power_save_bank1));
+	if (machine_is_snowball())
+		sleep_pins_config_pm(mop500_pins_common_power_save_bank1_snowball,
+			ARRAY_SIZE(mop500_pins_common_power_save_bank1_snowball));
+	else
+		sleep_pins_config_pm(mop500_pins_common_power_save_bank1,
+			ARRAY_SIZE(mop500_pins_common_power_save_bank1));
 
 	if (machine_is_hrefv60())
 		sleep_pins_config_pm(mop500_pins_common_power_save_bank2_href60,
@@ -1042,8 +1058,12 @@ static void mop500_pins_suspend_force_mux(void)
 	sleep_pins_config_pm_mux(mop500_pins_common_power_save_bank0,
 		ARRAY_SIZE(mop500_pins_common_power_save_bank0));
 
-	sleep_pins_config_pm_mux(mop500_pins_common_power_save_bank1,
-		ARRAY_SIZE(mop500_pins_common_power_save_bank1));
+	if (machine_is_snowball())
+		sleep_pins_config_pm_mux(mop500_pins_common_power_save_bank1_snowball,
+			ARRAY_SIZE(mop500_pins_common_power_save_bank1_snowball));
+	else
+		sleep_pins_config_pm_mux(mop500_pins_common_power_save_bank1,
+			ARRAY_SIZE(mop500_pins_common_power_save_bank1));
 
 	sleep_pins_config_pm_mux(mop500_pins_common_power_save_bank2,
 		ARRAY_SIZE(mop500_pins_common_power_save_bank2));
