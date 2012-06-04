@@ -1,6 +1,6 @@
 arch="armel"
-supported="%VENDOR% %UCFLAVOUR%"
-desc="%VENDOR% %UCFLAVOUR%-based systems"
+supported="STE UX500"
+desc="STE UX500-based systems"
 target="Targeted towards boards such as TBD"
 bootloader="flash-kernel"
 provides=""
